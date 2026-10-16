@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>字卡聊天</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #e9e9e9;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+    min-height: 100vh;
+  }
+  .app {
+    width: 100%;
+    max-width: 440px;
+    height: min(860px, calc(100vh - 32px));
+    height: min(860px, calc(100dvh - 32px));
+    background: #ededed;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,.18);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- 顶部 ---------- */
+  .topbar {
+    background: #f7f7f7;
+    border-bottom: 1px solid #dcdcdc;
+    padding: 8px 12px 0;
+    flex-shrink: 0;
+  }
+  .topbar .title {
+    text-align: center;
+    font-weight: 600;
+    font-size: 16px;
+    padding: 4px 0 8px;
+    color: #111;
+  }
+  .tabs { display: flex; gap: 6px; }
+  .tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 8px 0;
+    font-size: 14px;
+    color: #666;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .tab.active {
+    color: #07c160;
+    border-bottom-color: #07c160;
+    font-weight: 600;
+  }
+
+  /* ---------- 视图容器 ---------- */
+  .view { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .view.active { display: flex; }
+
+  /* ---------- 聊天 ---------- */
+  .chat { flex: 1; overflow-y: auto; padding: 12px; }
+  .msg {
+    display: flex;
+    margin-bottom: 12px;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .msg.user { flex-direction: row-reverse; }
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background: #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .msg.user .avatar { background: #07c160; }
+  .msg.bot .avatar { background: #576b95; }
+  .bubble {
+    max-width: 70%;
+    padding: 9px 12px;
+    border-radius: 6px;
+    background: #fff;
+    word-break: break-word;
+    line-height: 1.45;
+    font-size: 15px;
+    color: #111;
+  }
+  .msg.user .bubble { background: #95ec69; }
+
+  .footer {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    background: #f7f7f7;
+    border-top: 1px solid #dcdcdc;
+    flex-shrink: 0;
+  }
+  .footer input {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px;
+    outline: none;
+    font-size: 15px;
+    font-family: inherit;
+    background: #fff;
+  }
+  .footer input:focus { border-color: #07c160; }
+  .footer button {
+    border: none;
+    background: #07c160;
+    color: #fff;
+    border-radius: 6px;
+    padding: 0 16px;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .footer button:active { opacity: .85; }
+
+  /* ---------- 管理页 ---------- */
+  .manage-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .card-form {
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .form-row { margin-bottom: 10px; }
+  .form-row:last-child { margin-bottom: 0; }
+  .form-row.two { display: flex; gap: 10px; }
+  .form-row.two > div { flex: 1; }
+  .card-form label {
+    display: block;
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 4px;
+  }
+  .card-form input {
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 14px;
+    outline: none;
+    font-family: inherit;
+    background: #fafafa;
+  }
+  .card-form input:focus { border-color: #07c160; background: #fff; }
+
+  .form-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .card-form .form-actions button {
+    flex: 1;
+    border: none;
+    background: #07c160;
+    color: #fff;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .card-form .form-actions button.ghost {
+    background: #fff;
+    color: #444;
+    border: 1px solid #ddd;
+  }
+  .hidden { display: none !important; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 8px;
+  }
+  .stat { font-size: 12px; color: #888; }
+  .tools { display: flex; gap: 6px; }
+  .tools button {
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: #444;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .tools button.danger { color: #e64340; border-color: #f2c1c0; }
+
+  .card-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .card-main { flex: 1; min-width: 0; }
+  .card-text { font-size: 15px; color: #111; word-break: break-word; }
+  .card-meta {
+    margin-top: 5px;
+    font-size: 12px;
+    color: #999;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .pill {
+    background: #f1f1f1;
+    border-radius: 4px;
+    padding: 1px 6px;
+    line-height: 1.6;
+  }
+  .pill.weight { background: #e8f8ee; color: #07a050; }
+  .card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .card-actions button {
+    border: none;
+    background: #f2f2f2;
+    color: #444;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .card-actions button.del { color: #e64340; }
+  .empty {
+    text-align: center;
+    color: #aaa;
+    font-size: 13px;
+    padding: 30px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <div class="title">字卡聊天</div>
+    <nav class="tabs">
+      <button class="tab active" data-view="chat">聊天</button>
+      <button class="tab" data-view="manage">字卡管理</button>
+    </nav>
+  </header>
+
+  <!-- 聊天视图 -->
+  <section class="view active" id="view-chat">
+    <div class="chat" id="chat"></div>
+    <div class="footer">
+      <input id="input" placeholder="输入消息..." autocomplete="off" />
+      <button id="send">发送</button>
+    </div>
+  </section>
+
+  <!-- 管理视图 -->
+  <section class="view" id="view-manage">
+    <div class="manage-scroll" id="manageScroll">
+      <form class="card-form" id="cardForm">
+        <div class="form-row">
+          <label>内容</label>
+          <input id="fText" required placeholder="例如：你好呀" />
+        </div>
+        <div class="form-row two">
+          <div>
+            <label>分类</label>
+            <input id="fCategory" placeholder="问候" />
+          </div>
+          <div>
+            <label>权重</label>
+            <input id="fWeight" type="number" min="1" step="1" value="1" />
+          </div>
+        </div>
+        <div class="form-row">
+          <label>标签（逗号分隔，用于匹配用户输入）</label>
+          <input id="fTags" placeholder="你好, hi, 嗨" />
+        </div>
+        <div class="form-actions">
+          <button type="submit" id="submitBtn">添加</button>
+          <button type="button" id="cancelBtn" class="ghost hidden">取消编辑</button>
+        </div>
+      </form>
+
+      <div class="toolbar">
+        <div class="stat" id="stat">共 0 张卡</div>
+        <div class="tools">
+          <button id="exportBtn">导出</button>
+          <button id="importBtn">导入</button>
+          <button id="resetBtn" class="danger">重置</button>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept=".json,application/json" hidden />
+
+      <div class="card-list" id="cardList"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ==================== 数据层 ==================== */
+const STORAGE_KEY = 'flashcard_chat_v1';
+
+const DEFAULT_CARDS = [
+  { id: 'c1', text: '你好呀',      category: '问候', tags: ['你好', 'hi', '嗨', 'hello'], weight: 3 },
+  { id: 'c2', text: '在的，怎么啦', category: '问候', tags: ['在吗', '在不在'],           weight: 2 },
+  { id: 'c3', text: '哈哈',        category: '情绪', tags: ['好笑', '哈哈', '笑死'],       weight: 2 },
+  { id: 'c4', text: '今天天气不错', category: '闲聊', tags: ['天气'],                      weight: 1 },
+  { id: 'c5', text: '这个有意思',   category: '评价', tags: ['有趣', '好玩'],              weight: 1 },
+  { id: 'c6', text: '然后呢？',     category: '追问', tags: [],                            weight: 1 },
+  { id: 'c7', text: '嗯嗯',        category: '通用', tags: [],                            weight: 1 },
+  { id: 'c8', text: '我不太明白',   category: '通用', tags: [],                            weight: 1 }
+];
+
+let cards = [];
+let editingId = null;   // 当前正在编辑的卡 id
+let lastReplyId = null; // 上一次回复的卡 id（用于避免连续重复）
+
+function uid() {
+  return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function normalizeCard(raw) {
+  const w = Math.round(Number(raw.weight));
+  return {
+    id: raw.id || uid(),
+    text: String(raw.text ?? '').trim(),
+    category: String(raw.category ?? '').trim(),
+    tags: Array.isArray(raw.tags)
+      ? raw.tags.map(t => String(t).trim()).filter(Boolean)
+      : String(raw.tags ?? '').split(/[,，\s]+/).map(s => s.trim()).filter(Boolean),
+    weight: Number.isFinite(w) && w >= 1 ? w : 1
+  };
+}
+
+function loadCards() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length) return parsed.map(normalizeCard);
+    }
+  } catch (e) { console.warn('读取本地字卡失败', e); }
+  return DEFAULT_CARDS.map(normalizeCard);
+}
+
+function saveCards() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+  } catch (e) { console.warn('保存失败', e); }
+}
+
+/* ==================== 权重随机 ==================== */
+function weightedRandom(items) {
+  const total = items.reduce((sum, it) => sum + (it.weight || 1), 0);
+  if (total <= 0) return items[Math.floor(Math.random() * items.length)];
+  let r = Math.random() * total;
+  for (const it of items) {
+    r -= (it.weight || 1);
+    if (r < 0) return it;
+  }
+  return items[items.length - 1];
+}
+
+/**
+ * 选卡策略：
+ * 1. 用户输入命中某张卡的标签 → 只在这些卡里抽（关键词优先）
+ * 2. 没命中 → 全库抽
+ * 3. 用 weight 做加权随机
+ * 4. 尽量不和上一次回复重复
+ */
+function pickReply(userText) {
+  if (!cards.length) return null;
+
+  const q = userText.toLowerCase();
+  const matched = cards.filter(c =>
+    c.tags.some(tag => tag && q.includes(tag.toLowerCase()))
+  );
+  let pool = matched.length ? matched : cards;
+
+  if (pool.length > 1 && lastReplyId) {
+    const filtered = pool.filter(c => c.id !== lastReplyId);
+    if (filtered.length) pool = filtered;
+  }
+
+  const card = weightedRandom(pool);
+  lastReplyId = card.id;
+  return card;
+}
+
+/* ==================== 聊天视图 ==================== */
+const chatEl   = document.getElementById('chat');
+const inputEl  = document.getElementById('input');
+const sendBtn  = document.getElementById('send');
+
+function addMessage(text, role) {
+  const msg = document.createElement('div');
+  msg.className = 'msg ' + role;
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.textContent = role === 'user' ? '我' : '卡';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+
+  msg.appendChild(avatar);
+  msg.appendChild(bubble);
+  chatEl.appendChild(msg);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function send() {
+  const text = inputEl.value.trim();
+  if (!text) return;
+
+  addMessage(text, 'user');
+  inputEl.value = '';
+  inputEl.focus();
+
+  setTimeout(() => {
+    const card = pickReply(text);
+    addMessage(
+      card ? card.text : '（字卡库是空的，去「字卡管理」添加几张吧）',
+      'bot'
+    );
+  }, 400 + Math.random() * 500);
+}
+
+sendBtn.addEventListener('click', send);
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter') send();
+});
+
+/* ==================== 管理视图 ==================== */
+const cardForm    = document.getElementById('cardForm');
+const fText       = document.getElementById('fText');
+const fCategory   = document.getElementById('fCategory');
+const fTags       = document.getElementById('fTags');
+const fWeight     = document.getElementById('fWeight');
+const submitBtn   = document.getElementById('submitBtn');
+const cancelBtn   = document.getElementById('cancelBtn');
+const cardListEl  = document.getElementById('cardList');
+const statEl      = document.getElementById('stat');
+const manageScroll= document.getElementById('manageScroll');
+const fileInput   = document.getElementById('fileInput');
+
+function renderCards() {
+  statEl.textContent = `共 ${cards.length} 张卡`;
+  cardListEl.innerHTML = '';
+
+  if (!cards.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = '还没有字卡，先在上面添加一张吧';
+    cardListEl.appendChild(empty);
+    return;
+  }
+
+  cards.forEach(card => {
+    const item = document.createElement('div');
+    item.className = 'card-item';
+
+    const main = document.createElement('div');
+    main.className = 'card-main';
+
+    const textEl = document.createElement('div');
+    textEl.className = 'card-text';
+    textEl.textContent = card.text;
+    main.appendChild(textEl);
+
+    const meta = document.createElement('div');
+    meta.className = 'card-meta';
+
+    if (card.category) {
+      const p = document.createElement('span');
+      p.className = 'pill';
+      p.textContent = card.category;
+      meta.appendChild(p);
+    }
+    card.tags.forEach(t => {
+      const p = document.createElement('span');
+      p.className = 'pill';
+      p.textContent = '#' + t;
+      meta.appendChild(p);
+    });
+    const w = document.createElement('span');
+    w.className = 'pill weight';
+    w.textContent = '权重 ' + card.weight;
+    meta.appendChild(w);
+
+    main.appendChild(meta);
+    item.appendChild(main);
+
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '编辑';
+    editBtn.addEventListener('click', () => startEdit(card.id));
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'del';
+    delBtn.textContent = '删除';
+    delBtn.addEventListener('click', () => removeCard(card.id));
+
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+    item.appendChild(actions);
+
+    cardListEl.appendChild(item);
+  });
+}
+
+function resetForm() {
+  editingId = null;
+  fText.value = '';
+  fCategory.value = '';
+  fTags.value = '';
+  fWeight.value = 1;
+  submitBtn.textContent = '添加';
+  cancelBtn.classList.add('hidden');
+}
+
+function startEdit(id) {
+  const card = cards.find(c => c.id === id);
+  if (!card) return;
+
+  editingId = id;
+  fText.value = card.text;
+  fCategory.value = card.category;
+  fTags.value = card.tags.join(', ');
+  fWeight.value = card.weight;
+  submitBtn.textContent = '保存修改';
+  cancelBtn.classList.remove('hidden');
+
+  manageScroll.scrollTo({ top: 0, behavior: 'smooth' });
+  fText.focus();
+}
+
+function removeCard(id) {
+  const card = cards.find(c => c.id === id);
+  if (!card) return;
+  if (!confirm(`确定删除字卡「${card.text}」？`)) return;
+
+  cards = cards.filter(c => c.id !== id);
+  if (editingId === id) resetForm();
+  saveCards();
+  renderCards();
+}
+
+cardForm.addEventListener('submit', e => {
+  e.preventDefault();
+
+  const text = fText.value.trim();
+  if (!text) return;
+
+  const tags = fTags.value
+    .split(/[,，\s]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  const category = fCategory.value.trim();
+  const weight = Math.max(1, Math.round(Number(fWeight.value) || 1));
+
+  if (editingId) {
+    const card = cards.find(c => c.id === editingId);
+    if (card) Object.assign(card, { text, category, tags, weight });
+  } else {
+    cards.push({ id: uid(), text, category, tags, weight });
+  }
+
+  resetForm();
+  saveCards();
+  renderCards();
+});
+
+cancelBtn.addEventListener('click', resetForm);
+
+/* ---------- 导出 / 导入 / 重置 ---------- */
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(cards, null, 2)], {
+    type: 'application/json'
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cards-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('importBtn').addEventListener('click', () => {
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) return;
+
+  try {
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data)) throw new Error('文件内容不是数组');
+
+    const imported = data.map(normalizeCard).filter(c => c.text);
+    if (!imported.length) throw new Error('没有找到有效字卡');
+
+    const merged = cards.slice();
+    imported.forEach(c => {
+      const dup = merged.find(m => m.text === c.text && m.category === c.category);
+      if (dup) {
+        dup.weight = c.weight;
+        dup.tags = Array.from(new Set([...dup.tags, ...c.tags]));
+      } else {
+        merged.push({ ...c, id: uid() });
+      }
+    });
+
+    cards = merged;
+    saveCards();
+    renderCards();
+    alert(`导入完成：新增/合并 ${imported.length} 张，当前共 ${cards.length} 张`);
+  } catch (err) {
+    alert('导入失败：' + err.message);
+  } finally {
+    fileInput.value = '';
+  }
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('恢复为默认字卡？当前所有字卡会被替换，此操作不可撤销。')) return;
+  cards = DEFAULT_CARDS.map(normalizeCard);
+  lastReplyId = null;
+  resetForm();
+  saveCards();
+  renderCards();
+});
+
+/* ==================== 标签页切换 ==================== */
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(btn => {
+  btn.addEventListener('click', () => {
+    tabs.forEach(b => b.classList.toggle('active', b === btn));
+    const view = btn.dataset.view;
+    document.getElementById('view-chat').classList.toggle('active', view === 'chat');
+    document.getElementById('view-manage').classList.toggle('active', view === 'manage');
+    if (view === 'manage') renderCards();
+    if (view === 'chat') chatEl.scrollTop = chatEl.scrollHeight;
+  });
+});
+
+/* ==================== 初始化 ==================== */
+cards = loadCards();
+renderCards();
+addMessage('你好，我是字卡机器人。随便说点什么吧～', 'bot');
+</script>
+</body>
+</html>
