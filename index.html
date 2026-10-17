@@ -15,7 +15,7 @@
   --bubble-me:#95EC69; --bubble-bot:#FFFFFF;
   --text:#191919; --text2:#8A8A8A; --text3:#BFBFBF;
   --line:#E7E7E7; --danger:#FA5151; --like:#FA5151;
-  --input-bg:var(--input-bg); --sheet-bg:var(--sheet-bg); --hover:var(--hover); --track:var(--track); --frame:#E4E4E8;
+  --input-bg:#F1F2F5; --sheet-bg:#F7F8FA; --hover:#F1F3F7; --track:#E5E8EE; --frame:#E4E4E8;
   --nav-h:48px; --tab-h:56px;
   --radius:12px;
   --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC","Segoe UI",Roboto,sans-serif;
@@ -545,6 +545,193 @@ body[data-theme="dark"] #view-nowplaying{background:linear-gradient(180deg,#2a24
   padding:7px 14px;font-size:12.5px;color:var(--text)}
 .jam-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
 .jam-pill.off .dot{background:var(--text3)}
+
+/* ============================================================
+   黎宸视觉改版 · 星夜雾蓝 / 柔和玻璃感
+   仅覆盖视觉样式，保留原有交互与功能逻辑
+   ============================================================ */
+:root{
+  --bg:#edf0f8;
+  --page:#f7f8fc;
+  --card:#ffffff;
+  --green:#6579d8;
+  --green-d:#5267c4;
+  --bubble-me:#dce4ff;
+  --bubble-bot:#ffffff;
+  --text:#252b43;
+  --text2:#858ba3;
+  --text3:#b0b5c8;
+  --line:#e8eaf3;
+  --danger:#e66d82;
+  --like:#e66d82;
+  --input-bg:#f0f2f9;
+  --sheet-bg:#f8f9fd;
+  --hover:#f0f2fb;
+  --track:#e4e8f5;
+  --frame:#dfe3ef;
+  --radius:16px;
+}
+body{
+  background:
+    radial-gradient(ellipse at 15% 8%,rgba(144,158,232,.24),transparent 34%),
+    radial-gradient(ellipse at 88% 90%,rgba(231,190,211,.22),transparent 32%),
+    #e6e9f3;
+  letter-spacing:.05px;
+}
+#app{
+  background:var(--page);
+  box-shadow:0 24px 80px rgba(49,57,98,.13);
+}
+@media (min-width:560px){
+  #app{border:1px solid rgba(255,255,255,.8);border-radius:30px;overflow:hidden}
+}
+.nav{
+  background:rgba(255,255,255,.92);
+  backdrop-filter:blur(18px);
+  border-bottom-color:rgba(225,229,242,.8);
+}
+.nav h1,.nav .nav-title-left{letter-spacing:.3px}
+.icon-btn{border-radius:12px;color:#5e6684}
+.icon-btn:active{background:#edf0fb}
+.tabbar{
+  background:rgba(255,255,255,.94);
+  backdrop-filter:blur(18px);
+  border-top-color:#e8eaf4;
+}
+.tab{font-weight:500;transition:color .18s}
+.tab.on{color:var(--green)}
+.tab.on svg{filter:drop-shadow(0 2px 5px rgba(101,121,216,.22))}
+.cell{
+  border-bottom-color:#eff0f6;
+  transition:background .18s,transform .18s;
+}
+.cell:active{background:#f2f4fc}
+.avatar{border-radius:13px;box-shadow:0 3px 9px rgba(40,49,87,.08)}
+.cell-title{letter-spacing:.05px}
+.cell-sub,.preview{line-height:1.55}
+.btn-primary,.head-btn,.emoji-import-btn{
+  background:linear-gradient(135deg,#8292e8,#6277d9);
+  box-shadow:0 5px 14px rgba(101,121,216,.2);
+}
+.btn-primary:active,.head-btn:active,.emoji-import-btn:active{background:#5267c4}
+.empty-icon{border-radius:24px;background:linear-gradient(145deg,#edf0ff,#f9eaf2)}
+.chat-body{
+  background:
+    radial-gradient(ellipse at 0% 0%,rgba(184,195,245,.22),transparent 45%),
+    linear-gradient(180deg,#edf0f8 0%,#f1f2f8 100%);
+}
+.msg{margin:8px 0;padding:0 13px}
+.msg .avatar{border-radius:12px;box-shadow:0 3px 8px rgba(40,49,87,.08)}
+.bubble{
+  padding:10px 13px;
+  border-radius:15px;
+  line-height:1.62;
+  box-shadow:0 3px 10px rgba(49,57,98,.045);
+}
+.msg.bot .bubble{
+  border-top-left-radius:5px;
+  background:rgba(255,255,255,.96);
+}
+.msg.me .bubble{
+  border-top-right-radius:5px;
+  background:linear-gradient(135deg,#e3e8ff,#d7e1ff);
+  color:#30395f;
+}
+.msg-day{
+  color:#9ca3bc;
+  background:rgba(255,255,255,.56);
+  border-radius:20px;
+  padding:4px 10px;
+  align-self:center;
+}
+.chat-input{
+  background:rgba(255,255,255,.96);
+  backdrop-filter:blur(16px);
+  border-top-color:#e8eaf4;
+  padding-top:10px;
+}
+.chat-input input{
+  background:#f0f2fa;
+  border:1px solid #e9ecf6;
+  border-radius:13px;
+}
+.send-btn{
+  border-radius:13px;
+  background:linear-gradient(135deg,#8292e8,#6277d9);
+  box-shadow:0 4px 10px rgba(101,121,216,.2);
+}
+.send-btn:active{background:#5267c4}
+.card-chip,.import-box,.song-list,.pl-card,.emoji-card,.theme-item{
+  border-radius:16px;
+}
+.card-chip{
+  padding:12px 10px 12px 15px;
+  border:1px solid rgba(230,233,245,.85);
+  box-shadow:0 4px 12px rgba(45,53,91,.035);
+}
+.card-chip.sel{box-shadow:0 0 0 2px var(--green),0 6px 16px rgba(101,121,216,.12)}
+.card-groups{padding-top:12px;padding-bottom:8px}
+.cg{border-radius:20px;padding:7px 13px;background:#fff}
+.cg.on{background:linear-gradient(135deg,#8292e8,#6277d9);box-shadow:0 4px 12px rgba(101,121,216,.18)}
+.batch-bar{background:rgba(255,255,255,.97);backdrop-filter:blur(12px)}
+.batch-bar .bb{border-radius:12px}
+.me-head{
+  background:radial-gradient(circle at 88% 8%,rgba(255,255,255,.22),transparent 34%),
+             linear-gradient(135deg,#5369c7 0%,#7889df 56%,#9a91d9 100%);
+  padding-top:30px;padding-bottom:28px;
+}
+.me-avatar{border-radius:18px;box-shadow:0 8px 22px rgba(34,42,93,.22);border:2px solid rgba(255,255,255,.55)}
+.me-stats .st b{color:#343b60}
+.menu-list,.set-group,.cd-set-group{
+  border:1px solid #eceef6;
+  border-radius:15px;
+  overflow:hidden;
+  box-shadow:0 4px 14px rgba(45,53,91,.025);
+}
+.menu-list{margin:12px 12px 0}
+.set-group{margin:10px 12px 0}
+.set-title{padding-left:18px;color:#999fba}
+.set-row{padding:14px 16px}
+.stepper button{border-radius:10px;background:#edf0fa;color:#5365b4}
+.set-row input[type=number],.set-row input[type=text],.m-field input,.m-field textarea,.ev-form input{
+  background:#f1f3fa;border:1px solid #e9ecf5;border-radius:11px;
+}
+.btn-danger-ghost{border-radius:13px;background:#fff;border-color:#f6dfe5}
+.import-box{box-shadow:0 6px 18px rgba(45,53,91,.045);border:1px solid #eceef6}
+.import-row input{border:1px solid #e9ecf5;border-radius:11px}
+.pl-card{
+  background:radial-gradient(circle at 95% 5%,rgba(255,255,255,.22),transparent 32%),
+             linear-gradient(135deg,#596bc6,#777bd5 60%,#9b83ce);
+  box-shadow:0 10px 25px rgba(92,105,199,.23);
+}
+.pl-cover{border-radius:13px}
+.song-list{border:1px solid #eceef6;box-shadow:0 5px 16px rgba(45,53,91,.04)}
+.song-row{padding-top:13px;padding-bottom:13px}
+.song-row.on .song-name{color:#6277d9}
+.player{background:linear-gradient(125deg,#272b45,#393653 70%,#51415f)}
+.progress .fill{background:#91a0ff}
+.ctl.play-main,.npc.big{background:linear-gradient(135deg,#8797f0,#6378dc);box-shadow:0 6px 18px rgba(101,121,216,.32)}
+.ctl.play-main:active,.npc.big:active{background:#5267c4}
+.mini-player{background:linear-gradient(120deg,#272b45,#393653 70%,#51415f);box-shadow:0 12px 30px rgba(31,35,65,.26)}
+.mini-fill{background:#91a0ff}
+#view-nowplaying{background:radial-gradient(ellipse at 50% 12%,#e4e6fb 0%,#f5f5fb 48%,#f7f8fc 100%)}
+.np-disc::before{box-shadow:0 0 0 7px rgba(97,111,190,.10),0 18px 42px rgba(48,56,105,.23)}
+.np-disc .np-cover{border-color:rgba(255,255,255,.94)}
+.np-jam .jam-pill{border:1px solid rgba(222,226,242,.8)}
+.theme-item{box-shadow:0 3px 10px rgba(45,53,91,.025)}
+.theme-item.on{box-shadow:0 5px 14px rgba(101,121,216,.12)}
+.overlay,.modal{backdrop-filter:blur(5px)}
+.dlg-card,.modal-card{border-radius:20px;box-shadow:0 18px 55px rgba(31,37,70,.16)}
+.dlg-btns .btn,.m-btns .btn{border-radius:12px}
+.sheet{border-radius:22px 22px 0 0;box-shadow:0 -12px 40px rgba(30,35,65,.12)}
+.sheet .sh-item,.sheet .sh-cancel{padding:16px}
+#toast{border-radius:14px;box-shadow:0 8px 26px rgba(20,25,50,.18)}
+.moment-item{border-bottom-color:#edf0f8}
+.moment-comments{background:#f0f2fa;border-radius:10px}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
+}
+
 </style>
 </head>
 <body data-theme="default">
