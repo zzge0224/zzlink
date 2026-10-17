@@ -112,6 +112,11 @@ body{font-family:"Noto Sans SC",-apple-system,"PingFang SC","Microsoft YaHei",sy
 .m-import-btn button{flex:1;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:600;cursor:pointer}
 .m-do{background:linear-gradient(135deg,var(--green),var(--green-deep));color:#fff}
 .m-clear{border:1px solid var(--line);background:#fff;color:var(--ink-soft)}
+.m-vip-line{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+.vip-toggle{border:1px solid var(--line);background:#fff;color:var(--ink-soft);font-size:13px;padding:7px 14px;border-radius:999px;cursor:pointer;transition:.15s;flex:0 0 auto}
+.vip-toggle.on{background:linear-gradient(135deg,var(--green),var(--green-deep));border-color:var(--green);color:#fff;font-weight:600}
+.m-vhint{font-size:11px;color:var(--ink-faint);flex:1;min-width:150px}
+.track-vip{font-size:9px;color:#c2620f;background:#ffe6cc;padding:1px 6px;border-radius:6px;margin-left:7px;vertical-align:1px}
 .queue{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:12px}
 .q-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
 .q-head h3{font-size:14px;font-weight:600}
@@ -240,7 +245,7 @@ const SEED_PARTNERS = [
   {id:"happy",name:"快乐搭子",sub:"整天哈哈哈的损友",c1:"#7cc0ff",c2:"#3f8fe0",cards:{"打招呼":["嗨嗨嗨！来啦来啦","哟，终于想起我了？","大驾光临，有失远迎","来了来了，聊起来！"],"接话":["哈哈哈哈笑死我了","真的假的，这也太逗了","我笑到隔壁来敲门","懂你，接着唠！","你这是要笑飞我"],"整活":["今天要不要整点活？","赌一个，你能说赢我","打赌输了请奶茶","给你比个大拇指"]}},
   {id:"tender",name:"温柔知己",sub:"轻声细语的暖心人",c1:"#f3a6c0",c2:"#e069a0",cards:{"问候":["你今天好吗？想听听你的近况","忙一天了吧，先歇会儿","我一直都在，随时找我","想你了，就来说句话吧"],"关心":["累的时候就多休息，别硬撑","记得按时吃饭，照顾好自己","你做的已经很好了","在我这里，你可以不用逞强"],"晚安":["夜深了，早点睡","愿你有个好梦，晚安","明天也会顺利的","我在这儿陪你说到睡"]}}
 ];
-const DEFAULT_SETTINGS = {delayMin:1,delayMax:3,countMin:1,countMax:1,userName:"我",myC1:"#f0a97a",myC2:"#e47a5a",userBio:"这是我能帮你查到任何东西的地方"};
+const DEFAULT_SETTINGS = {delayMin:1,delayMax:3,countMin:1,countMax:1,userName:"我",myC1:"#f0a97a",myC2:"#e47a5a",userBio:"这是我能帮你查到任何东西的地方",excludeVip:false};
 
 let partners,settings,onCatsMap,histories,activeId;
 function load(){ try{ const s=JSON.parse(localStorage.getItem(LS_KEY)); if(s&&s.partners){ partners=s.partners; settings=Object.assign({},DEFAULT_SETTINGS,s.settings); onCatsMap=s.onCatsMap||{}; histories=s.histories||{}; activeId=s.activeId||partners[0].id; return; } }catch(e){} partners=JSON.parse(JSON.stringify(SEED_PARTNERS)); settings=Object.assign({},DEFAULT_SETTINGS); onCatsMap={};histories={};activeId=partners[0].id; }
@@ -421,13 +426,23 @@ function musicReset(){try{audio&&audio.pause()}catch(e){}playlist=[];plIndex=-1}
 function fmtTime(s){if(!isFinite(s)||s<=0)return "0:00";s=Math.round(s);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")}
 function playSrc(id){return "https://music.163.com/song/media/outer/url?id="+id+".mp3"}
 async function fetchVia(url){const prox=["https://corsproxy.io/?url=","https://api.allorigins.win/raw?url="];for(const p of prox){try{const r=await fetch(p+encodeURIComponent(url));if(r.ok){const t=await r.text();return JSON.parse(t)}}catch(e){}}throw new Error("api-unreachable")}
-function addSong(id){if(playlist.find(t=>t.id===id)){toast("已在歌单中");return}playlist.push({id,title:"歌曲 #"+id,artist:"正在获取…",dur:0});renderMusic();toast("已加入歌曲 #"+id);
-  fetchVia("https://music.163.com/api/v3/song/detail?id="+id+"&ids=["+id+"]").then(d=>{const s=d.songs&&d.songs[0];if(!s)return;const t=playlist.find(x=>x.id===id);if(!t)return;t.title=s.name;t.artist=(s.ar||[]).map(a=>a.name).join(" / ");t.dur=Math.round((s.dt||0)/1000);renderMusic()}).catch(()=>{})
+function isVipSong(s){return s.fee>0||(s.privilege&&s.privilege.st>0)}
+function addSong(id){if(playlist.find(t=>t.id===id)){toast("已在歌单中");return}playlist.push({id,title:"歌曲 #"+id,artist:"正在获取…",dur:0,vip:false});renderMusic();toast("已加入歌曲 #"+id);
+  fetchVia("https://music.163.com/api/v3/song/detail?id="+id+"&ids=["+id+"]").then(d=>{const s=d.songs&&d.songs[0];if(!s)return;const t=playlist.find(x=>x.id===id);if(!t)return;t.title=s.name;t.artist=(s.ar||[]).map(a=>a.name).join(" / ");t.dur=Math.round((s.dt||0)/1000);t.vip=isVipSong(s);if(settings.excludeVip&&t.vip){const i=playlist.indexOf(t);playlist.splice(i,1);toast("已跳过VIP歌曲："+t.title)}renderMusic()}).catch(()=>{})
 }
 async function resolvePlaylist(id){
   toast("正在读取歌单…");
-  try{const d=await fetchVia("https://music.163.com/api/v6/playlist/detail?id="+id+"&n=500");const tr=d.playlist&&d.playlist.trackIds?d.playlist.tracks:[];let added=0;(tr||[]).slice(0,200).forEach(t=>{if(!playlist.find(x=>x.id===t.id)){playlist.push({id:t.id,title:t.name||"歌曲 #"+t.id,artist:(t.ar||[]).map(a=>a.name).join(" / "),dur:t.dt?Math.round(t.dt/1000):0});added++}});renderMusic();toast(added>0?"已导入歌单 "+added+" 首":"歌单为空或读取失败");}
-  catch(e){toast("歌单读取失败：需可访问的接口（当前网络环境受限），可改用手动添加歌曲");}
+  try{
+    const d=await fetchVia("https://music.163.com/api/v6/playlist/detail?id="+id+"&n=1000");
+    const ids=((d.playlist&&d.playlist.trackIds)||[]).map(t=>t.id);
+    if(!ids.length)throw new Error("empty");
+    const meta=await fetchVia("https://music.163.com/api/v3/song/detail?ids="+encodeURIComponent("["+ids.slice(0,1000).join(",")+"]"));
+    const songs=(meta.songs)||[];let added=0,skipped=0;
+    songs.forEach(s=>{if(playlist.find(x=>x.id===s.id))return;const vip=isVipSong(s);if(settings.excludeVip&&vip){skipped++;return}playlist.push({id:s.id,title:s.name||"歌曲 #"+s.id,artist:(s.ar||[]).map(a=>a.name).join(" / "),dur:Math.round((s.dt||0)/1000),vip});added++});
+    renderMusic();
+    toast(added>0?("已导入歌单 "+added+" 首"+(skipped>0?("，跳过VIP "+skipped+" 首"):"")):"歌单为空或读取失败");
+  }
+  catch(e){toast("歌单读取失败：需可访问的接口（当前网络环境受限），可改用手动添加歌曲")}
 }
 function parseLink(l){
   const pl=l.match(/(?:playlist\?id=|playlist\/|#\/playlist\?id=)(\d+)/);
@@ -446,15 +461,20 @@ function prevTrack(){if(!playlist.length)return;const ni=plIndex<0?0:(plIndex-1+
 
 function renderMusic(){
   const el=document.getElementById("music");
-  const importHtml='<div class="m-import"><textarea id="mInput" rows="3" placeholder="粘贴网易云歌曲或歌单链接，每行一个…"></textarea><div class="m-hint">支持：音乐链接 music.163.com/song?id=… / 歌单链接 music.163.com/playlist?id=… / 纯歌曲ID（含直接数字）</div><div class="m-import-btn"><button class="m-do" id="mImport">导入</button><button class="m-clear" id="mClear">清空歌单</button></div></div>';
+  const importHtml='<div class="m-import"><textarea id="mInput" rows="3" placeholder="粘贴网易云歌曲或歌单链接，每行一个…"></textarea><div class="m-hint">支持：音乐链接 music.163.com/song?id=… / 歌单链接 music.163.com/playlist?id=… / 纯歌曲ID</div><div class="m-import-btn"><button class="m-do" id="mImport">导入</button><button class="m-clear" id="mClear">清空歌单</button></div><div class="m-vip-line"><button class="vip-toggle'+(settings.excludeVip?" on":"")+'" id="vipToggle">去除VIP歌曲</button><span class="m-vhint">'+(settings.excludeVip?"已开启：导入时自动跳过VIP/付费歌曲":"已关闭：保留所有歌曲（VIP歌曲仅能试听约30秒）")+'</span></div></div>';
   const qhead='<div class="q-head"><h3>播放列表（'+playlist.length+'）</h3><div class="q-modes"><button class="'+(plMode==="sequential"?"on":"")+'" data-m="sequential">顺序</button><button class="'+(plMode==="random"?"on":"")+'" data-m="random">随机</button><button class="'+(plMode==="single"?"on":"")+'" data-m="single">单曲</button></div></div>';
   let q='';
   if(!playlist.length){q='<div class="empty" style="height:120px"><div class="big">歌单还是空的。粘贴一首网易云歌曲或歌单链接试试。</div></div>'}else{
-    playlist.forEach((t,i)=>{q+='<div class="track'+(i===plIndex?" cur":"")+'" data-i="'+i+'"><span class="track-num">'+(i+1)+'</span><div class="track-info"><div class="track-title">'+esc(t.title)+'</div><div class="track-artist">'+esc(t.artist)+'</div></div><span class="track-dur">'+fmtTime(t.dur)+'</span><button class="track-del" data-del="'+i+'" aria-label="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'});
+    playlist.forEach((t,i)=>{q+='<div class="track'+(i===plIndex?" cur":"")+'" data-i="'+i+'"><span class="track-num">'+(i+1)+'</span><div class="track-info"><div class="track-title">'+esc(t.title)+(t.vip?'<span class="track-vip">VIP</span>':'')+'</div><div class="track-artist">'+esc(t.artist)+'</div></div><span class="track-dur">'+fmtTime(t.dur)+'</span><button class="track-del" data-del="'+i+'" aria-label="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'});
   }
   el.innerHTML=importHtml+'<div class="queue">'+qhead+q+'</div>';
   el.querySelector("#mImport").addEventListener("click",()=>{const v=document.getElementById("mInput").value;document.getElementById("mInput").value="";importLinks(v)});
   el.querySelector("#mClear").addEventListener("click",()=>{musicReset();renderMusic()});
+  const vt=el.querySelector("#vipToggle");if(vt)vt.addEventListener("click",()=>{
+    settings.excludeVip=!settings.excludeVip;save();
+    if(settings.excludeVip){const removed=playlist.filter(t=>t.vip).length;playlist=playlist.filter(t=>!t.vip);if(removed)toast("已移除 "+removed+" 首VIP歌曲");}
+    renderMusic();
+  });
   el.querySelectorAll(".q-modes button").forEach(b=>b.addEventListener("click",()=>{plMode=b.dataset.m;renderMusic()}));
   el.querySelectorAll(".track").forEach(r=>r.addEventListener("click",e=>{if(e.target.closest(".track-del"))return;playIndex(parseInt(r.dataset.i))}));
   el.querySelectorAll(".track-del").forEach(b=>b.addEventListener("click",()=>{const i=parseInt(b.dataset.del);playlist.splice(i,1);if(plIndex>=playlist.length)plIndex=playlist.length-1;if(plIndex===i)audio&&audio.pause();renderMusic()}));
