@@ -732,6 +732,43 @@ body{
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
 }
 
+
+/* ===== 星夜增强：可拖拽迷你播放器、音乐排版、壁纸与互动消息 ===== */
+.mini-player{left:auto;right:14px;bottom:90px;width:min(360px,calc(100% - 28px));touch-action:none;user-select:none;transition:box-shadow .2s,opacity .2s;cursor:grab}
+.mini-player.dragging{cursor:grabbing;box-shadow:0 18px 42px rgba(31,35,65,.36);opacity:.96}
+.mini-player.compact{width:68px;height:68px;padding:8px;border-radius:22px;gap:0;justify-content:center}
+.mini-player.compact .mini-cover{width:50px;height:50px;border-radius:15px}
+.mini-player.compact .mini-info,.mini-player.compact #miniNext,.mini-player.compact #miniClose{display:none}
+.mini-player.compact #miniToggle{position:absolute;right:-5px;bottom:-5px;width:27px;height:27px;background:#697ddd;border:2px solid #fff}
+.mini-player .mini-resize{position:absolute;left:-7px;top:-7px;width:24px;height:24px;border-radius:50%;background:#fff;color:#5969bd;box-shadow:0 2px 8px #0002;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:2}
+.music-hero{margin:10px 12px 0;padding:15px;border-radius:18px;background:linear-gradient(135deg,#edf0ff,#f9edf5);border:1px solid #fff;display:flex;align-items:center;gap:12px}
+.music-hero .hero-icon{width:44px;height:44px;border-radius:15px;background:linear-gradient(135deg,#8797f0,#bd9bd8);color:white;display:grid;place-items:center;font-size:21px;box-shadow:0 7px 16px #8797f044}
+.music-hero strong{font-size:14px;color:#38416a}.music-hero p{font-size:11px;color:#9097b2;margin-top:4px;line-height:1.5}
+#view-music .body{overflow-y:auto!important;padding-bottom:calc(var(--tab-h) + 16px)!important}
+#view-music .import-box{margin-top:12px;margin-bottom:12px}
+#view-music .pl-card{margin-bottom:12px;min-height:90px}
+#view-music .song-list{flex:initial;min-height:120px;margin-bottom:14px}
+#view-music .player{margin:0 12px 14px;border-radius:18px;padding:14px 16px 16px}
+#view-music .controls{gap:2px}.ctl.mode{padding:0 7px}.ctl{width:34px;height:36px}
+#view-nowplaying .np-body{padding-top:8px}
+#view-nowplaying .np-disc{width:min(62vw,248px);height:min(62vw,248px);margin:14px auto 22px}
+#view-nowplaying .np-lyric{margin-top:14px}
+.chat-body{background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important}
+.chat-tool-btn{height:38px;min-width:36px;padding:0 9px;border-radius:12px;background:#f0f2fa;color:#6874b2;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.msg.system-msg{justify-content:center;margin:10px 0}.system-msg .bubble{max-width:86%;background:rgba(100,110,145,.12)!important;box-shadow:none;color:#77809a;font-size:12px;text-align:center;padding:6px 12px;border-radius:12px}
+.msg .bubble.money-bubble{min-width:210px;max-width:250px;padding:0;border-radius:12px;overflow:hidden;color:#fff;cursor:pointer;box-shadow:0 4px 14px #0001}
+.money-top{padding:14px 14px 12px;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#f6a65c,#e9754b)}
+.money-bubble.redpacket .money-top{background:linear-gradient(135deg,#f5a45d,#e66a4e)}
+.money-bubble.transfer .money-top{background:linear-gradient(135deg,#e7a75a,#d98c43)}
+.money-icon{font-size:28px}.money-title{font-size:15px;font-weight:650}.money-sub{font-size:11px;opacity:.85;margin-top:3px}
+.money-foot{background:#fff;color:#a3a3a3;font-size:10px;padding:7px 12px}
+body[data-theme="dark"] .money-foot{background:#3a3a3c;color:#bbb}
+.wallpaper-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}
+.wallpaper-item{aspect-ratio:3/4;border-radius:10px;overflow:hidden;position:relative;border:2px solid transparent;background:#eee}
+.wallpaper-item img{width:100%;height:100%;object-fit:cover}.wallpaper-item.selected{border-color:var(--green);box-shadow:0 0 0 2px #fff inset}
+.wallpaper-item button{position:absolute;right:4px;top:4px;width:23px;height:23px;border-radius:50%;background:#0009;color:#fff}
+@media(max-width:380px){.mini-player{width:calc(100% - 24px);right:12px}.music-hero{margin-left:10px;margin-right:10px}}
+
 </style>
 </head>
 <body data-theme="default">
@@ -2981,6 +3018,77 @@ function init(){
   route();
 }
 init();
+</script>
+<script>
+
+/* 星夜增强交互 */
+(function(){
+  const $x = s => document.querySelector(s);
+  const app = $x('#app');
+  // 拖拽/缩小迷你播放器；位置和形态保存在本机
+  const mini=$x('#miniPlayer');
+  if(mini){
+    const saved=(()=>{try{return JSON.parse(localStorage.getItem('wc_mini_layout')||'{}')}catch(e){return {}}})();
+    if(saved.compact) mini.classList.add('compact');
+    if(saved.left!=null){mini.style.left=saved.left+'px';mini.style.top=saved.top+'px';mini.style.right='auto';mini.style.bottom='auto'}
+    const resize=document.createElement('button');resize.className='mini-resize';resize.type='button';resize.title='缩小 / 还原';resize.textContent='↙';mini.appendChild(resize);
+    resize.addEventListener('click',e=>{e.stopPropagation();mini.classList.toggle('compact');resize.textContent=mini.classList.contains('compact')?'↗':'↙';saveMini()});
+    let drag=null;
+    mini.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;drag={x:e.clientX,y:e.clientY,left:mini.offsetLeft,top:mini.offsetTop,moved:false};mini.setPointerCapture?.(e.pointerId);mini.classList.add('dragging')});
+    mini.addEventListener('pointermove',e=>{if(!drag)return;let dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;if(!drag.moved)return;let w=mini.offsetWidth,h=mini.offsetHeight,rect=app.getBoundingClientRect();mini.style.left=Math.max(0,Math.min(rect.width-w,drag.left+dx))+'px';mini.style.top=Math.max(0,Math.min(rect.height-h,drag.top+dy))+'px';mini.style.right='auto';mini.style.bottom='auto'});
+    mini.addEventListener('pointerup',()=>{if(drag&&drag.moved)saveMini();drag=null;mini.classList.remove('dragging')});
+    function saveMini(){const r=mini.getBoundingClientRect(),a=app.getBoundingClientRect();localStorage.setItem('wc_mini_layout',JSON.stringify({left:Math.round(r.left-a.left),top:Math.round(r.top-a.top),compact:mini.classList.contains('compact')}))}
+    // 内部点击控件照常触发，拖动后不误开播放页
+    mini.addEventListener('click',e=>{if(e.target.closest('button'))return;if(drag&&drag.moved)e.stopImmediatePropagation()},true);
+  }
+  // 音乐页增加轻量视觉导语，让导入、歌单、歌曲列表层次更清楚
+  const oldRenderMusic=window.renderMusic;
+  if(typeof oldRenderMusic==='function'){
+    window.renderMusic=function(){oldRenderMusic();const body=$x('#musicBody');if(body&&!body.querySelector('.music-hero')){const hero=document.createElement('div');hero.className='music-hero';hero.innerHTML='<div class="hero-icon">♫</div><div><strong>把喜欢的旋律放在一起</strong><p>导入歌单 · 收藏心动 · 和联系人一起听</p></div>';const importBox=body.querySelector('.import-box');if(importBox)importBox.after(hero);else body.prepend(hero)}};
+  }
+  // 将消息类型绘制成微信风格的系统提示/红包/转账卡片
+  const oldMsgHtml=window.msgHtml;
+  window.msgHtml=function(c,m){
+    if(m.type==='poke') return '<div class="msg system-msg"><div class="bubble">'+esc(m.text||'拍了拍对方')+'</div></div>';
+    if(m.type==='redpacket'||m.type==='transfer'){
+      const sent=m.role==='me',title=m.type==='redpacket'?(m.claimed?'已领取红包':'恭喜发财，大吉大利'):(m.accepted?'已收款':'转账给'+esc(sent?c.name:'我'));
+      return '<div class="msg '+(sent?'me':'bot')+'" data-mid="'+esc(m.id)+'">'+(sent?'':avatarHtml(c,38))+'<div class="bubble money-bubble '+m.type+'" data-money-id="'+esc(m.id)+'"><div class="money-top"><span class="money-icon">'+(m.type==='redpacket'?'🧧':'💴')+'</span><div><div class="money-title">'+title+'</div><div class="money-sub">'+(m.type==='redpacket'?(m.note?esc(m.note):'心意红包'):(m.note?esc(m.note):'转账'))+' · ¥'+Number(m.amount||0).toFixed(2)+'</div></div></div><div class="money-foot">'+(m.type==='redpacket'?'微信红包':'微信转账')+'</div></div>'+(sent?avatarHtml(state.profile,38):'')+'</div>';
+    }
+    return oldMsgHtml(c,m);
+  };
+  // 壁纸库、拍一拍内容设置、红包与转账入口
+  const oldRenderContactDetail=window.renderContactDetail;
+  if(typeof oldRenderContactDetail==='function')window.renderContactDetail=function(){oldRenderContactDetail();const detail=$x('#view-contact-detail');if(!detail)return;const groups=detail.querySelectorAll('.cd-set-group');const last=groups[0];if(last&&!last.querySelector('[data-action="manage-wallpapers"]')){const row=document.createElement('div');row.className='set-row';row.dataset.action='manage-wallpapers';row.innerHTML='<span class="lbl">聊天壁纸库<small>上传多张壁纸并选择当前背景</small></span><span class="cell-arrow">›</span>';last.appendChild(row);const poke=document.createElement('div');poke.className='set-row';poke.dataset.action='edit-poke-text';poke.innerHTML='<span class="lbl">拍一拍设置<small>分别设置我和 TA 的拍一拍内容</small></span><span class="cell-arrow">›</span>';last.appendChild(poke)}};
+  const chatInput=$x('.chat-input');
+  if(chatInput&&$x('#view-chat')&&!$x('#chatMoreBtn')){const b=document.createElement('button');b.id='chatMoreBtn';b.className='chat-tool-btn';b.type='button';b.title='红包、转账、拍一拍';b.textContent='＋';$x('#emojiBtn').after(b);b.addEventListener('click',()=>openSheet({title:'聊天互动',items:[{label:'拍一拍 TA',fn:()=>sendPoke('me')},{label:'发送红包',fn:()=>sendMoney('redpacket')},{label:'转账',fn:()=>sendMoney('transfer')}]}))}
+  ACTIONS['manage-wallpapers']=function(){
+    const c=getContact(currentRoute.param); if(!c)return; c.chatWallpapers=c.chatWallpapers||[];
+    const root=$x('#modalRoot');
+    const draw=()=>{
+      root.innerHTML='<div class="modal-card"><h2>聊天壁纸库</h2><div style="font-size:12px;color:var(--text2);line-height:1.6">上传多张图片，点选缩略图即可应用。图片仅保存在当前浏览器。</div><div class="wallpaper-grid">'+c.chatWallpapers.map((w,i)=>'<div class="wallpaper-item '+(c.chatWallpaperIndex===i?'selected':'')+'"><img src="'+w+'"><button data-wdel="'+i+'">×</button></div>').join('')+'</div><div class="m-btns"><button class="btn plain" id="wallAdd">＋ 上传壁纸</button><button class="btn plain" id="wallClear">恢复纯色</button></div><div class="m-btns"><button class="btn plain" id="wallDone">完成</button></div></div>';
+      root.classList.add('show');
+      root.querySelectorAll('.wallpaper-item img').forEach((img,i)=>{img.onclick=()=>{c.chatWallpaperIndex=i;c.chatBgImage=c.chatWallpapers[i];save();renderChat();draw()}});
+      root.querySelectorAll('[data-wdel]').forEach(btn=>{btn.onclick=()=>{const i=+btn.dataset.wdel;c.chatWallpapers.splice(i,1);if(c.chatWallpaperIndex===i){c.chatBgImage='';c.chatWallpaperIndex=-1}else if(c.chatWallpaperIndex>i)c.chatWallpaperIndex--;save();renderChat();draw()}});
+      root.querySelector('#wallAdd').onclick=()=>pickImageFiles(true,files=>{
+        let pending=files.length;if(!pending)return;
+        files.forEach(file=>{compressImage(file,1200,.82,data=>{if(data)c.chatWallpapers.push(data);pending--;if(!pending){c.chatWallpaperIndex=c.chatWallpapers.length-1;c.chatBgImage=c.chatWallpapers[c.chatWallpaperIndex]||'';save();renderChat();draw()}})});
+      });
+      root.querySelector('#wallClear').onclick=()=>{c.chatBgImage='';c.chatBg='';c.chatWallpaperIndex=-1;save();renderChat();draw()};
+      root.querySelector('#wallDone').onclick=()=>{root.classList.remove('show');renderContactDetail()};
+    };draw();
+  };
+  ACTIONS['edit-poke-text']=function(){const c=getContact(currentRoute.param);if(!c)return;const root=$x('#modalRoot');root.innerHTML='<div class="modal-card"><h2>拍一拍设置</h2><div class="m-field"><label>我拍 TA 时显示的内容</label><input id="pokeMe" value="'+esc(c.pokeMeText||'拍了拍'+c.name)+'"></div><div class="m-field"><label>TA 拍我时显示的内容</label><input id="pokeBot" value="'+esc(c.pokeBotText||'拍了拍我')+'"></div><div class="m-btns"><button class="btn plain" id="pokeCancel">取消</button><button class="btn primary" id="pokeSave">保存</button></div></div>';root.classList.add('show');root.querySelector('#pokeCancel').onclick=()=>root.classList.remove('show');root.querySelector('#pokeSave').onclick=()=>{c.pokeMeText=root.querySelector('#pokeMe').value.trim()||'拍了拍'+c.name;c.pokeBotText=root.querySelector('#pokeBot').value.trim()||'拍了拍我';save();root.classList.remove('show');renderContactDetail();toast('拍一拍内容已保存')}};
+  function sendPoke(role){const cid=currentRoute.param,c=getContact(cid);if(!c)return;const msgs=state.chats[cid]||(state.chats[cid]=[]);msgs.push({id:uid(),role:'system',type:'poke',text:role==='me'?'我'+(c.pokeMeText||'拍了拍'+c.name).replace(/^我/,''):c.name+(c.pokeBotText||'拍了拍我').replace(/^TA/,'我'),time:Date.now()});save();renderChat()}
+  function sendMoney(type){const c=getContact(currentRoute.param);if(!c)return;const amount=prompt(type==='redpacket'?'请输入红包金额（元）':'请输入转账金额（元）','8.88');if(amount===null)return;const n=Number(amount);if(!Number.isFinite(n)||n<=0||n>200000){toast('请输入有效金额');return}const note=prompt(type==='redpacket'?'写一句红包祝福':'转账备注','');const msgs=state.chats[c.id]||(state.chats[c.id]=[]);msgs.push({id:uid(),role:'me',type,amount:n,note:note||'',time:Date.now()});save();renderChat()}
+  // 点击红包/转账卡片可模拟领取/收款，不涉及真实资金
+  document.addEventListener('click',e=>{const card=e.target.closest('[data-money-id]');if(!card)return;const c=getContact(currentRoute.param);if(!c)return;const m=(state.chats[c.id]||[]).find(x=>x.id===card.dataset.moneyId);if(!m||m.role==='me')return;if(m.type==='redpacket')m.claimed=true;else m.accepted=true;save();renderChat();toast(m.type==='redpacket'?'已领取（模拟）':'已收款（模拟）')});
+  // renderChat 结束后应用图片壁纸
+  const oldRenderChat=window.renderChat;
+  window.renderChat=function(){oldRenderChat();const c=getContact(currentRoute.param),body=$x('#chatBody');if(!c||!body)return;if(c.chatBgImage){body.style.backgroundImage='linear-gradient(180deg,rgba(247,248,252,.52),rgba(247,248,252,.68)),url("'+c.chatBgImage+'")';body.style.backgroundColor='transparent'}else{body.style.backgroundImage='';if(c.chatBg)body.style.background=c.chatBg}};
+  // 随机由联系人发起拍一拍：聊天窗口打开时低频触发，避免刷屏
+  setInterval(()=>{if(!currentRoute||currentRoute.name!=='chat'||Math.random()>.045)return;const c=getContact(currentRoute.param);if(!c)return;const msgs=state.chats[c.id]||(state.chats[c.id]=[]);if(msgs.length&&Date.now()-(msgs[msgs.length-1].time||0)<18000)return;msgs.push({id:uid(),role:'system',type:'poke',text:c.name+(c.pokeBotText||'拍了拍我').replace(/^TA/,'我'),time:Date.now()});save();renderChat()},18000);
+})();
+
 </script>
 </body>
 </html>
