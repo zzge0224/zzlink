@@ -122,6 +122,7 @@ body{font-family:"Noto Sans SC",-apple-system,"PingFang SC","Microsoft YaHei",sy
 .q-head h3{font-size:14px;font-weight:600}
 .q-modes{display:flex;gap:6px}
 .q-modes button{border:1px solid var(--line);background:#fff;color:var(--ink-soft);font-size:12px;padding:5px 11px;border-radius:999px;cursor:pointer}.q-modes button.on{background:var(--green);border-color:var(--green);color:#fff}
+.q-refresh{flex:0 0 auto;border:1px solid var(--green-soft);background:var(--green-soft);color:var(--green-deep);font-size:12px;padding:5px 11px;border-radius:999px;cursor:pointer;margin-right:6px}
 .track{display:flex;align-items:center;gap:11px;padding:10px 14px;border-top:1px solid var(--line);cursor:pointer}
 .track:first-child{border-top:none}.track:active{background:var(--panel-2)}
 .track.cur{background:rgba(76,191,120,.08)}
@@ -436,6 +437,24 @@ function isVipSong(s){return s.fee>0||(s.privilege&&s.privilege.st>0)}
 function addSong(id){if(playlist.find(t=>t.id===id)){toast("已在歌单中");return}playlist.push({id,title:"歌曲 #"+id,artist:"正在获取…",dur:0,vip:false});renderMusic();toast("已加入歌曲 #"+id);
   fetchVia("https://music.163.com/api/v3/song/detail?id="+id+"&ids=["+id+"]").then(d=>{const s=d.songs&&d.songs[0];if(!s)return;const t=playlist.find(x=>x.id===id);if(!t)return;t.title=s.name;t.artist=(s.ar||[]).map(a=>a.name).join(" / ");t.dur=Math.round((s.dt||0)/1000);t.vip=isVipSong(s);if(settings.excludeVip&&t.vip){const i=playlist.indexOf(t);playlist.splice(i,1);toast("已跳过VIP歌曲："+t.title)}renderMusic()}).catch(()=>{})
 }
+async function enrichIds(ids){
+  const out={};const CHUNK=100;
+  for(let i=0;i<ids.length;i+=CHUNK){
+    const chunk=ids.slice(i,i+CHUNK);
+    try{const meta=await fetchVia("https://music.163.com/api/v3/song/detail?ids="+encodeURIComponent("["+chunk.join(",")+"]"));
+      (meta.songs||[]).forEach(s=>{out[s.id]={name:s.name,ar:(s.ar||[]).map(a=>a.name).join(" / "),dt:Math.round((s.dt||0)/1000),vip:isVipSong(s)}});
+    }catch(e){}
+  }
+  return out;
+}
+function applyMeta(map){let changed=0;playlist.forEach(t=>{const m=map[t.id];if(m){const was=t.vip;t.title=m.name||t.title;t.artist=m.ar;t.dur=m.dt;t.vip=m.vip;if(m.vip!==was)changed++}});return changed}
+function askRemoveVip(){
+  const vip=playlist.filter(t=>t.vip);
+  if(!vip.length)return;
+  if(confirm("检测到 "+vip.length+" 首VIP/付费歌曲（仅能试听约30秒）。\n是否全部移除？")){
+    playlist=playlist.filter(t=>!t.vip);renderMusic();toast("已移除 "+vip.length+" 首VIP歌曲");
+  }
+}
 async function resolvePlaylist(id){
   toast("正在读取歌单…");
   let ids=[];
@@ -444,15 +463,14 @@ async function resolvePlaylist(id){
     ids=((d.playlist&&d.playlist.trackIds)||[]).map(t=>t.id);
   }catch(e){toast("歌单信息读取失败：当前网络访问不了网易云接口（可尝试换网络/开代理），或改用手动逐首添加");return}
   if(!ids.length){toast("歌单为空或解析不到歌曲");return}
-  let added=0,skipped=0;
-  try{
-    const meta=await fetchVia("https://music.163.com/api/v3/song/detail?ids="+encodeURIComponent("["+ids.slice(0,1000).join(",")+"]"));
-    (meta.songs||[]).forEach(s=>{if(playlist.find(x=>x.id===s.id))return;const vip=isVipSong(s);if(settings.excludeVip&&vip){skipped++;return}playlist.push({id:s.id,title:s.name||"歌曲 #"+s.id,artist:(s.ar||[]).map(a=>a.name).join(" / "),dur:Math.round((s.dt||0)/1000),vip});added++});
-  }catch(e){
-    ids.slice(0,1000).forEach(iid=>{if(playlist.find(x=>x.id===iid))return;playlist.push({id:iid,title:"歌曲 #"+iid,artist:"",dur:0,vip:false});added++});
-  }
+  const fresh=ids.filter(iid=>!playlist.find(x=>x.id===iid));
+  fresh.forEach(iid=>playlist.push({id:iid,title:"歌曲 #"+iid,artist:"",dur:0,vip:false}));
+  renderMusic();toast("已载入歌单，正在补齐标题与时长…");
+  const map=await enrichIds(fresh);
+  applyMeta(map);
   renderMusic();
-  toast(added>0?("已导入歌单 "+added+" 首"+(skipped>0?("，跳过VIP "+skipped+" 首"):"")):"歌单为空或读取失败");
+  if(settings.excludeVip){const n=playlist.filter(t=>t.vip).length;playlist=playlist.filter(t=>!t.vip);renderMusic();toast(playlist.length+" 首已导入"+(n?("，已跳过VIP "+n+" 首"):""));}
+  else{renderMusic();askRemoveVip();}
 }
 function parseLink(l){
   const pl=l.match(/(?:playlist\?id=|playlist\/|#\/playlist\?id=)(\d+)/);
@@ -472,7 +490,8 @@ function prevTrack(){if(!playlist.length)return;const ni=plIndex<0?0:(plIndex-1+
 function renderMusic(){
   const el=document.getElementById("music");
   const importHtml='<div class="m-import"><textarea id="mInput" rows="3" placeholder="粘贴网易云歌曲或歌单链接，每行一个…"></textarea><div class="m-hint">支持：音乐链接 music.163.com/song?id=… / 歌单链接 music.163.com/playlist?id=… / 纯歌曲ID</div><div class="m-import-btn"><button class="m-do" id="mImport">导入</button><button class="m-clear" id="mClear">清空歌单</button></div><div class="m-vip-line"><button class="vip-toggle'+(settings.excludeVip?" on":"")+'" id="vipToggle">去除VIP歌曲</button><span class="m-vhint">'+(settings.excludeVip?"已开启：导入时自动跳过VIP/付费歌曲":"已关闭：保留所有歌曲（VIP歌曲仅能试听约30秒）")+'</span></div></div>';
-  const qhead='<div class="q-head"><h3>播放列表（'+playlist.length+'）</h3><div class="q-modes"><button class="'+(plMode==="sequential"?"on":"")+'" data-m="sequential">顺序</button><button class="'+(plMode==="random"?"on":"")+'" data-m="random">随机</button><button class="'+(plMode==="single"?"on":"")+'" data-m="single">单曲</button></div></div>';
+  const unresolved=playlist.some(t=>!t.dur);
+  const qhead='<div class="q-head"><h3>播放列表（'+playlist.length+'）</h3>'+(unresolved?'<button class="q-refresh" id="qRefresh">补齐标题/时长</button>':'')+'<div class="q-modes"><button class="'+(plMode==="sequential"?"on":"")+'" data-m="sequential">顺序</button><button class="'+(plMode==="random"?"on":"")+'" data-m="random">随机</button><button class="'+(plMode==="single"?"on":"")+'" data-m="single">单曲</button></div></div>';
   let q='';
   if(!playlist.length){q='<div class="empty" style="height:120px"><div class="big">歌单还是空的。粘贴一首网易云歌曲或歌单链接试试。</div></div>'}else{
     playlist.forEach((t,i)=>{q+='<div class="track'+(i===plIndex?" cur":"")+'" data-i="'+i+'"><span class="track-num">'+(i+1)+'</span><div class="track-info"><div class="track-title">'+esc(t.title)+(t.vip?'<span class="track-vip">VIP</span>':'')+'</div><div class="track-artist">'+esc(t.artist)+'</div></div><span class="track-dur">'+fmtTime(t.dur)+'</span><button class="track-del" data-del="'+i+'" aria-label="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'});
@@ -486,6 +505,13 @@ function renderMusic(){
     renderMusic();
   });
   el.querySelectorAll(".q-modes button").forEach(b=>b.addEventListener("click",()=>{plMode=b.dataset.m;renderMusic()}));
+  const qr=el.querySelector("#qRefresh");if(qr)qr.addEventListener("click",async()=>{
+    const missing=playlist.filter(t=>!t.dur).map(t=>t.id);
+    if(!missing.length){toast("没有需要补齐的歌曲");return}
+    toast("正在补齐 " + missing.length + " 首…");
+    const map=await enrichIds(missing);applyMeta(map);renderMusic();
+    toast("补齐完成");
+  });
   el.querySelectorAll(".track").forEach(r=>r.addEventListener("click",e=>{if(e.target.closest(".track-del"))return;playIndex(parseInt(r.dataset.i))}));
   el.querySelectorAll(".track-del").forEach(b=>b.addEventListener("click",()=>{const i=parseInt(b.dataset.del);playlist.splice(i,1);if(plIndex>=playlist.length)plIndex=playlist.length-1;if(plIndex===i)audio&&audio.pause();renderMusic()}));
   renderNowBar();
