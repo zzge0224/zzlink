@@ -432,6 +432,77 @@ body[data-theme="dark"] .cell:active{background:#333}
 .theme-swatch{width:38px;height:38px;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.15)}
 .theme-name{font-size:12px;color:var(--text);font-weight:500}
 .theme-desc{font-size:10.5px;color:var(--text3);text-align:center;line-height:1.4}
+
+/* ---------- 字卡分组 ---------- */
+.card-groups{display:flex;gap:8px;overflow-x:auto;padding:10px 14px 4px;flex-shrink:0}
+.card-groups::-webkit-scrollbar{display:none}
+.cg{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;background:var(--card);
+  border:1px solid var(--line);border-radius:16px;padding:6px 12px;font-size:13px;color:var(--text2);white-space:nowrap}
+.cg em{font-style:normal;font-size:11px;color:var(--text3)}
+.cg.on{background:var(--green);border-color:var(--green);color:#fff}
+.cg.on em{color:rgba(255,255,255,.85)}
+.cg.add{border-style:dashed;color:var(--green);font-size:16px;padding:4px 12px}
+.card-chip.sel{box-shadow:0 0 0 2px var(--green)}
+.chip-check{width:26px;height:26px;border-radius:6px;border:2px solid #CBD5E0;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff}
+.card-chip.sel .chip-check{background:var(--green);border-color:var(--green)}
+.chip-check svg{width:16px;height:16px}
+.batch-bar{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--card);border-top:1px solid var(--line)}
+.batch-bar .bb{flex:1;height:38px;border-radius:9px;background:var(--input-bg);color:var(--text);font-size:14px}
+.batch-bar .bb.danger{background:var(--danger);color:#fff}
+.batch-bar .bb-count{font-size:13px;color:var(--text2);white-space:nowrap}
+.head-btn{display:inline-flex;align-items:center;gap:4px;background:var(--green);color:#fff;font-size:12.5px;
+  padding:6px 11px;border-radius:15px;font-weight:500;flex-shrink:0}
+.head-btn:active{background:var(--green-d)}
+.head-btn svg{width:14px;height:14px}
+.head-btn.ghost{background:var(--input-bg);color:var(--text)}
+
+/* ---------- 播放悬浮窗 ---------- */
+.mini-player{position:absolute;left:0;right:0;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom));
+  background:var(--card);border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;
+  padding:8px 12px;z-index:25;cursor:pointer}
+.mini-player.hidden{display:none}
+.mini-cover{width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--input-bg)}
+.mini-info{flex:1;min-width:0}
+.mini-name{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-art{font-size:11px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-ctl{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text);flex-shrink:0}
+.mini-ctl:active{background:var(--hover)}
+.mini-ctl svg{width:20px;height:20px}
+
+/* ---------- 网易云风格播放页 ---------- */
+#view-nowplaying{background:linear-gradient(180deg,#E8E4F2 0%,#F6F6F6 40%)}
+body[data-theme="dark"] #view-nowplaying{background:linear-gradient(180deg,#2a2438 0%,#1C1C1E 40%)}
+.np-body{flex:1;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:20px 24px 30px}
+.np-disc{position:relative;width:240px;height:240px;margin:26px auto 30px;flex-shrink:0}
+.np-disc .np-cover{width:100%;height:100%;border-radius:50%;object-fit:cover;box-shadow:0 12px 30px rgba(0,0,0,.25);
+  border:6px solid #fff;display:block}
+.np-disc.playing .np-cover{animation:npSpin 18s linear infinite}
+@keyframes npSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.np-disc .np-hole{position:absolute;left:50%;top:50%;width:52px;height:52px;transform:translate(-50%,-50%);
+  border-radius:50%;background:var(--page);box-shadow:inset 0 0 4px rgba(0,0,0,.2)}
+.np-song{font-size:19px;font-weight:600;color:var(--text);text-align:center;margin-top:6px}
+.np-art{font-size:13px;color:var(--text2);margin-top:6px;text-align:center}
+.np-lyric{width:100%;max-height:150px;overflow:hidden;margin-top:22px;text-align:center;
+  font-size:14px;color:var(--text3);line-height:2;position:relative}
+.np-lyric::after{content:'';position:absolute;left:0;right:0;bottom:0;height:46px;
+  background:linear-gradient(transparent,var(--page))}
+.np-lyric p{transition:opacity .2s}
+.np-lyric p.on{color:var(--green);font-weight:600}
+.np-progress{width:100%;margin-top:22px}
+.np-time{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text3);margin-top:4px}
+.np-controls{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:20px}
+.npc{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text)}
+.npc:active{background:var(--hover)}
+.npc svg{width:24px;height:24px}
+.npc.like.liked{color:var(--like)}
+.npc.big{width:64px;height:64px;background:var(--green);color:#fff;box-shadow:0 6px 18px rgba(7,193,96,.4)}
+.npc.big:active{background:var(--green-d)}
+.npc.big svg{width:28px;height:28px}
+.np-jam{display:flex;align-items:center;gap:8px;margin-top:26px;width:100%;justify-content:center;flex-wrap:wrap}
+.jam-pill{display:inline-flex;align-items:center;gap:6px;background:var(--input-bg);border-radius:16px;
+  padding:7px 14px;font-size:12.5px;color:var(--text)}
+.jam-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.jam-pill.off .dot{background:var(--text3)}
 </style>
 </head>
 <body data-theme="default">
@@ -463,6 +534,10 @@ body[data-theme="dark"] .cell:active{background:#333}
   <symbol id="i-wifi" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 9.5a13 13 0 0 1 17 0M6.5 12.5a8.5 8.5 0 0 1 11 0M9.5 15.5a4 4 0 0 1 5 0"/><circle cx="12" cy="18.5" r="1.1" fill="currentColor" stroke="none"/></g></symbol>
   <symbol id="i-battery" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2.5" y="8" width="17" height="8" rx="2"/><path d="M22 10.5v3" stroke-linecap="round"/><rect x="4.5" y="10" width="9" height="4" rx="1" fill="currentColor" stroke="none"/></g></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></g></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M4 18l5-5 3 3 4-4 4 4"/></g></symbol>
 </svg>
 
 <div id="app">
@@ -520,6 +595,38 @@ body[data-theme="dark"] .cell:active{background:#333}
     <div class="body" id="musicBody" style="display:flex;flex-direction:column;overflow:hidden"></div>
   </section>
 
+  <!-- ===== 视图：网易云风格播放页 ===== -->
+  <section id="view-nowplaying" class="view">
+    <header class="nav">
+      <button class="icon-btn" data-action="np-collapse" title="收起"><svg><use href="#i-chevron-down" xlink:href="#i-chevron-down"/></svg></button>
+      <h1 id="npPlaylistName">正在播放</h1>
+      <div class="nav-right">
+        <button class="icon-btn" data-action="np-close" title="关闭播放"><svg><use href="#i-close" xlink:href="#i-close"/></svg></button>
+      </div>
+    </header>
+    <div class="np-body">
+      <div class="np-disc" id="npDisc">
+        <img class="np-cover" id="npCover" alt="封面">
+        <div class="np-hole"></div>
+      </div>
+      <div class="np-song" id="npSongName">暂无歌曲</div>
+      <div class="np-art" id="npSongArt"></div>
+      <div class="np-lyric" id="npLyric"><p>暂无歌词，静心聆听</p></div>
+      <div class="np-progress">
+        <div class="progress" id="npProgressBar"><div class="track"><div class="fill" id="npProgressFill"></div><div class="knob" id="npProgressKnob"></div></div></div>
+        <div class="np-time"><span id="npCurTime">00:00</span><span id="npDurTime">00:00</span></div>
+      </div>
+      <div class="np-controls">
+        <button class="npc" data-action="cycle-mode" title="播放模式"><svg><use id="npModeIcon" href="#i-loop" xlink:href="#i-loop"/></svg></button>
+        <button class="npc" data-action="player-prev" title="上一首"><svg><use href="#i-prev" xlink:href="#i-prev"/></svg></button>
+        <button class="npc big" data-action="player-toggle" title="播放/暂停"><svg><use id="npPlayIcon" href="#i-play" xlink:href="#i-play"/></svg></button>
+        <button class="npc" data-action="player-next" title="下一首"><svg><use href="#i-next" xlink:href="#i-next"/></svg></button>
+        <button class="npc like" id="npLike" data-action="np-like" title="红心"><svg><use href="#i-like" xlink:href="#i-like"/></svg></button>
+      </div>
+      <div class="np-jam" id="npJamBox"></div>
+    </div>
+  </section>
+
   <!-- ===== 视图：朋友圈 ===== -->
   <section id="view-moments" class="view">
     <header class="nav">
@@ -550,13 +657,20 @@ body[data-theme="dark"] .cell:active{background:#333}
   <section id="view-cards" class="view">
     <header class="nav">
       <button class="icon-btn" data-action="back"><svg><use href="#i-back" xlink:href="#i-back"/></svg></button>
-      <h1>字卡库</h1>
+      <h1 id="cardsTitle">字卡库</h1>
       <div class="nav-right">
-        <button class="icon-btn" data-action="batch-import-cards" title="批量导入"><svg><use href="#i-upload" xlink:href="#i-upload"/></svg></button>
+        <button class="head-btn ghost" data-action="enter-batch" title="批量删除"><svg><use href="#i-trash" xlink:href="#i-trash"/></svg>管理</button>
+        <button class="head-btn" data-action="batch-import-cards" title="批量导入"><svg><use href="#i-upload" xlink:href="#i-upload"/></svg>批量导入</button>
       </div>
     </header>
-    <div class="cards-tip">对方回复时会从这里随机抽取字卡。支持单条添加，也可点右上角批量导入。</div>
+    <div class="cards-tip">对方回复时会从这里随机抽取字卡。支持分组管理、批量导入、批量删除。</div>
     <div id="cardsWrap" class="cards-wrap"></div>
+    <div class="batch-bar" id="cardBatchBar" style="display:none">
+      <button class="bb" data-action="batch-select-all">全选</button>
+      <span class="bb-count" id="batchCount">已选 0</span>
+      <button class="bb danger" data-action="batch-delete">删除选中</button>
+      <button class="bb" data-action="exit-batch">完成</button>
+    </div>
     <div class="chat-input">
       <input id="cardInput" type="text" maxlength="40" placeholder="输入新的字卡内容…" autocomplete="off">
       <button class="send-btn add" id="cardAdd" title="添加"><svg><use href="#i-plus" xlink:href="#i-plus"/></svg></button>
@@ -605,6 +719,17 @@ body[data-theme="dark"] .cell:active{background:#333}
     <button class="tab" data-route="music" data-action="tab"><svg><use href="#i-music" xlink:href="#i-music"/></svg>音乐</button>
     <button class="tab" data-route="me" data-action="tab"><svg><use href="#i-me" xlink:href="#i-me"/></svg>我的</button>
   </nav>
+
+  <!-- 播放悬浮窗 -->
+  <div class="mini-player hidden" id="miniPlayer" data-action="open-nowplaying">
+    <img class="mini-cover" id="miniCover" alt="封面">
+    <div class="mini-info">
+      <div class="mini-name" id="miniName">暂无歌曲</div>
+      <div class="mini-art" id="miniArt"></div>
+    </div>
+    <button class="mini-ctl" id="miniToggle" data-action="mini-toggle" title="播放/暂停"><svg><use href="#i-play" xlink:href="#i-play"/></svg></button>
+    <button class="mini-ctl" id="miniClose" data-action="mini-close" title="关闭"><svg><use href="#i-close" xlink:href="#i-close"/></svg></button>
+  </div>
 
   <!-- 浮层 -->
   <div id="toast"></div>
@@ -689,6 +814,23 @@ function setTheme(k){
   render();
   toast('已切换为「' + themeInfo().name + '」主题');
 }
+/* ============================================================
+   字卡分组（兼容旧版 wc_cards 数组）
+   ============================================================ */
+function initCardGroups(){
+  const g = LS.get('wc_cardGroups', null);
+  if (g && Array.isArray(g) && g.length) return g;
+  const old = LS.get('wc_cards', null);
+  const cards = Array.isArray(old) && old.length ? old.slice() : DEFAULT_CARDS.slice();
+  return [{id:'g_default', name:'默认', cards: cards}];
+}
+function allCards(){
+  return state.cardGroups.reduce((a, g) => a.concat(g.cards || []), []);
+}
+function currentGroupObj(){
+  if (!state.currentGroup || state.currentGroup === 'all') return null;
+  return state.cardGroups.find(g => g.id === state.currentGroup) || null;
+}
 const DEFAULT_MOMENTS = [
   {id:'m1', authorId:'c1', text:DEFAULT_CARDS[randInt(0, DEFAULT_CARDS.length-1)] + ' ' + DEFAULT_CARDS[randInt(0, DEFAULT_CARDS.length-1)], time: Date.now() - 3600*1000*2, likes:['我'], comments:[]}
 ];
@@ -697,15 +839,17 @@ const DEFAULT_MOMENTS = [
    全局状态
    ============================================================ */
 const state = {
-  profile: LS.get('wc_profile', {name:'我', color:6, sig:'这个人很懒，什么都没写', avatarUrl:''}),
-  cards: LS.get('wc_cards', DEFAULT_CARDS),
+  profile: LS.get('wc_profile', {name:'我', color:6, sig:'这个人很懒，什么都没写', avatarUrl:'', bgImage:''}),
+  cardGroups: initCardGroups(),
+  currentGroup: 'all',
   contacts: LS.get('wc_contacts', DEFAULT_CONTACTS),
   chats: LS.get('wc_chats', {}),
-  settings: LS.get('wc_settings', {minReplies:1, maxReplies:3, minDelay:1, maxDelay:4, theme:'default'}),
+  settings: LS.get('wc_settings', {minReplies:1, maxReplies:3, minDelay:1, maxDelay:4, theme:'default', miniPlayer:true}),
   music: LS.get('wc_music', null),
   apiBase: LS.get('wc_apiBase', ''),
   moments: LS.get('wc_moments', DEFAULT_MOMENTS),
   emojis: LS.get('wc_emojis', []),
+  jam: LS.get('wc_jam', null),
   lastReplyIdx: {},
   typingChat: null,
   importing: false,
@@ -716,7 +860,7 @@ const state = {
 };
 function save(){
   LS.set('wc_profile', state.profile);
-  LS.set('wc_cards', state.cards);
+  LS.set('wc_cardGroups', state.cardGroups);
   LS.set('wc_contacts', state.contacts);
   LS.set('wc_chats', state.chats);
   LS.set('wc_settings', state.settings);
@@ -725,6 +869,7 @@ function save(){
   LS.set('wc_moments', state.moments);
   LS.set('wc_emojis', state.emojis);
   LS.set('wc_vipSongs', state.vipSongs);
+  LS.set('wc_jam', state.jam);
 }
 
 /* ============================================================
@@ -816,6 +961,7 @@ function render(){
   if (currentRoute.name === 'chat' && currentRoute.param) v = $('#view-chat');
   else if (currentRoute.name === 'contacts') v = $('#view-contacts');
   else if (currentRoute.name === 'music') v = $('#view-music');
+  else if (currentRoute.name === 'nowplaying') v = $('#view-nowplaying');
   else if (currentRoute.name === 'me') v = $('#view-me');
   else if (currentRoute.name === 'settings') v = $('#view-settings');
   else if (currentRoute.name === 'cards') v = $('#view-cards');
@@ -829,6 +975,7 @@ function render(){
   if (currentRoute.name === 'chat' && currentRoute.param) renderChat();
   else if (currentRoute.name === 'contacts') { renderContacts(); }
   else if (currentRoute.name === 'music') renderMusic();
+  else if (currentRoute.name === 'nowplaying') renderNowPlaying();
   else if (currentRoute.name === 'me') renderMe();
   else if (currentRoute.name === 'settings') renderSettings();
   else if (currentRoute.name === 'cards') renderCards();
@@ -848,6 +995,7 @@ function render(){
   } else {
     scrollChatToBottom();
   }
+  updateMiniPlayer();
 }
 
 /* ============================================================
@@ -1017,7 +1165,7 @@ async function runReply(cid){
   if (currentRoute.name === 'chat' && currentRoute.param === cid) renderChat();
 }
 function pickCard(cid){
-  const arr = state.cards;
+  const arr = allCards();
   if (!arr.length) return '（字卡库是空的，去加一些吧）';
   let i = randInt(0, arr.length - 1);
   if (arr.length > 1 && i === state.lastReplyIdx[cid]) i = (i + 1) % arr.length;
@@ -1091,6 +1239,7 @@ function renderContactDetail(){
       '<div class="set-row" data-action="upload-contact-avatar"><span class="lbl">自定义头像</span><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
       '<div class="set-row" data-action="edit-contact-status"><span class="lbl">在线状态设置<small>每行一个状态，聊天时随机展示</small></span><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
       '<div class="set-row" data-action="set-chat-bg"><span class="lbl">聊天背景颜色</span><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
+      '<div class="set-row" data-action="view-contact-likes"><span class="lbl">TA 收藏的歌曲<small>一起听时联系人会收藏喜欢的歌</small></span><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
     '</div>' +
     '<div class="cd-set-group">' +
       '<div class="set-title">单独回复设置</div>' +
@@ -1179,18 +1328,23 @@ function openProfileModal(contact){
 function renderMe(){
   const body = $('#meBody');
   const totalMsgs = Object.keys(state.chats).reduce((a, k) => a + (state.chats[k] || []).length, 0);
+  const headStyle = state.profile.bgImage
+    ? 'background:linear-gradient(rgba(7,193,96,.45),rgba(10,173,139,.45)),url(' + state.profile.bgImage + ') center/cover'
+    : '';
   body.innerHTML =
-    '<div class="me-head">' +
+    '<div class="me-head"' + (headStyle ? ' style="' + headStyle + '"' : '') + '>' +
       '<div class="me-avatar" data-action="edit-me">' + avatarHtml(state.profile, 64) + '</div>' +
       '<div class="me-info"><div class="me-name" data-action="edit-me">' + esc(state.profile.name) + '</div>' +
       '<div class="me-sig" data-action="edit-me">' + esc(state.profile.sig || '这个人很懒，什么都没写') + '</div></div>' +
     '</div>' +
     '<div class="me-stats">' +
-      '<div class="st"><b>' + state.cards.length + '</b><span>字卡</span></div>' +
+      '<div class="st"><b>' + allCards().length + '</b><span>字卡</span></div>' +
       '<div class="st"><b>' + state.contacts.length + '</b><span>联系人</span></div>' +
       '<div class="st"><b>' + totalMsgs + '</b><span>消息数</span></div>' +
     '</div>' +
     '<div class="menu-list">' +
+      '<div class="cell" data-action="upload-me-avatar"><span class="icon-cell" style="background:#0FB768"><svg><use href="#i-camera" xlink:href="#i-camera"/></svg></span><div class="cell-title">更换我的头像</div><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
+      '<div class="cell" data-action="set-me-bg"><span class="icon-cell" style="background:#3B82F6"><svg><use href="#i-image" xlink:href="#i-image"/></svg></span><div class="cell-title">更换我的背景图</div><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
       '<div class="cell" data-action="open-cards"><span class="icon-cell" style="background:#5B6BF0"><svg><use href="#i-card" xlink:href="#i-card"/></svg></span><div class="cell-title">字卡库管理</div><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
       '<div class="cell" data-action="open-emojis"><span class="icon-cell" style="background:#F0579B"><svg><use href="#i-emoji" xlink:href="#i-emoji"/></svg></span><div class="cell-title">表情包管理</div><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
       '<div class="cell" data-action="open-settings"><span class="icon-cell" style="background:#8A8F99"><svg><use href="#i-gear" xlink:href="#i-gear"/></svg></span><div class="cell-title">设置</div><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
@@ -1231,6 +1385,11 @@ function renderSettings(){
         '<div class="theme-swatch" style="background:' + t.bg + '"></div>' +
         '<div class="theme-name">' + t.name + '</div><div class="theme-desc">' + t.desc + '</div></div>'
       ).join('') + '</div>' +
+    '</div>' +
+    '<div class="set-group">' +
+      '<div class="set-title">播放器</div>' +
+      '<div class="set-row"><span class="lbl">显示播放悬浮窗<small>在聊天、联系人等页面底部显示迷你播放条</small></span>' +
+        '<div class="toggle' + (s.miniPlayer ? ' on' : '') + '" id="miniPlayerToggle" data-action="toggle-mini"></div></div>' +
     '</div>' +
     '<div class="set-group">' +
       '<div class="set-title">VIP/试听歌曲管理</div>' +
@@ -1281,32 +1440,62 @@ async function resetAll(){
 /* ============================================================
    字卡库
    ============================================================ */
+function groupCards(g){
+  return g ? (g.cards || []) : allCards();
+}
 function renderCards(){
   const wrap = $('#cardsWrap');
-  if (!state.cards.length) {
-    wrap.innerHTML = emptyHtml('cards', '字卡库还是空的', '添加一些词语或句子，它们会变成对方的随机回复');
+  const curGroup = currentGroupObj();
+  const list = groupCards(curGroup);
+  // 分组栏
+  const gbar = '<div class="card-groups">' +
+    '<button class="cg' + (state.currentGroup === 'all' ? ' on' : '') + '" data-action="switch-group" data-g="all">全部<em>' + allCards().length + '</em></button>' +
+    state.cardGroups.map(g =>
+      '<button class="cg' + (state.currentGroup === g.id ? ' on' : '') + '" data-action="group-menu" data-g="' + esc(g.id) + '" data-name="' + esc(g.name) + '">' + esc(g.name) + '<em>' + (g.cards || []).length + '</em></button>'
+    ).join('') +
+    '<button class="cg add" data-action="add-group">＋</button>' +
+    '</div>';
+  // 批量工具条显隐
+  const batchBar = $('#cardBatchBar');
+  if (batchBar) batchBar.style.display = state.batchMode ? 'flex' : 'none';
+  const inputRow = $('#view-cards .chat-input');
+  if (inputRow) inputRow.style.display = state.batchMode ? 'none' : 'flex';
+  const bc = $('#batchCount');
+  if (bc) bc.textContent = '已选 ' + (state.selected ? state.selected.length : 0);
+  if (!list.length) {
+    wrap.innerHTML = gbar + emptyHtml('cards', curGroup ? ('「' + curGroup.name + '」分组还是空的') : '字卡库还是空的', '添加一些词语或句子，或用右上角批量导入，它们会变成对方的随机回复');
     return;
   }
-  wrap.innerHTML = '<div class="card-count">共 ' + state.cards.length + ' 张字卡</div>' +
-    state.cards.map((t, i) =>
-      '<div class="card-chip"><span class="chip-text">' + esc(t) + '</span>' +
-      '<button class="chip-del" data-action="del-card" data-i="' + i + '" title="删除"><svg><use href="#i-trash" xlink:href="#i-trash"/></svg></button></div>'
-    ).join('');
+  const chips = list.map((t, i) => {
+    if (state.batchMode) {
+      const sel = state.selected.includes(i);
+      return '<div class="card-chip' + (sel ? ' sel' : '') + '" data-action="toggle-select" data-i="' + i + '">' +
+        '<span class="chip-check">' + (sel ? '<svg><use href="#i-check" xlink:href="#i-check"/></svg>' : '') + '</span>' +
+        '<span class="chip-text">' + esc(t) + '</span></div>';
+    }
+    return '<div class="card-chip"><span class="chip-text">' + esc(t) + '</span>' +
+      '<button class="chip-del" data-action="card-menu" data-i="' + i + '" title="更多"><svg><use href="#i-dots" xlink:href="#i-dots"/></svg></button></div>';
+  }).join('');
+  wrap.innerHTML = gbar + '<div class="card-count">' + (curGroup ? esc(curGroup.name) + '分组' : '全部') + ' · 共 ' + list.length + ' 张字卡</div>' + chips;
 }
 function addCard(){
   const input = $('#cardInput');
   const t = input.value.trim();
   if (!t) return;
-  state.cards.push(t);
+  const g = currentGroupObj() || state.cardGroups[0];
+  g.cards = g.cards || [];
+  g.cards.push(t);
   save(); renderCards();
   input.value = '';
   input.focus();
   toast('已添加字卡');
 }
 function openBatchImport(){
+  const g = currentGroupObj();
+  const into = g ? ('「' + g.name + '」分组') : '默认分组';
   const root = $('#modalRoot');
   root.innerHTML = '<div class="modal-card"><h2>批量导入字卡</h2>' +
-    '<div class="m-field"><label>每行一条，或用逗号 / 分号分隔，自动去重</label>' +
+    '<div class="m-field"><label>导入到：' + into + '（每行一条，或用逗号 / 分号分隔，自动去重）</label>' +
     '<textarea id="batchText" placeholder="例如：&#10;好的好的&#10;没问题呀&#10;哈哈哈哈哈,笑死我了&#10;今天天气不错"></textarea></div>' +
     '<div class="m-field"><label>也可以从 txt 文件导入</label>' +
     '<button class="btn plain" id="batchFileBtn" style="width:100%">选择 txt 文件</button></div>' +
@@ -1335,22 +1524,157 @@ function openBatchImport(){
   root.querySelector('#pm-ok').onclick = () => {
     const raw = root.querySelector('#batchText').value;
     const items = raw.split(/[\n,，;；、]+/).map(s => s.trim()).filter(s => s.length > 0);
+    const target = currentGroupObj() || state.cardGroups[0];
+    const pool = target.cards || (target.cards = []);
     let added = 0;
     items.forEach(t => {
-      if (!state.cards.includes(t)) { state.cards.push(t); added++; }
+      if (!pool.includes(t)) { pool.push(t); added++; }
     });
     if (!added) { toast('没有可导入的新字卡'); return; }
     save();
     root.classList.remove('show');
     renderCards();
-    toast('已导入 ' + added + ' 张字卡（共 ' + state.cards.length + ' 张）');
+    toast('已导入 ' + added + ' 张字卡');
   };
 }
-function delCard(i){
-  if (i < 0 || i >= state.cards.length) return;
-  state.cards.splice(i, 1);
-  save(); renderCards();
-  toast('已删除');
+function cardMenu(i){
+  const g = currentGroupObj();
+  const pool = groupCards(g);
+  const t = pool[i];
+  if (t == null) return;
+  const items = [];
+  if (state.cardGroups.length > 1) {
+    items.push({label:'移动到分组', fn(){ moveCardMenu(i); }});
+  }
+  items.push({label:'删除这张字卡', danger:true, fn(){
+    if (g) g.cards.splice(i, 1);
+    else state.cardGroups.forEach(gg => { const idx = (gg.cards||[]).indexOf(t); if (idx > -1) gg.cards.splice(idx, 1); });
+    save(); renderCards(); toast('已删除');
+  }});
+  openSheet({title: t, items: items});
+}
+function moveCardMenu(i){
+  const g = currentGroupObj();
+  const pool = groupCards(g);
+  const t = pool[i];
+  if (t == null) return;
+  const targets = state.cardGroups.filter(gg => gg !== g);
+  openSheet({
+    title: '移动到分组',
+    items: targets.map(gg => ({
+      label: gg.name,
+      fn(){
+        if (g) { g.cards.splice(i, 1); }
+        else { state.cardGroups.forEach(x => { const idx = (x.cards||[]).indexOf(t); if (idx > -1) x.cards.splice(idx, 1); }); }
+        gg.cards = gg.cards || [];
+        gg.cards.push(t);
+        save(); renderCards();
+        toast('已移动到「' + gg.name + '」');
+      }
+    }))
+  });
+}
+function switchGroup(gid){
+  state.currentGroup = gid;
+  if (state.batchMode) state.batchMode = false;
+  renderCards();
+}
+function addGroup(){
+  const root = $('#modalRoot');
+  root.innerHTML = '<div class="modal-card"><h2>新建分组</h2>' +
+    '<div class="m-field"><input id="gName" maxlength="12" placeholder="分组名称"></div>' +
+    '<div class="m-btns"><button class="btn plain" id="pm-cancel">取消</button><button class="btn primary" id="pm-ok">创建</button></div></div>';
+  root.classList.add('show');
+  root.querySelector('#pm-cancel').onclick = () => root.classList.remove('show');
+  root.querySelector('#pm-ok').onclick = () => {
+    const name = root.querySelector('#gName').value.trim();
+    if (!name) { toast('请输入分组名称'); return; }
+    if (state.cardGroups.some(g => g.name === name)) { toast('已有同名分组'); return; }
+    const g = {id: 'g_' + uid(), name: name, cards: []};
+    state.cardGroups.push(g);
+    state.currentGroup = g.id;
+    save(); root.classList.remove('show'); renderCards();
+    toast('已创建分组「' + name + '」');
+  };
+}
+function groupMenu(gid, name){
+  const g = state.cardGroups.find(x => x.id === gid);
+  if (!g) return;
+  openSheet({
+    title: '分组「' + name + '」',
+    items: [
+      {label:'重命名', fn(){ renameGroup(g); }},
+      {label:'删除分组（卡片移入默认）', danger:true, fn(){ deleteGroup(g); }}
+    ]
+  });
+}
+function renameGroup(g){
+  const root = $('#modalRoot');
+  root.innerHTML = '<div class="modal-card"><h2>重命名分组</h2>' +
+    '<div class="m-field"><input id="gName" maxlength="12" value="' + esc(g.name) + '"></div>' +
+    '<div class="m-btns"><button class="btn plain" id="pm-cancel">取消</button><button class="btn primary" id="pm-ok">保存</button></div></div>';
+  root.classList.add('show');
+  root.querySelector('#pm-cancel').onclick = () => root.classList.remove('show');
+  root.querySelector('#pm-ok').onclick = () => {
+    const name = root.querySelector('#gName').value.trim();
+    if (!name) { toast('名称不能为空'); return; }
+    if (state.cardGroups.some(x => x !== g && x.name === name)) { toast('已有同名分组'); return; }
+    g.name = name;
+    save(); root.classList.remove('show'); renderCards();
+    toast('已重命名');
+  };
+}
+function deleteGroup(g){
+  const moveTo = state.cardGroups.find(x => x.id === 'g_default') || state.cardGroups[0];
+  const cnt = (g.cards || []).length;
+  confirmDialog({title: '删除分组', text: '确定删除「' + g.name + '」吗？其中 ' + cnt + ' 张字卡将移入「' + (moveTo ? moveTo.name : '默认') + '」分组。', okText: '删除', danger: true}).then(ok => {
+    if (!ok) return;
+    if (moveTo && moveTo !== g) {
+      moveTo.cards = (moveTo.cards || []).concat(g.cards || []);
+    }
+    state.cardGroups = state.cardGroups.filter(x => x.id !== g.id);
+    if (state.currentGroup === g.id) state.currentGroup = 'all';
+    save(); renderCards();
+    toast('已删除分组');
+  });
+}
+function enterBatch(){
+  state.batchMode = true;
+  state.selected = [];
+  renderCards();
+}
+function exitBatch(){
+  state.batchMode = false;
+  state.selected = [];
+  renderCards();
+}
+function toggleSelect(i){
+  if (!state.batchMode) return;
+  const idx = state.selected.indexOf(i);
+  if (idx > -1) state.selected.splice(idx, 1);
+  else state.selected.push(i);
+  renderCards();
+}
+function batchSelectAll(){
+  const list = groupCards(currentGroupObj());
+  if (state.selected.length === list.length) state.selected = [];
+  else state.selected = list.map((_, i) => i);
+  renderCards();
+}
+function batchDelete(){
+  if (!state.selected.length) { toast('请先选择要删除的字卡'); return; }
+  const g = currentGroupObj();
+  const list = groupCards(g);
+  const sel = state.selected.slice().sort((a,b) => b - a);
+  confirmDialog({title: '批量删除', text: '确定删除选中的 ' + sel.length + ' 张字卡吗？', okText: '删除', danger: true}).then(ok => {
+    if (!ok) return;
+    if (g) { sel.forEach(i => g.cards.splice(i, 1)); }
+    else { const removeSet = new Set(sel.map(i => list[i])); state.cardGroups.forEach(gg => { gg.cards = (gg.cards || []).filter(t => !removeSet.has(t)); }); }
+    state.selected = [];
+    state.batchMode = false;
+    save(); renderCards();
+    toast('已删除 ' + sel.length + ' 张字卡');
+  });
 }
 
 /* ============================================================
@@ -1480,10 +1804,10 @@ setInterval(() => {
   if (!mine.length) return;
   if (Math.random() < 0.6) {
     const m = mine[randInt(0, mine.length-1)];
-    if (!state.contacts.length || !state.cards.length) return;
+    if (!state.contacts.length || !allCards().length) return;
     const c = state.contacts[randInt(0, state.contacts.length-1)];
     if (!m.comments) m.comments = [];
-    m.comments.push({author: c.name, text: state.cards[randInt(0, state.cards.length-1)], time: Date.now()});
+    m.comments.push({author: c.name, text: allCards()[randInt(0, allCards().length-1)], time: Date.now()});
     save();
     if (currentRoute.name === 'moments') renderMoments();
   }
@@ -1507,11 +1831,12 @@ function postMoment(){
 }
 // 自动生成联系人朋友圈
 setInterval(() => {
-  if (!state.contacts.length || !state.cards.length) return;
+  if (!state.contacts.length || !allCards().length) return;
   if (Math.random() < 0.3) {
     const c = state.contacts[randInt(0, state.contacts.length-1)];
-    const t1 = state.cards[randInt(0, state.cards.length-1)];
-    const t2 = state.cards[randInt(0, state.cards.length-1)];
+    const ac = allCards();
+    const t1 = ac[randInt(0, ac.length-1)];
+    const t2 = ac[randInt(0, ac.length-1)];
     state.moments.push({id: uid(), authorId:c.id, text:t1 + ' ' + t2, time: Date.now(), likes:['我'], comments:[]});
     save();
     if (currentRoute.name === 'moments') renderMoments();
@@ -1638,6 +1963,149 @@ async function getSongUrl(id){
   }
   return 'https://music.163.com/song/media/outer/url?id=' + id + '.mp3';
 }
+/* ============================================================
+   播放悬浮窗 + 网易云风格播放页 + 一起听
+   ============================================================ */
+function updateMiniPlayer(){
+  const mp = $('#miniPlayer');
+  if (!mp) return;
+  const inTabHome = ['chats','contacts','moments','me'].includes(currentRoute.name);
+  const show = state.settings.miniPlayer && state.music && state.music.songs && state.music.songs.length && inTabHome;
+  mp.classList.toggle('hidden', !show);
+  if (!show) return;
+  const s = state.music.songs[state.music.index] || state.music.songs[0];
+  $('#miniName').textContent = s.name;
+  $('#miniArt').textContent = s.artists;
+  $('#miniCover').src = state.music.cover ? fixUrl(state.music.cover) : '';
+  const pi = $('#miniToggle').querySelector('use');
+  const paused = audio.paused || audio.ended || !audio.src;
+  pi.setAttribute('href', paused ? '#i-play' : '#i-pause');
+  pi.setAttribute('xlink:href', paused ? '#i-play' : '#i-pause');
+}
+function renderNowPlaying(){
+  const m = state.music;
+  $('#npPlaylistName').textContent = m ? m.name : '正在播放';
+  const s = m && m.songs[m.index];
+  const disc = $('#npDisc');
+  if (m && m.cover) $('#npCover').src = fixUrl(m.cover);
+  else $('#npCover').removeAttribute('src');
+  disc.classList.toggle('playing', !!(s && audio.src && !audio.paused));
+  $('#npSongName').textContent = s ? s.name : '暂无歌曲';
+  $('#npSongArt').textContent = s ? s.artists : '';
+  $('#npDurTime').textContent = s ? fmtDur((s.dt || 0) / 1000) : '00:00';
+  $('#npLyric').innerHTML = s ? ('<p class="on">' + esc(s.name) + '</p><p>' + esc(s.artists) + '</p><p>♪</p>') : '<p>暂无歌词，静心聆听</p>';
+  const mi = modeInfo();
+  $('#npModeIcon').setAttribute('href', mi.icon);
+  $('#npModeIcon').setAttribute('xlink:href', mi.icon);
+  const like = $('#npLike');
+  like.classList.toggle('liked', !!(s && s.liked));
+  const pi = $('#npPlayIcon');
+  const paused = audio.paused || audio.ended || !audio.src;
+  pi.setAttribute('href', paused ? '#i-play' : '#i-pause');
+  pi.setAttribute('xlink:href', paused ? '#i-play' : '#i-pause');
+  const bar = $('#npProgressBar');
+  bar.onclick = e => {
+    if (!audio.duration) return;
+    const r = bar.getBoundingClientRect();
+    const p = (e.clientX - r.left) / r.width;
+    audio.currentTime = Math.max(0, Math.min(1, p)) * audio.duration;
+  };
+  renderJamBox();
+}
+function renderJamBox(){
+  const box = $('#npJamBox');
+  if (!box) return;
+  if (!state.music || !state.music.songs || !state.music.songs.length) { box.innerHTML = ''; return; }
+  const j = state.jam;
+  if (!j) {
+    box.innerHTML = '<button class="jam-pill off" data-action="invite-jam"><span class="dot"></span>邀请联系人一起听</button>';
+    return;
+  }
+  const c = getContact(j.contactId);
+  if (!c) { state.jam = null; save(); box.innerHTML = ''; return; }
+  const cnt = (c.likedSongs || []).length;
+  box.innerHTML =
+    '<span class="jam-pill"><span class="dot"></span>' + esc(c.name) + ' 正在一起听</span>' +
+    '<button class="jam-pill" data-action="view-jam-likes">TA 收藏 ' + cnt + ' 首</button>' +
+    '<button class="jam-pill" data-action="stop-jam">结束</button>';
+}
+function inviteJam(){
+  if (!state.contacts.length) { toast('还没有联系人可邀请'); return; }
+  openSheet({
+    title: '邀请联系人一起听',
+    items: state.contacts.map(c => ({label: c.name, fn(){ startJam(c.id); }}))
+  });
+}
+function startJam(cid){
+  const c = getContact(cid);
+  if (!c) return;
+  if (!c.likedSongs) c.likedSongs = [];
+  state.jam = {contactId: cid};
+  save();
+  renderJamBox();
+  toast('已邀请「' + c.name + '」一起听');
+}
+function stopJam(){
+  state.jam = null;
+  save();
+  renderJamBox();
+  toast('已结束一起听');
+}
+function viewJamLikes(){
+  const j = state.jam;
+  if (!j) return;
+  const c = getContact(j.contactId);
+  if (!c) return;
+  const liked = c.likedSongs || [];
+  openSheet({
+    title: c.name + ' 收藏的歌曲',
+    items: liked.length ? liked.map(s => ({label: (s.name || '未知') + ' - ' + (s.artists || ''), fn(){}})) : [{label: '还没有收藏歌曲', fn(){}}]
+  });
+}
+function npLike(){
+  const m = state.music;
+  if (!m || !m.songs[m.index]) return;
+  const s = m.songs[m.index];
+  s.liked = !s.liked;
+  save();
+  renderNowPlaying();
+  if (currentRoute.name === 'music') renderMusic();
+  toast(s.liked ? '已点红心' : '已取消红心');
+}
+function stopPlayer(){
+  audio.pause();
+  audio.removeAttribute('src');
+  audio.load();
+  setPlayingUi();
+  updateMiniPlayer();
+  renderNowPlaying();
+}
+// 联系人一起听时的随机操作
+setInterval(() => {
+  const j = state.jam;
+  if (!j || !state.music || !state.music.songs || !state.music.songs.length) return;
+  const c = getContact(j.contactId);
+  if (!c) return;
+  const song = state.music.songs[state.music.index];
+  const r = Math.random();
+  if (r < 0.3 && audio.src && !audio.paused) {
+    audio.pause(); toast(c.name + ' 暂停了播放');
+  } else if (r < 0.5 && audio.src && audio.paused) {
+    audio.currentTime = 0; audio.play().catch(()=>{}); toast(c.name + ' 重新播放了这首歌');
+  } else if (r < 0.7 && song && audio.src) {
+    if (!c.likedSongs) c.likedSongs = [];
+    if (!c.likedSongs.some(x => x.id === song.id)) {
+      c.likedSongs.push({id: song.id, name: song.name, artists: song.artists});
+      save(); toast(c.name + ' 收藏了《' + song.name + '》');
+      if (currentRoute.name === 'nowplaying') renderJamBox();
+    }
+  } else if (r < 0.85 && audio.src) {
+    nextTrack(); toast(c.name + ' 切到了下一首');
+  }
+  updateMiniPlayer();
+  if (currentRoute.name === 'nowplaying') renderNowPlaying();
+}, 1000 * 40);
+
 function renderMusic(){
   const body = $('#musicBody');
   const m = state.music;
@@ -1690,7 +2158,7 @@ function playerHtml(cur){
     '<div class="progress" id="progressBar"><div class="track"><div class="fill" id="progressFill"></div><div class="knob" id="progressKnob"></div></div></div>' +
     '<div class="p-time"><span id="curTime">00:00</span><span id="durTime">' + fmtDur((cur.dt || 0) / 1000) + '</span></div>' +
     '<div class="player-main">' +
-      '<div class="now-info"><div class="now-name">' + esc(cur.name) + '</div><div class="now-art">' + esc(cur.artists) + '</div></div>' +
+      '<div class="now-info" data-action="open-nowplaying" style="cursor:pointer"><div class="now-name">' + esc(cur.name) + '</div><div class="now-art">' + esc(cur.artists) + '</div></div>' +
       '<div class="controls">' +
         '<button class="ctl mode" data-action="cycle-mode" title="播放模式"><svg><use href="' + mi.icon + '" xlink:href="' + mi.icon + '"/></svg>' + mi.label + '</button>' +
         '<button class="ctl" data-action="player-prev" title="上一首"><svg><use href="#i-prev" xlink:href="#i-prev"/></svg></button>' +
@@ -1811,7 +2279,8 @@ function onEnded(){
   }
   const ni = m.index + 1;
   if (m.mode === 'loop') { playAt(ni % n); return; }
-  if (ni >= n) { audio.removeAttribute('src'); audio.load(); setPlayingUi(); return; }
+  // 顺序播放：播完最后一首回到第一首继续（自动连播）
+  if (ni >= n) { playAt(0); return; }
   playAt(ni);
 }
 function onAudioError(){
@@ -1883,10 +2352,12 @@ audio.addEventListener('timeupdate', () => {
   f.style.width = (p * 100) + '%';
   if (k) k.style.left = (p * 100) + '%';
   if (t) t.textContent = fmtDur(audio.currentTime);
+  const nf = $('#npProgressFill'), nk = $('#npProgressKnob'), nt = $('#npCurTime');
+  if (nf) { nf.style.width = (p * 100) + '%'; if (nk) nk.style.left = (p * 100) + '%'; if (nt) nt.textContent = fmtDur(audio.currentTime); }
 });
-audio.addEventListener('playing', () => { state.errCount = 0; updatePlayIcon(); });
-audio.addEventListener('pause', () => updatePlayIcon());
-audio.addEventListener('ended', onEnded);
+audio.addEventListener('playing', () => { state.errCount = 0; updatePlayIcon(); updateMiniPlayer(); renderNowPlaying(); });
+audio.addEventListener('pause', () => { updatePlayIcon(); updateMiniPlayer(); renderNowPlaying(); });
+audio.addEventListener('ended', () => { updatePlayIcon(); updateMiniPlayer(); onEnded(); });
 audio.addEventListener('error', onAudioError);
 
 /* ============================================================
@@ -1903,7 +2374,15 @@ const ACTIONS = {
   'open-settings': () => go('#/settings'),
   'open-cards': () => go('#/cards'),
   'open-about': () => go('#/about'),
-  'del-card': el => delCard(+el.dataset.i),
+  'switch-group': el => switchGroup(el.dataset.g),
+  'group-menu': el => groupMenu(el.dataset.g, el.dataset.name),
+  'add-group': () => addGroup(),
+  'card-menu': el => cardMenu(+el.dataset.i),
+  'enter-batch': () => enterBatch(),
+  'exit-batch': () => exitBatch(),
+  'toggle-select': el => toggleSelect(+el.dataset.i),
+  'batch-select-all': () => batchSelectAll(),
+  'batch-delete': () => batchDelete(),
   'stepper': el => stepSetting(el.dataset.k, +el.dataset.d),
   'reset-settings': () => resetSettings(),
   'reset-all': () => resetAll(),
@@ -1913,6 +2392,70 @@ const ACTIONS = {
   'player-next': () => nextTrack(),
   'play-song': el => playAt(+el.dataset.i),
   'clear-playlist': () => clearPlaylist(),
+  'open-nowplaying': () => go('#/nowplaying'),
+  'np-collapse': () => go('#/music'),
+  'np-close': () => stopPlayer(),
+  'np-like': () => npLike(),
+  'mini-toggle': () => togglePlay(),
+  'mini-close': () => stopPlayer(),
+  'invite-jam': () => inviteJam(),
+  'stop-jam': () => stopJam(),
+  'view-jam-likes': () => viewJamLikes(),
+  'toggle-mini': () => {
+    state.settings.miniPlayer = !state.settings.miniPlayer;
+    save();
+    renderSettings();
+    updateMiniPlayer();
+    toast(state.settings.miniPlayer ? '已开启播放悬浮窗' : '已关闭播放悬浮窗');
+  },
+  'upload-me-avatar': () => {
+    pickImageFiles(false, files => {
+      const file = files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        state.profile.avatarUrl = ev.target.result;
+        save(); render(); toast('头像已更新');
+      };
+      reader.readAsDataURL(file);
+    });
+  },
+  'set-me-bg': () => {
+    openSheet({
+      title: '更换我的背景图',
+      items: [
+        {label:'上传图片作为背景', fn(){
+          pickImageFiles(false, files => {
+            const file = files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+              state.profile.bgImage = ev.target.result;
+              save(); render(); toast('背景图已更新');
+            };
+            reader.readAsDataURL(file);
+          });
+        }},
+        {label:'使用内置渐变背景', fn(){
+          state.profile.bgImage = '';
+          save(); render(); toast('已恢复默认背景');
+        }},
+        {label:'清除背景图', danger:true, fn(){
+          state.profile.bgImage = '';
+          save(); render(); toast('已清除背景图');
+        }}
+      ]
+    });
+  },
+  'view-contact-likes': () => {
+    const c = getContact(currentRoute.param);
+    if (!c) return;
+    const liked = c.likedSongs || [];
+    openSheet({
+      title: c.name + ' 收藏的歌曲',
+      items: liked.length ? liked.map(s => ({label: (s.name || '未知') + ' - ' + (s.artists || ''), fn(){}})) : [{label:'还没有收藏歌曲', fn(){}}]
+    });
+  },
   'like-song': el => {
     const i = +el.dataset.i;
     if (state.music && state.music.songs[i]) {
