@@ -15,13 +15,14 @@
   --bubble-me:#95EC69; --bubble-bot:#FFFFFF;
   --text:#191919; --text2:#8A8A8A; --text3:#BFBFBF;
   --line:#E7E7E7; --danger:#FA5151; --like:#FA5151;
+  --input-bg:var(--input-bg); --sheet-bg:var(--sheet-bg); --hover:var(--hover); --track:var(--track); --frame:#E4E4E8;
   --nav-h:48px; --tab-h:56px;
   --radius:12px;
   --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC","Segoe UI",Roboto,sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
-body{font-family:var(--font);font-size:15px;color:var(--text);background:#E4E4E8;overflow:hidden}
+body{font-family:var(--font);font-size:15px;color:var(--text);background:var(--frame);overflow:hidden}
 button{font-family:inherit;border:none;background:none;cursor:pointer;color:inherit}
 input{font-family:inherit;border:none;outline:none}
 ::-webkit-scrollbar{width:0;height:0}
@@ -81,7 +82,7 @@ body.no-tab .tabbar{display:none}
 /* ---------- 通用列表行 ---------- */
 .cell{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--card);
   border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
-.cell:active{background:#F4F4F4}
+.cell:active{background:var(--hover)}
 .cell-main{flex:1;min-width:0}
 .cell-title{font-size:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cell-sub{font-size:12.5px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -96,7 +97,7 @@ body.no-tab .tabbar{display:none}
 /* ---------- 空状态 ---------- */
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;padding:72px 32px;color:var(--text2)}
-.empty-icon{width:76px;height:76px;border-radius:22px;background:#EEF1F4;color:#B9C2CC;
+.empty-icon{width:76px;height:76px;border-radius:22px;background:var(--icon-bg,#EEF1F4);color:var(--icon-fg,#B9C2CC);
   display:flex;align-items:center;justify-content:center;margin-bottom:18px}
 .empty-icon svg{width:38px;height:38px}
 .empty-title{font-size:16px;font-weight:600;color:var(--text)}
@@ -148,7 +149,7 @@ body.no-tab .tabbar{display:none}
 .emoji-panel{position:absolute;left:0;right:0;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom));
   background:var(--card);border-top:1px solid var(--line);padding:12px;display:none;z-index:8;max-height:220px;overflow-y:auto}
 .emoji-panel.show{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.emoji-item{width:100%;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#F7F7F7;cursor:pointer;
+.emoji-item{width:100%;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--sheet-bg);cursor:pointer;
   display:flex;align-items:center;justify-content:center}
 .emoji-item img{width:100%;height:100%;object-fit:contain}
 .emoji-add{border:2px dashed #DDD;display:flex;align-items:center;justify-content:center;color:#999;font-size:24px}
@@ -182,7 +183,7 @@ body.no-tab .tabbar{display:none}
 .menu-list .cell .icon-cell{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
 .menu-list .cell .icon-cell svg{width:16px;height:16px}
 .menu-list .cell.danger .cell-title{color:var(--danger)}
-.menu-badge{font-size:12px;color:var(--text2);background:#F2F3F5;padding:2px 9px;border-radius:10px}
+.menu-badge{font-size:12px;color:var(--text2);background:var(--input-bg);padding:2px 9px;border-radius:10px}
 
 /* ---------- 设置页 ---------- */
 .set-group{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-top:10px}
@@ -192,11 +193,11 @@ body.no-tab .tabbar{display:none}
 .set-row .lbl{font-size:15px}
 .set-row .lbl small{display:block;font-size:11.5px;color:var(--text3);margin-top:2px;font-weight:400}
 .stepper{display:flex;align-items:center;gap:2px}
-.stepper button{width:30px;height:30px;border-radius:8px;background:#F2F3F5;color:#333;
+.stepper button{width:30px;height:30px;border-radius:8px;background:var(--input-bg);color:#333;
   font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1}
 .stepper button:active{background:#E6E8EB}
 .stepper span{min-width:40px;text-align:center;font-size:15px;font-weight:600}
-.set-row input[type=number],.set-row input[type=text]{width:96px;height:34px;background:#F2F3F5;
+.set-row input[type=number],.set-row input[type=text]{width:96px;height:34px;background:var(--input-bg);
   border-radius:8px;padding:0 10px;font-size:15px;text-align:center}
 .set-row input[type=text]{text-align:left;width:200px}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
@@ -213,7 +214,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .card-chip .chip-text{flex:1;font-size:15px;min-width:0;word-break:break-all}
 .card-chip .chip-del{width:30px;height:30px;border-radius:8px;color:#C2C8CF;flex-shrink:0;
   display:flex;align-items:center;justify-content:center}
-.card-chip .chip-del:active{background:#F2F3F5;color:var(--danger)}
+.card-chip .chip-del:active{background:var(--input-bg);color:var(--danger)}
 .card-chip .chip-del svg{width:17px;height:17px}
 .card-count{font-size:11.5px;color:var(--text3);text-align:right;padding:0 16px 2px}
 
@@ -221,7 +222,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .import-box{background:var(--card);border-bottom:1px solid var(--line);padding:14px 16px}
 .import-title{font-size:14px;font-weight:600;margin-bottom:10px}
 .import-row{display:flex;gap:8px}
-.import-row input{flex:1;min-width:0;height:38px;background:#F2F3F5;border-radius:8px;
+.import-row input{flex:1;min-width:0;height:38px;background:var(--input-bg);border-radius:8px;
   padding:0 12px;font-size:14px}
 .btn-primary.sm{padding:0 18px;height:38px;border-radius:8px;font-size:14px;margin:0;flex-shrink:0}
 .import-hint{font-size:11.5px;color:var(--text3);margin-top:8px;line-height:1.6}
@@ -234,7 +235,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .pl-meta{font-size:12px;color:var(--text2);margin-top:4px}
 .song-list{flex:1;overflow-y:auto;background:var(--card);padding-bottom:6px}
 .song-row{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;
-  border-bottom:1px solid #F4F4F4;transition:background .12s}
+  border-bottom:1px solid var(--hover);transition:background .12s}
 .song-row:active{background:#F6F6F6}
 .song-idx{width:22px;text-align:center;font-size:13px;color:var(--text3);flex-shrink:0}
 .song-row.on .song-idx{color:var(--green)}
@@ -262,16 +263,18 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .moment-time{font-size:11.5px;color:var(--text3);margin-top:8px}
 .moment-actions{display:flex;gap:16px;margin-top:10px;margin-left:54px;font-size:13px}
 .moment-actions span{color:#576B95;cursor:pointer}
-.moment-comments{margin-top:10px;margin-left:54px;background:#F7F7F7;border-radius:6px;padding:8px 10px;font-size:13.5px}
+.moment-comments{margin-top:10px;margin-left:54px;background:var(--sheet-bg);border-radius:6px;padding:8px 10px;font-size:13.5px}
 .moment-comments .cmt{margin:3px 0;line-height:1.5}
 .moment-comments .cmt b{color:#576B95}
+.moment-comments .cmt-del{margin-left:6px;color:var(--text3);font-size:13px;background:none;padding:0 4px}
+.moment-likes{color:#576B95;padding-bottom:3px;margin-bottom:4px;border-bottom:1px solid var(--hover);font-size:13px}
 .moment-cover{margin:8px 0 0 54px;border-radius:8px;overflow;height:180px}
 .moment-cover img{width:100%;height:100%;object-fit:cover}
 
 /* ---------- 播放器 ---------- */
 .player{flex-shrink:0;background:var(--card);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
 .progress{height:18px;display:flex;align-items:center;cursor:pointer;position:relative}
-.progress .track{flex:1;height:3px;background:#E9E9E9;border-radius:2px;position:relative;overflow:visible}
+.progress .track{flex:1;height:3px;background:var(--track);border-radius:2px;position:relative;overflow:visible}
 .progress .fill{position:absolute;left:0;top:0;height:3px;background:var(--green);border-radius:2px;width:0%}
 .progress .knob{position:absolute;top:50%;left:0;width:12px;height:12px;border-radius:50%;
   background:#fff;border:2px solid var(--green);transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(0,0,0,.15);pointer-events:none}
@@ -283,12 +286,12 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .now-art{font-size:11.5px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .controls{display:flex;align-items:center;gap:6px}
 .ctl{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#333}
-.ctl:active{background:#F2F3F5}
+.ctl:active{background:var(--input-bg)}
 .ctl svg{width:21px;height:21px}
 .ctl.play-main{width:46px;height:46px;background:var(--green);color:#fff;box-shadow:0 3px 10px rgba(7,193,96,.35)}
 .ctl.play-main:active{background:var(--green-d)}
 .ctl.play-main svg{width:22px;height:22px}
-.ctl.mode{width:auto;padding:0 8px;height:28px;border-radius:14px;background:#F2F3F5;font-size:11px;color:#555;gap:4px}
+.ctl.mode{width:auto;padding:0 8px;height:28px;border-radius:14px;background:var(--input-bg);font-size:11px;color:#555;gap:4px}
 .ctl.mode svg{width:14px;height:14px}
 
 /* ---------- 部署说明页 ---------- */
@@ -299,7 +302,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .about-body{flex:1;min-width:0}
 .about-body h3{font-size:15px;font-weight:600;margin-bottom:5px}
 .about-body p{font-size:13px;color:#5A5A5A;line-height:1.75}
-.about-body code{background:#F2F3F5;border-radius:4px;padding:1px 6px;font-size:12.5px;color:#0B6A42;font-family:ui-monospace,Consolas,monospace}
+.about-body code{background:var(--input-bg);border-radius:4px;padding:1px 6px;font-size:12.5px;color:#0B6A42;font-family:ui-monospace,Consolas,monospace}
 .about-tip{background:#F0F9F3;border-radius:10px;padding:12px 14px;font-size:12.5px;color:#0F7A45;line-height:1.8;margin-top:4px}
 .about-warn{background:#FFF7E8;border-radius:10px;padding:12px 14px;font-size:12.5px;color:#B26A00;line-height:1.8;margin-top:10px}
 
@@ -317,13 +320,13 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .dlg-title{font-size:16.5px;font-weight:600}
 .dlg-text{font-size:13.5px;color:#666;margin-top:9px;line-height:1.65}
 .dlg-btns{display:flex;gap:10px;margin-top:20px}
-.dlg-btns .btn{flex:1;padding:10px;border-radius:9px;font-size:15px;background:#F2F3F5;color:#333}
+.dlg-btns .btn{flex:1;padding:10px;border-radius:9px;font-size:15px;background:var(--input-bg);color:#333}
 .dlg-btns .btn:active{background:#E7E9EC}
 .dlg-btns .btn.danger{background:var(--danger);color:#fff}
 .dlg-btns .btn.danger:active{background:#E04444}
 .dlg-btns .btn.primary{background:var(--green);color:#fff}
 .dlg-btns .btn.primary:active{background:var(--green-d)}
-.sheet{position:absolute;left:0;right:0;bottom:0;background:#F7F7F7;border-radius:14px 14px 0 0;
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--sheet-bg);border-radius:14px 14px 0 0;
   overflow:hidden;animation:sheetUp .22s ease;z-index:160;padding-bottom:env(safe-area-inset-bottom)}
 @keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
 .sheet .sh-title{font-size:12px;color:var(--text3);text-align:center;padding:11px 0 4px}
@@ -338,8 +341,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .modal-card h2{font-size:16.5px;font-weight:600;text-align:center;margin-bottom:16px}
 .m-field{margin-bottom:13px}
 .m-field label{display:block;font-size:12.5px;color:var(--text2);margin-bottom:6px}
-.m-field input{width:100%;height:38px;background:#F2F3F5;border-radius:8px;padding:0 12px;font-size:15px}
-.m-field textarea{width:100%;min-height:80px;background:#F2F3F5;border-radius:8px;padding:10px 12px;font-size:15px;resize:vertical}
+.m-field input{width:100%;height:38px;background:var(--input-bg);border-radius:8px;padding:0 12px;font-size:15px}
+.m-field textarea{width:100%;min-height:80px;background:var(--input-bg);border-radius:8px;padding:10px 12px;font-size:15px;resize:vertical}
 .color-palette{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .cp-item{width:34px;height:34px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:transform .12s}
 .cp-item:active{transform:scale(.9)}
@@ -348,7 +351,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .m-btns .btn{flex:1;padding:11px;border-radius:9px;font-size:15px}
 .m-btns .btn.primary{background:var(--green);color:#fff}
 .m-btns .btn.primary:active{background:var(--green-d)}
-.m-btns .btn.plain{background:#F2F3F5;color:#333}
+.m-btns .btn.plain{background:var(--input-bg);color:#333}
 .m-btns .btn.plain:active{background:#E7E9EC}
 .toggle{width:46px;height:26px;border-radius:13px;background:#E5E5E5;position:relative;transition:background .2s;cursor:pointer}
 .toggle.on{background:var(--green)}
@@ -360,9 +363,78 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .loading-dots i{width:5px;height:5px;border-radius:50%;background:#fff;animation:tp 1s ease-in-out infinite}
 .loading-dots i:nth-child(2){animation-delay:.18s}
 .loading-dots i:nth-child(3){animation-delay:.36s}
+
+/* ---------- 美化主题模板 ---------- */
+body[data-theme="pink"]{
+  --green:#F06C9B; --green-d:#E0558B; --bubble-me:#FFD6E5; --bg:#F2E2E9; --page:#FFF8FA;
+  --card:#FFFFFF; --line:#F0DDE5; --text:#3A2330; --text2:#A98A97; --text3:#C9B0BC;
+  --input-bg:#FFF0F4; --sheet-bg:#FFF8FA; --hover:#FFF0F4; --track:#F5DDE5; --frame:#E8D5DC;
+  --icon-bg:#FFE9F0; --icon-fg:#E8A0BC;
+}
+body[data-theme="blue"]{
+  --green:#3B82F6; --green-d:#2F6FE0; --bubble-me:#BFDBFE; --bg:#E3EDF9; --page:#F5F9FF;
+  --card:#FFFFFF; --line:#DFEAF7; --text:#172554; --text2:#7A8FB0; --text3:#A9BCD6;
+  --input-bg:#EDF3FB; --sheet-bg:#F5F9FF; --hover:#EDF3FB; --track:#D8E5F5; --frame:#D6E2F0;
+  --icon-bg:#E3EEFB; --icon-fg:#7FA6DC;
+}
+body[data-theme="orange"]{
+  --green:#F59E0B; --green-d:#E08C00; --bubble-me:#FDE8C8; --bg:#F8EFDF; --page:#FFFBF2;
+  --card:#FFFFFF; --line:#F2E4CB; --text:#3D2B10; --text2:#A08A5F; --text3:#C2AC82;
+  --input-bg:#FFF5E5; --sheet-bg:#FFFBF2; --hover:#FFF5E5; --track:#F0E2C8; --frame:#EDE0C8;
+  --icon-bg:#FDF0D8; --icon-fg:#D9A94E;
+}
+body[data-theme="purple"]{
+  --green:#8B5CF6; --green-d:#7A4BE8; --bubble-me:#DDD0FB; --bg:#EDE7F7; --page:#F9F6FF;
+  --card:#FFFFFF; --line:#E6DDF5; --text:#2E1A5E; --text2:#9581BC; --text3:#B7A7D6;
+  --input-bg:#F3EEFC; --sheet-bg:#F9F6FF; --hover:#F3EEFC; --track:#E4DAF5; --frame:#DFD6EF;
+  --icon-bg:#EFE8FC; --icon-fg:#A78BEA;
+}
+body[data-theme="dark"]{
+  --bg:#1C1C1E; --page:#242426; --card:#2C2C2E;
+  --green:#30D158; --green-d:#28B84C; --bubble-me:#1E4D2E; --bubble-bot:#3A3A3C;
+  --text:#F2F2F7; --text2:#98989E; --text3:#6E6E73;
+  --line:#3A3A3C; --danger:#FF6B6B; --like:#FF6B6B;
+  --input-bg:#3A3A3C; --sheet-bg:#2C2C2E; --hover:#3A3A3C; --track:#4A4A4C; --frame:#151517;
+  --icon-bg:#3A3A3C; --icon-fg:#98989E;
+}
+body[data-theme="dark"] .me-head{background:linear-gradient(135deg,#1F7A45 0%,#1E9E58 55%,#18875F 100%)}
+body[data-theme="dark"] .dlg-card{background:#2C2C2E}
+body[data-theme="dark"] .dlg-text{color:#B0B0B6}
+body[data-theme="dark"] .dlg-btns .btn{background:#3A3A3C}
+body[data-theme="dark"] .sheet .sh-item{background:#2C2C2E;border-color:#3A3A3C}
+body[data-theme="dark"] .sheet .sh-cancel{background:#2C2C2E;color:#F2F2F7}
+body[data-theme="dark"] .modal-card{background:#2C2C2E}
+body[data-theme="dark"] .modal-card h2{color:#F2F2F7}
+body[data-theme="dark"] .m-field label{color:#98989E}
+body[data-theme="dark"] .moment-comments{background:#3A3A3C}
+body[data-theme="dark"] .chat-body .msg.bot .bubble{color:#F2F2F7}
+body[data-theme="dark"] .card-chip{background:#2C2C2E;color:#F2F2F7}
+body[data-theme="dark"] .song-row.on .song-name{color:#30D158}
+body[data-theme="dark"] .cell:active{background:#333}
+
+/* ---------- 表情包管理页 ---------- */
+.emoji-manage-wrap{flex:1;overflow-y:auto;padding:12px 14px 20px}
+.emoji-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.emoji-card{position:relative;aspect-ratio:1;border-radius:10px;background:var(--card);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.emoji-card img{width:100%;height:100%;object-fit:contain;padding:6px}
+.emoji-card .emoji-del{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;
+  background:rgba(0,0,0,.55);color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center}
+.emoji-import-btn{width:100%;margin-top:12px;background:var(--green);color:#fff;font-size:15px;
+  padding:12px;border-radius:10px;font-weight:500}
+.emoji-count{font-size:11.5px;color:var(--text3);text-align:right;padding:0 16px 2px}
+
+/* ---------- 主题选择 ---------- */
+.theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:12px 16px 16px}
+.theme-item{background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px 8px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:7px;transition:border-color .15s}
+.theme-item.on{border-color:var(--green)}
+.theme-swatch{width:38px;height:38px;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.theme-name{font-size:12px;color:var(--text);font-weight:500}
+.theme-desc{font-size:10.5px;color:var(--text3);text-align:center;line-height:1.4}
 </style>
 </head>
-<body>
+<body data-theme="default">
 
 <!-- SVG 图标库 -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -479,13 +551,30 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     <header class="nav">
       <button class="icon-btn" data-action="back"><svg><use href="#i-back" xlink:href="#i-back"/></svg></button>
       <h1>字卡库</h1>
-      <div class="nav-right"></div>
+      <div class="nav-right">
+        <button class="icon-btn" data-action="batch-import-cards" title="批量导入"><svg><use href="#i-upload" xlink:href="#i-upload"/></svg></button>
+      </div>
     </header>
-    <div class="cards-tip">对方回复时会从这里随机抽取字卡，想让它说什么就放什么进来。</div>
+    <div class="cards-tip">对方回复时会从这里随机抽取字卡。支持单条添加，也可点右上角批量导入。</div>
     <div id="cardsWrap" class="cards-wrap"></div>
     <div class="chat-input">
       <input id="cardInput" type="text" maxlength="40" placeholder="输入新的字卡内容…" autocomplete="off">
       <button class="send-btn add" id="cardAdd" title="添加"><svg><use href="#i-plus" xlink:href="#i-plus"/></svg></button>
+    </div>
+  </section>
+
+  <!-- ===== 视图：表情包管理 ===== -->
+  <section id="view-emojis" class="view">
+    <header class="nav">
+      <button class="icon-btn" data-action="back"><svg><use href="#i-back" xlink:href="#i-back"/></svg></button>
+      <h1>表情包管理</h1>
+      <div class="nav-right"></div>
+    </header>
+    <div class="cards-tip">统一管理聊天表情包。可批量导入本地图片，聊天时点输入框左侧笑脸按钮使用。</div>
+    <div id="emojiCount" class="emoji-count"></div>
+    <div id="emojiWrap" class="emoji-manage-wrap"></div>
+    <div class="chat-input">
+      <button class="send-btn add" style="flex:1;height:40px;border-radius:10px;background:var(--green);color:#fff;font-size:15px" data-action="emoji-import" title="批量导入表情包">批量导入表情包</button>
     </div>
   </section>
 
@@ -523,7 +612,6 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
   <div class="overlay" id="sheetOverlay"></div>
   <div class="modal" id="modalRoot"></div>
   <audio id="audio" preload="none"></audio>
-  <input type="file" id="imgUpload" accept="image/*" style="display:none">
 </div>
 
 <script>
@@ -581,6 +669,26 @@ const AV_COLORS = [
   ['#FF9F6E','#FF6B6B'], ['#5AD8A6','#2FBFA0'], ['#7C9CFF','#5B6BF0'], ['#F6A5C0','#F0579B'],
   ['#FFD166','#F4A340'], ['#8FD3F4','#4BA6E0'], ['#B39DDB','#7E6BD6'], ['#A0D2A8','#5FBF77']
 ];
+const THEMES = [
+  {k:'default', name:'微信绿', desc:'经典微信配色', bg:'#07C160'},
+  {k:'pink', name:'樱花粉', desc:'少女心满满', bg:'#F06C9B'},
+  {k:'blue', name:'深海蓝', desc:'清爽海洋风', bg:'#3B82F6'},
+  {k:'orange', name:'暖阳橙', desc:'温暖活力感', bg:'#F59E0B'},
+  {k:'purple', name:'暮光紫', desc:'浪漫高级感', bg:'#8B5CF6'},
+  {k:'dark', name:'暗夜黑', desc:'护眼夜间模式', bg:'#1F2937'}
+];
+function themeInfo(){ return THEMES.find(x => x.k === state.settings.theme) || THEMES[0]; }
+function applyTheme(){
+  const k = state.settings.theme || 'default';
+  document.body.setAttribute('data-theme', THEMES.some(t => t.k === k) ? k : 'default');
+}
+function setTheme(k){
+  state.settings.theme = k;
+  save();
+  applyTheme();
+  render();
+  toast('已切换为「' + themeInfo().name + '」主题');
+}
 const DEFAULT_MOMENTS = [
   {id:'m1', authorId:'c1', text:DEFAULT_CARDS[randInt(0, DEFAULT_CARDS.length-1)] + ' ' + DEFAULT_CARDS[randInt(0, DEFAULT_CARDS.length-1)], time: Date.now() - 3600*1000*2, likes:['我'], comments:[]}
 ];
@@ -593,7 +701,7 @@ const state = {
   cards: LS.get('wc_cards', DEFAULT_CARDS),
   contacts: LS.get('wc_contacts', DEFAULT_CONTACTS),
   chats: LS.get('wc_chats', {}),
-  settings: LS.get('wc_settings', {minReplies:1, maxReplies:3, minDelay:1, maxDelay:4}),
+  settings: LS.get('wc_settings', {minReplies:1, maxReplies:3, minDelay:1, maxDelay:4, theme:'default'}),
   music: LS.get('wc_music', null),
   apiBase: LS.get('wc_apiBase', ''),
   moments: LS.get('wc_moments', DEFAULT_MOMENTS),
@@ -711,6 +819,7 @@ function render(){
   else if (currentRoute.name === 'me') v = $('#view-me');
   else if (currentRoute.name === 'settings') v = $('#view-settings');
   else if (currentRoute.name === 'cards') v = $('#view-cards');
+  else if (currentRoute.name === 'emojis') v = $('#view-emojis');
   else if (currentRoute.name === 'moments') v = $('#view-moments');
   else if (currentRoute.name === 'contact-detail' && currentRoute.param) v = $('#view-contact-detail');
   else if (currentRoute.name === 'about') v = $('#view-about');
@@ -723,6 +832,7 @@ function render(){
   else if (currentRoute.name === 'me') renderMe();
   else if (currentRoute.name === 'settings') renderSettings();
   else if (currentRoute.name === 'cards') renderCards();
+  else if (currentRoute.name === 'emojis') renderEmojis();
   else if (currentRoute.name === 'moments') renderMoments();
   else if (currentRoute.name === 'contact-detail' && currentRoute.param) renderContactDetail();
   else if (currentRoute.name === 'about') renderAbout();
@@ -1082,7 +1192,7 @@ function renderMe(){
     '</div>' +
     '<div class="menu-list">' +
       '<div class="cell" data-action="open-cards"><span class="icon-cell" style="background:#5B6BF0"><svg><use href="#i-card" xlink:href="#i-card"/></svg></span><div class="cell-title">字卡库管理</div><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
-      '<div class="cell" data-action="manage-emojis"><span class="icon-cell" style="background:#F0579B"><svg><use href="#i-emoji" xlink:href="#i-emoji"/></svg></span><div class="cell-title">表情包管理</div><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
+      '<div class="cell" data-action="open-emojis"><span class="icon-cell" style="background:#F0579B"><svg><use href="#i-emoji" xlink:href="#i-emoji"/></svg></span><div class="cell-title">表情包管理</div><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
       '<div class="cell" data-action="open-settings"><span class="icon-cell" style="background:#8A8F99"><svg><use href="#i-gear" xlink:href="#i-gear"/></svg></span><div class="cell-title">设置</div><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
       '<div class="cell" data-action="open-about"><span class="icon-cell" style="background:#07C160"><svg><use href="#i-upload" xlink:href="#i-upload"/></svg></span><div class="cell-title">部署到 GitHub Pages</div><span class="cell-arrow"><svg width="16" height="16"><use href="#i-back" xlink:href="#i-back"/></svg></span></div>' +
     '</div>' +
@@ -1113,6 +1223,14 @@ function renderSettings(){
       '<div class="set-row"><span class="lbl">自定义 API 地址<small>留空使用内置公共节点</small></span>' +
         '<input type="text" id="v-apiBase" placeholder="https://your-api.example.com" value="' + esc(state.apiBase) + '"></div>' +
       '<div class="set-hint">若公共节点导入歌单失败，可填写自建 NeteaseCloudMusicApi 的地址（例如部署在 Vercel / Render 的实例）。以 http(s):// 开头、不带末尾斜杠，示例：https://music-api.xxx.vercel.app</div>' +
+    '</div>' +
+    '<div class="set-group">' +
+      '<div class="set-title">美化模板</div>' +
+      '<div class="theme-grid">' + THEMES.map(t =>
+        '<div class="theme-item' + (t.k === state.settings.theme ? ' on' : '') + '" data-action="pick-theme" data-k="' + t.k + '">' +
+        '<div class="theme-swatch" style="background:' + t.bg + '"></div>' +
+        '<div class="theme-name">' + t.name + '</div><div class="theme-desc">' + t.desc + '</div></div>'
+      ).join('') + '</div>' +
     '</div>' +
     '<div class="set-group">' +
       '<div class="set-title">VIP/试听歌曲管理</div>' +
@@ -1146,9 +1264,9 @@ function stepSetting(k, d){
   if (el) el.textContent = s[k];
 }
 async function resetSettings(){
-  const ok = await confirmDialog({title: '恢复默认设置', text: '回复条数与延迟时间将恢复默认值。', okText: '恢复'});
+  const ok = await confirmDialog({title: '恢复默认设置', text: '回复条数与延迟时间将恢复默认值，当前美化主题保留。', okText: '恢复'});
   if (!ok) return;
-  state.settings = {minReplies: 1, maxReplies: 3, minDelay: 1, maxDelay: 4};
+  state.settings = {minReplies: 1, maxReplies: 3, minDelay: 1, maxDelay: 4, theme: state.settings.theme || 'default'};
   state.apiBase = '';
   save(); render(); toast('已恢复默认设置');
 }
@@ -1185,11 +1303,111 @@ function addCard(){
   input.focus();
   toast('已添加字卡');
 }
+function openBatchImport(){
+  const root = $('#modalRoot');
+  root.innerHTML = '<div class="modal-card"><h2>批量导入字卡</h2>' +
+    '<div class="m-field"><label>每行一条，或用逗号 / 分号分隔，自动去重</label>' +
+    '<textarea id="batchText" placeholder="例如：&#10;好的好的&#10;没问题呀&#10;哈哈哈哈哈,笑死我了&#10;今天天气不错"></textarea></div>' +
+    '<div class="m-field"><label>也可以从 txt 文件导入</label>' +
+    '<button class="btn plain" id="batchFileBtn" style="width:100%">选择 txt 文件</button></div>' +
+    '<div class="m-btns"><button class="btn plain" id="pm-cancel">取消</button><button class="btn primary" id="pm-ok">导入</button></div></div>';
+  root.classList.add('show');
+  root.querySelector('#pm-cancel').onclick = () => root.classList.remove('show');
+  root.querySelector('#batchFileBtn').onclick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.txt,text/plain';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.onchange = () => {
+      const file = input.files[0];
+      document.body.removeChild(input);
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        root.querySelector('#batchText').value = ev.target.result;
+        toast('已读取文件内容，点「导入」添加');
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+  root.querySelector('#pm-ok').onclick = () => {
+    const raw = root.querySelector('#batchText').value;
+    const items = raw.split(/[\n,，;；、]+/).map(s => s.trim()).filter(s => s.length > 0);
+    let added = 0;
+    items.forEach(t => {
+      if (!state.cards.includes(t)) { state.cards.push(t); added++; }
+    });
+    if (!added) { toast('没有可导入的新字卡'); return; }
+    save();
+    root.classList.remove('show');
+    renderCards();
+    toast('已导入 ' + added + ' 张字卡（共 ' + state.cards.length + ' 张）');
+  };
+}
 function delCard(i){
   if (i < 0 || i >= state.cards.length) return;
   state.cards.splice(i, 1);
   save(); renderCards();
   toast('已删除');
+}
+
+/* ============================================================
+   表情包管理
+   ============================================================ */
+function renderEmojis(){
+  const wrap = $('#emojiWrap');
+  const cnt = $('#emojiCount');
+  if (cnt) cnt.textContent = '共 ' + state.emojis.length + ' 个表情包';
+  if (!state.emojis.length) {
+    wrap.innerHTML = emptyHtml('cards', '还没有表情包', '点击下方按钮批量导入图片，聊天中即可使用');
+    return;
+  }
+  wrap.innerHTML = '<div class="emoji-grid">' + state.emojis.map((src, i) =>
+    '<div class="emoji-card"><img src="' + src + '" alt="表情' + (i+1) + '">' +
+    '<button class="emoji-del" data-action="del-emoji" data-i="' + i + '" title="删除">×</button></div>'
+  ).join('') + '</div>';
+}
+// 创建独立文件选择器（避免与其他上传功能互相覆盖）
+function pickImageFiles(multiple, onFiles){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  if (multiple) input.multiple = true;
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = () => {
+    const files = Array.from(input.files || []);
+    document.body.removeChild(input);
+    onFiles(files);
+  };
+  input.click();
+}
+function importEmojis(files){
+  if (!files || !files.length) return;
+  let added = 0;
+  files.forEach(file => {
+    if (!/^image\//.test(file.type)) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      state.emojis.push(ev.target.result);
+      added++;
+      if (added === files.filter(f => /^image\//.test(f.type)).length) {
+        save();
+        renderEmojis();
+        toast('已导入 ' + added + ' 个表情包');
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function delEmoji(i){
+  if (i < 0 || i >= state.emojis.length) return;
+  state.emojis.splice(i, 1);
+  save();
+  renderEmojis();
+  toast('已删除表情包');
 }
 
 /* ============================================================
@@ -1205,6 +1423,8 @@ function renderMoments(){
     const author = m.authorId === 'me' ? state.profile : getContact(m.authorId);
     if (!author) return '';
     const liked = m.likes.includes('我');
+    const likeList = m.likes && m.likes.length ? '<div class="moment-likes">♥ ' + esc(m.likes.join('、')) + '</div>' : '';
+    const cmts = m.comments || [];
     return '<div class="moment-item">' +
       '<div class="moment-head">' + avatarHtml(author, 42) +
       '<div><div class="moment-author">' + esc(author.name) + '</div></div></div>' +
@@ -1214,10 +1434,60 @@ function renderMoments(){
         '<span data-action="like-moment" data-id="' + m.id + '">' + (liked?'已赞':'赞') + '</span>' +
         '<span data-action="comment-moment" data-id="' + m.id + '">评论</span>' +
       '</div>' +
-      (m.comments && m.comments.length ? '<div class="moment-comments">' + m.comments.map(c => '<div class="cmt"><b>' + esc(c.author) + '：</b>' + esc(c.text) + '</div>').join('') + '</div>' : '') +
+      (likeList || cmts.length ? '<div class="moment-comments">' + likeList +
+        cmts.map((c, ci) => '<div class="cmt"><b>' + esc(c.author) + '：</b>' + esc(c.text) +
+          (c.author === state.profile.name ? '<button class="cmt-del" data-action="del-moment-comment" data-id="' + m.id + '" data-ci="' + ci + '">×</button>' : '') +
+          '</div>').join('') +
+      '</div>' : '') +
     '</div>';
   }).join('');
 }
+function commentMoment(id){
+  const m = state.moments.find(x=>x.id===id);
+  if (!m) return;
+  const root = $('#modalRoot');
+  root.innerHTML = '<div class="modal-card"><h2>评论</h2>' +
+    '<div class="m-field"><input id="cmtInput" maxlength="60" placeholder="说点什么…" autocomplete="off"></div>' +
+    '<div class="m-btns"><button class="btn plain" id="pm-cancel">取消</button><button class="btn primary" id="pm-ok">发送</button></div></div>';
+  root.classList.add('show');
+  const input = root.querySelector('#cmtInput');
+  setTimeout(() => input.focus(), 50);
+  root.querySelector('#pm-cancel').onclick = () => root.classList.remove('show');
+  const submit = () => {
+    const text = input.value.trim();
+    if (!text) { toast('评论不能为空'); return; }
+    if (!m.comments) m.comments = [];
+    m.comments.push({author: state.profile.name, text: text, time: Date.now()});
+    save();
+    root.classList.remove('show');
+    renderMoments();
+    toast('评论成功');
+  };
+  root.querySelector('#pm-ok').onclick = submit;
+  input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submit(); } });
+}
+function delMomentComment(id, ci){
+  const m = state.moments.find(x=>x.id===id);
+  if (!m || !m.comments) return;
+  m.comments.splice(ci, 1);
+  save();
+  renderMoments();
+  toast('已删除评论');
+}
+// 联系人随机回复评论
+setInterval(() => {
+  const mine = state.moments.filter(m => m.authorId === 'me' && Math.random() < 0.5);
+  if (!mine.length) return;
+  if (Math.random() < 0.6) {
+    const m = mine[randInt(0, mine.length-1)];
+    if (!state.contacts.length || !state.cards.length) return;
+    const c = state.contacts[randInt(0, state.contacts.length-1)];
+    if (!m.comments) m.comments = [];
+    m.comments.push({author: c.name, text: state.cards[randInt(0, state.cards.length-1)], time: Date.now()});
+    save();
+    if (currentRoute.name === 'moments') renderMoments();
+  }
+}, 1000 * 60 * 6);
 function postMoment(){
   const root = $('#modalRoot');
   root.innerHTML = '<div class="modal-card"><h2>发表朋友圈</h2>' +
@@ -1661,23 +1931,29 @@ const ACTIONS = {
   },
   'post-moment': () => postMoment(),
   'show-vip-list': () => showVipList(),
+  'comment-moment': el => commentMoment(el.dataset.id),
+  'del-moment-comment': el => delMomentComment(el.dataset.id, +el.dataset.ci),
+  'batch-import-cards': () => openBatchImport(),
+  'open-emojis': () => go('#/emojis'),
+  'emoji-import': () => pickImageFiles(true, importEmojis),
+  'del-emoji': el => delEmoji(+el.dataset.i),
+  'pick-theme': el => setTheme(el.dataset.k),
   'edit-contact-basic': () => openProfileModal(getContact(currentRoute.param)),
   'upload-contact-avatar': () => {
-    $('#imgUpload').onchange = e => {
-      const file = e.target.files[0];
+    pickImageFiles(false, files => {
+      const file = files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = ev => {
         const c = getContact(currentRoute.param);
+        if (!c) return;
         c.avatarUrl = ev.target.result;
         save();
         renderContactDetail();
         toast('头像已更新');
       };
       reader.readAsDataURL(file);
-      e.target.value = '';
-    };
-    $('#imgUpload').click();
+    });
   },
   'edit-contact-status': () => {
     const c = getContact(currentRoute.param);
@@ -1707,28 +1983,7 @@ const ACTIONS = {
       }))
     });
   },
-  'del-contact-detail': () => deleteContact(currentRoute.param),
-  'manage-emojis': () => {
-    const root = $('#modalRoot');
-    let html = '<div class="modal-card"><h2>表情包管理</h2><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
-    state.emojis.forEach((src,i) => {
-      html += '<div style="position:relative;height:80px"><img src="'+src+'" style="width:100%;height:100%;object-fit:contain;border-radius:8px">' +
-              '<button data-del-emoji="'+i+'" style="position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:14px">×</button></div>';
-    });
-    html += '</div><div class="m-btns"><button class="btn plain" id="pm-cancel">关闭</button><button class="btn primary" id="addEmoji">添加表情包</button></div></div>';
-    root.innerHTML = html;
-    root.classList.add('show');
-    root.querySelector('#pm-cancel').onclick = () => root.classList.remove('show');
-    root.querySelector('#addEmoji').onclick = () => $('#imgUpload').click();
-    root.querySelectorAll('[data-del-emoji]').forEach(btn => {
-      btn.onclick = () => {
-        state.emojis.splice(+btn.dataset.delEmoji,1);
-        save();
-        toast('已删除');
-        ACTIONS['manage-emojis']();
-      };
-    });
-  }
+  'del-contact-detail': () => deleteContact(currentRoute.param)
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
@@ -1771,27 +2026,20 @@ function bindStatic(){
     const panel = $('#emojiPanel');
     if (panel.classList.contains('show')) { panel.classList.remove('show'); return; }
     let html = state.emojis.map(src => '<div class="emoji-item" data-emoji="' + src + '"><img src="' + src + '"></div>').join('');
-    html += '<div class="emoji-item emoji-add" id="addEmojiBtn">+</div>';
+    html += '<div class="emoji-item emoji-add" id="addEmojiBtn" title="导入表情包">+</div>';
     panel.innerHTML = html;
     panel.classList.add('show');
     $$('.emoji-item:not(.emoji-add)').forEach(el => {
       el.onclick = () => sendEmoji(el.dataset.emoji);
     });
-    $('#addEmojiBtn').onclick = () => $('#imgUpload').click();
-  };
-  // 图片上传
-  $('#imgUpload').onchange = e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      state.emojis.push(ev.target.result);
-      save();
-      toast('已添加表情包');
-      $('#emojiBtn').click(); $('#emojiBtn').click(); // 刷新面板
+    $('#addEmojiBtn').onclick = () => {
+      pickImageFiles(true, files => {
+        importEmojis(files);
+        const p = $('#emojiPanel');
+        if (p.classList.contains('show')) p.classList.remove('show');
+        setTimeout(() => $('#emojiBtn').click(), 150);
+      });
     };
-    reader.readAsDataURL(file);
-    e.target.value = '';
   };
   // 消息长按 / 点击菜单
   const body = $('#chatBody');
@@ -1815,6 +2063,7 @@ function updateStatusClock(){
   if (el) el.textContent = fmtClock(Date.now());
 }
 function init(){
+  applyTheme();
   bindStatic();
   updateStatusClock();
   setInterval(updateStatusClock, 30000);
