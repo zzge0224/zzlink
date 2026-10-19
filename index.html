@@ -10,26 +10,39 @@
   <div id="app">
     <!-- 顶部标题栏 -->
     <header class="app-header">
+      <button id="btn-back" class="btn-back hidden" title="返回">‹</button>
       <h1 id="page-title">聊天</h1>
+      <div class="header-right"></div>
     </header>
 
     <!-- 主内容区 -->
     <main class="app-main">
       <!-- 聊天页 -->
       <section id="page-chat" class="page active">
-        <div class="empty-state">
-          <div class="empty-icon">💬</div>
-          <p>选择联系人开始聊天</p>
-          <p class="hint">字卡会以纸笺形式回复</p>
+        <!-- 会话列表（未选中联系人时） -->
+        <div id="chat-list-view">
+          <div id="chat-list" class="chat-list"></div>
+          <div id="chat-list-empty" class="empty-state">
+            <div class="empty-icon">💬</div>
+            <p>选择联系人开始聊天</p>
+            <p class="hint">字卡会以纸笺形式回复</p>
+          </div>
+        </div>
+
+        <!-- 单聊视图 -->
+        <div id="chat-detail-view" class="hidden">
+          <div id="message-list" class="message-list"></div>
+          <div class="composer">
+            <textarea id="msg-input" placeholder="说点什么..." rows="1"></textarea>
+            <button id="btn-send" class="btn-send">发送</button>
+          </div>
         </div>
       </section>
 
       <!-- 联系人页 -->
       <section id="page-contacts" class="page">
         <div class="contacts-layout">
-          <!-- 左侧联系人列表 -->
           <div class="contacts-list" id="contacts-list"></div>
-          <!-- 右侧字卡详情 -->
           <div class="cards-panel" id="cards-panel">
             <div class="empty-state small">
               <p>选择一位联系人查看字卡库</p>
@@ -76,11 +89,13 @@
     </nav>
   </div>
 
-  <!-- 字卡编辑弹窗 -->
+  <!-- 通用弹窗（字卡编辑 / 回复设置） -->
   <div id="modal-overlay" class="modal-overlay hidden">
     <div class="modal">
       <h3 id="modal-title">添加字卡</h3>
-      <textarea id="modal-input" placeholder="输入字卡内容..." rows="4"></textarea>
+      <div id="modal-body">
+        <textarea id="modal-input" placeholder="输入字卡内容..." rows="4"></textarea>
+      </div>
       <div class="modal-actions">
         <button class="btn-ghost" id="modal-cancel">取消</button>
         <button class="btn-primary" id="modal-confirm">确定</button>
