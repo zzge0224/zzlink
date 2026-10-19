@@ -11,7 +11,10 @@
     <!-- 顶部标题栏 -->
     <header class="app-header">
       <button id="btn-back" class="btn-back hidden" title="返回">‹</button>
-      <h1 id="page-title">聊天</h1>
+      <div class="header-center">
+        <div id="header-avatar" class="header-avatar hidden" title="双击拍一拍"></div>
+        <h1 id="page-title">聊天</h1>
+      </div>
       <div class="header-right"></div>
     </header>
 
@@ -19,7 +22,7 @@
     <main class="app-main">
       <!-- 聊天页 -->
       <section id="page-chat" class="page active">
-        <!-- 会话列表（未选中联系人时） -->
+        <!-- 会话列表 -->
         <div id="chat-list-view">
           <div id="chat-list" class="chat-list"></div>
           <div id="chat-list-empty" class="empty-state">
@@ -32,7 +35,30 @@
         <!-- 单聊视图 -->
         <div id="chat-detail-view" class="hidden">
           <div id="message-list" class="message-list"></div>
+
+          <!-- 引用预览条 -->
+          <div id="quote-bar" class="quote-bar hidden">
+            <div class="quote-bar-content">
+              <span class="quote-bar-label">引用</span>
+              <span id="quote-bar-text" class="quote-bar-text"></span>
+            </div>
+            <button id="quote-bar-close" class="quote-bar-close">✕</button>
+          </div>
+
+          <!-- 附件面板 -->
+          <div id="attach-panel" class="attach-panel hidden">
+            <button class="attach-btn" data-action="transfer">
+              <span class="attach-icon">💸</span>
+              <span>转账</span>
+            </button>
+            <button class="attach-btn" data-action="redpacket">
+              <span class="attach-icon">🧧</span>
+              <span>红包</span>
+            </button>
+          </div>
+
           <div class="composer">
+            <button id="btn-attach" class="btn-attach" title="附件">+</button>
             <textarea id="msg-input" placeholder="说点什么..." rows="1"></textarea>
             <button id="btn-send" class="btn-send">发送</button>
           </div>
@@ -57,6 +83,16 @@
           <div class="avatar-large" style="background:#3D9A62">昕</div>
           <h2>昕</h2>
           <p class="subtitle">字笺 · 纸上心意</p>
+
+          <div class="balance-card">
+            <div class="balance-label">我的星币</div>
+            <div class="balance-value">
+              <span id="user-balance">888</span>
+              <span class="balance-unit">★</span>
+            </div>
+            <button class="btn-sm" id="btn-edit-balance">修改余额</button>
+          </div>
+
           <div class="stats">
             <div class="stat-item">
               <span class="stat-num" id="stat-contacts">0</span>
@@ -89,13 +125,16 @@
     </nav>
   </div>
 
-  <!-- 通用弹窗（字卡编辑 / 回复设置） -->
+  <!-- 消息操作菜单（长按） -->
+  <div id="msg-action-menu" class="msg-action-menu hidden">
+    <button data-action="quote">引用</button>
+  </div>
+
+  <!-- 通用弹窗 -->
   <div id="modal-overlay" class="modal-overlay hidden">
     <div class="modal">
       <h3 id="modal-title">添加字卡</h3>
-      <div id="modal-body">
-        <textarea id="modal-input" placeholder="输入字卡内容..." rows="4"></textarea>
-      </div>
+      <div id="modal-body"></div>
       <div class="modal-actions">
         <button class="btn-ghost" id="modal-cancel">取消</button>
         <button class="btn-primary" id="modal-confirm">确定</button>

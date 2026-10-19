@@ -970,4 +970,37 @@
     btnSend.addEventListener('click', sendMessage);
     msgInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
-       
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    msgInput.addEventListener('input', autoResizeInput);
+
+    // 附件
+    btnAttach.addEventListener('click', toggleAttachPanel);
+    attachPanel.querySelectorAll('.attach-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        openMoneyModal(btn.dataset.action);
+      });
+    });
+
+    // 引用
+    quoteBarClose.addEventListener('click', clearQuote);
+    msgActionMenu.querySelector('[data-action="quote"]').addEventListener('click', startQuote);
+
+    // 点击空白关闭菜单
+    document.addEventListener('click', (e) => {
+      if (!msgActionMenu.contains(e.target)) hideMsgMenu();
+    });
+
+    switchPage('chat');
+    updateStats();
+    updateBalanceUI();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
