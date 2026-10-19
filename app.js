@@ -6,7 +6,7 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'zijian_data_v4';
+  const STORAGE_KEY = 'zijian_data_v5';
 
   const DEFAULT_SETTINGS = { minDelay: 1.5, maxDelay: 4, maxReplies: 2 };
   const DEFAULT_INTERACTION = ['轻轻拍了拍', '重重拍了拍', '拍了拍', '戳了戳', '碰了碰'];
@@ -20,6 +20,8 @@
       avatarImg: null,
       chatBgColor: null,
       chatBgImg: null,
+      musicFavorites: [],
+      currentMusic: null,
       cards: [
         '今日风清，想与你分享一杯热茶。',
         '你说的那句话，我记了很久。',
@@ -37,6 +39,8 @@
       avatarImg: null,
       chatBgColor: null,
       chatBgImg: null,
+      musicFavorites: [],
+      currentMusic: null,
       cards: [
         '刚写完一页，忽然想起你。',
         '纸笺有限，心意无限。',
@@ -62,7 +66,8 @@
     pendingTimers: [],
     quotingMsg: null,
     longPressMsg: null,
-    uploadTarget: null
+    uploadTarget: null,
+    musicStatusTimer: null
   };
 
   function loadData() {
@@ -77,6 +82,8 @@
             if (c.avatarImg === undefined) c.avatarImg = null;
             if (c.chatBgColor === undefined) c.chatBgColor = null;
             if (c.chatBgImg === undefined) c.chatBgImg = null;
+            if (!c.musicFavorites) c.musicFavorites = [];
+            if (c.currentMusic === undefined) c.currentMusic = null;
           });
           return {
             contacts: parsed.contacts,
@@ -166,6 +173,16 @@
   const quoteBarText = $('#quote-bar-text');
   const quoteBarClose = $('#quote-bar-close');
   const msgActionMenu = $('#msg-action-menu');
+  const musicPanel = $('#music-panel');
+  const musicPanelToggle = $('#music-panel-toggle');
+  const musicIframe = $('#music-iframe');
+  const musicEmpty = $('#music-empty');
+  const musicStatusText = $('#music-status-text');
+  const musicStatusDot = document.querySelector('.music-status-dot');
+  const musicLinkInput = $('#music-link-input');
+  const btnMusicLoad = $('#btn-music-load');
+  const btnMusicSave = $('#btn-music-save');
+  const musicFavSelect = $('#music-fav-select');
 
   function applyTheme(name) {
     if (!THEMES.includes(name)) name = 'classic';
@@ -178,6 +195,152 @@
     $$('.theme-card').forEach((card) => {
       card.classList.toggle('active', card.dataset.theme === state.theme);
     });
+  }
+
+  // ========== 一起听 · 网易云 ==========
+  function parseNeteaseLink(input) {
+    if (!input || typeof input !== 'string') return null;
+    const str = input.trim();
+    // 已是 outchain
+    let m = str.match(/music\.163\.com\/outchain\/player\?[^\s"']+/i);
+    if (m) {
+      try {
+        const url = new URL('https://' + m[0].replace(/^\/\//, ''));
+        const type = url.searchParams.get('type');
+        const id = url.searchParams.get('id');
+        if (type != null && id) {
+          return {
+            type: parseInt(type, 10),
+            id,
+            embedUrl: `https://music.163.com/outchain/player?type=${type}&id=${id}&auto=0&height=66`,
+            label: (type === 0 || type === '0') ? `歌单 ${id}` : `单曲 ${id}`
+          };
+        }
+      } catch (_) {}
+    }
+    // 歌单
+    m = str.match(/playlist\?id=(\d+)/i) || str.match(/playlist\/(\d+)/i) || str.match(/[#&?]id=(\d+).*playlist/i);
+    if (m && /playlist/i.test(str)) {
+      const id = m[1];
+      return {
+        type: 0,
+        id,
+        embedUrl: `https://music.163.com/outchain/player?type=0&id=${id}&auto=0&height=66`,
+        label: `歌单 ${id}`
+      };
+    }
+    // 单曲
+    m = str.match(/song\?id=(\d+)/i) || str.match(/song\/(\d+)/i) || str.match(/[#&?]id=(\d+)/i);
+    if (m) {
+      const id = m[1];
+      return {
+        type: 2,
+        id,
+        embedUrl: `https://music.163.com/outchain/player?type=2&id=${id}&auto=0&height=66`,
+        label: `单曲 ${id}`
+      };
+    }
+    return null;
+  }
+
+  function loadMusicForContact(music) {
+    if (!music || !music.embedUrl) {
+      musicIframe.classList.add('hidden');
+      musicEmpty.classList.remove('hidden');
+      musicIframe.src = '';
+      stopMusicStatus();
+      return;
+    }
+    musicEmpty.classList.add('hidden');
+    musicIframe.classList.remove('hidden');
+    musicIframe.src = music.embedUrl;
+    startMusicStatus();
+  }
+
+  function startMusicStatus() {
+    stopMusicStatus();
+    const contact = state.contacts.find((c) => c.id === state.chatContactId);
+    if (!contact) return;
+    const phrases = [
+      `${contact.name} 正在听…`,
+      `${contact.name} 也在听这首`,
+      `${contact.name} 点了个赞`,
+      `${contact.name} 跟着哼了起来`
+    ];
+    let i = 0;
+    if (musicStatusDot) musicStatusDot.classList.add('active');
+    musicStatusText.textContent = phrases[0];
+    state.musicStatusTimer = setInterval(() => {
+      i = (i + 1) % phrases.length;
+      musicStatusText.textContent = phrases[i];
+    }, 4000 + Math.random() * 2000);
+  }
+
+  function stopMusicStatus() {
+    if (state.musicStatusTimer) {
+      clearInterval(state.musicStatusTimer);
+      state.musicStatusTimer = null;
+    }
+    if (musicStatusDot) musicStatusDot.classList.remove('active');
+    if (musicStatusText) musicStatusText.textContent = '对方未在听';
+  }
+
+  function refreshMusicFavSelect() {
+    const contact = state.contacts.find((c) => c.id === state.chatContactId);
+    if (!musicFavSelect) return;
+    musicFavSelect.innerHTML = '<option value="">收藏的歌单/单曲</option>';
+    if (!contact || !contact.musicFavorites) return;
+    contact.musicFavorites.forEach((fav, idx) => {
+      const opt = document.createElement('option');
+      opt.value = String(idx);
+      opt.textContent = fav.label || `${fav.type === 0 ? '歌单' : '单曲'} ${fav.id}`;
+      musicFavSelect.appendChild(opt);
+    });
+  }
+
+  function saveCurrentMusicToFav() {
+    const contact = state.contacts.find((c) => c.id === state.chatContactId);
+    if (!contact || !contact.currentMusic) {
+      alert('请先加载一首歌或歌单');
+      return;
+    }
+    if (!contact.musicFavorites) contact.musicFavorites = [];
+    const exists = contact.musicFavorites.some(
+      (f) => f.type === contact.currentMusic.type && f.id === contact.currentMusic.id
+    );
+    if (exists) {
+      alert('已在收藏中');
+      return;
+    }
+    contact.musicFavorites.push({ ...contact.currentMusic });
+    saveData();
+    refreshMusicFavSelect();
+    alert('已收藏');
+  }
+
+  function onMusicLoadClick() {
+    const parsed = parseNeteaseLink(musicLinkInput.value);
+    if (!parsed) {
+      alert('无法识别链接。请粘贴网易云单曲或歌单链接\n例如：\nhttps://music.163.com/song?id=xxx\nhttps://music.163.com/playlist?id=xxx');
+      return;
+    }
+    const contact = state.contacts.find((c) => c.id === state.chatContactId);
+    if (!contact) return;
+    contact.currentMusic = parsed;
+    saveData();
+    loadMusicForContact(parsed);
+    musicLinkInput.value = '';
+  }
+
+  function onMusicFavSelect() {
+    const contact = state.contacts.find((c) => c.id === state.chatContactId);
+    if (!contact || !contact.musicFavorites) return;
+    const idx = parseInt(musicFavSelect.value, 10);
+    if (isNaN(idx) || !contact.musicFavorites[idx]) return;
+    const fav = contact.musicFavorites[idx];
+    contact.currentMusic = fav;
+    saveData();
+    loadMusicForContact(fav);
   }
 
   function switchPage(pageName) {
@@ -304,11 +467,20 @@
     hideAttachPanel();
     state.quotingMsg = null;
     updateQuoteBar();
+    // 一起听
+    if (contact.currentMusic) {
+      loadMusicForContact(contact.currentMusic);
+    } else {
+      loadMusicForContact(null);
+    }
+    refreshMusicFavSelect();
     msgInput.focus();
   }
 
   function leaveChat() {
     clearPendingTimers();
+    stopMusicStatus();
+    if (musicIframe) musicIframe.src = '';
     const typing = messageList.querySelector('.typing-row');
     if (typing) typing.remove();
     state.chatContactId = null;
@@ -641,6 +813,15 @@
       <div class="section-title">互动字卡（拍一拍） <button class="btn-add" id="btn-add-inter" style="margin-left:8px">+ 添加</button></div>
       <div class="card-list">
         ${interCards.map((t, i) => makeCardHtml(t, i, 'interaction')).join('') || '<div class="empty-state small"><p>暂无</p></div>'}
+      </div>
+      <div class="section-title">一起听 · 收藏</div>
+      <div class="music-fav-list" id="contact-music-favs">
+        ${(contact.musicFavorites || []).map((fav, i) => `
+          <div class="music-fav-item" data-idx="${i}">
+            <span class="fav-type">${fav.type === 0 ? '歌单' : '单曲'}</span>
+            <span class="fav-id">${escapeHtml(fav.label || fav.id)}</span>
+            <button class="fav-del" data-idx="${i}">✕</button>
+          </div>`).join('') || '<div class="empty-state small"><p>暂无收藏，在聊天页「一起听」中添加</p></div>'}
       </div>`;
     $('#btn-add-card')?.addEventListener('click', () => openCardModal('add', 'normal'));
     $('#btn-add-inter')?.addEventListener('click', () => openCardModal('add', 'interaction'));
@@ -659,6 +840,15 @@
         applyContactChatBg(contact.id);
         enterChat(contact.id);
       }
+    });
+    cardsPanel.querySelectorAll('.fav-del').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        if (!contact.musicFavorites) return;
+        contact.musicFavorites.splice(idx, 1);
+        saveData();
+        renderCardsPanel();
+      });
     });
     cardsPanel.querySelectorAll('.card-btn.edit').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -933,6 +1123,17 @@
     document.addEventListener('click', (e) => {
       if (!msgActionMenu.contains(e.target)) hideMsgMenu();
     });
+
+    // 一起听
+    musicPanelToggle?.addEventListener('click', () => {
+      musicPanel?.classList.toggle('collapsed');
+    });
+    btnMusicLoad?.addEventListener('click', onMusicLoadClick);
+    musicLinkInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); onMusicLoadClick(); }
+    });
+    btnMusicSave?.addEventListener('click', saveCurrentMusicToFav);
+    musicFavSelect?.addEventListener('change', onMusicFavSelect);
 
     switchPage('chat');
     updateStats();
