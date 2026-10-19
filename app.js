@@ -198,48 +198,84 @@
   }
 
   // ========== 一起听 · 网易云 ==========
+  function buildEmbedUrl(type, id) {
+    // type: 0=歌单, 2=单曲；height=66 为迷你样式
+    const h = type === 0 ? 90 : 66;
+    return `https://music.163.com/outchain/player?type=${type}&id=${id}&auto=0&height=${h}`;
+  }
+
   function parseNeteaseLink(input) {
     if (!input || typeof input !== 'string') return null;
-    const str = input.trim();
-    // 已是 outchain
-    let m = str.match(/music\.163\.com\/outchain\/player\?[^\s"']+/i);
+    let str = input.trim();
+
+    // 清理分享文案中的多余字符
+    str = str.replace(/[\u200b-\u200f\ufeff]/g, '');
+
+    // 1) 已经是 outchain 链接
+    let m = str.match(/(?:https?:)?\/\/?(?:y\.)?music\.163\.com\/outchain\/player\?([^\s"'<>]+)/i);
     if (m) {
       try {
-        const url = new URL('https://' + m[0].replace(/^\/\//, ''));
-        const type = url.searchParams.get('type');
-        const id = url.searchParams.get('id');
-        if (type != null && id) {
+        const params = new URLSearchParams(m[1]);
+        const type = parseInt(params.get('type'), 10);
+        const id = params.get('id');
+        if (!isNaN(type) && id) {
           return {
-            type: parseInt(type, 10),
+            type,
             id,
-            embedUrl: `https://music.163.com/outchain/player?type=${type}&id=${id}&auto=0&height=66`,
-            label: (type === 0 || type === '0') ? `歌单 ${id}` : `单曲 ${id}`
+            embedUrl: buildEmbedUrl(type, id),
+            label: type === 0 ? `歌单 ${id}` : `单曲 ${id}`
           };
         }
       } catch (_) {}
     }
-    // 歌单
-    m = str.match(/playlist\?id=(\d+)/i) || str.match(/playlist\/(\d+)/i) || str.match(/[#&?]id=(\d+).*playlist/i);
-    if (m && /playlist/i.test(str)) {
-      const id = m[1];
-      return {
-        type: 0,
-        id,
-        embedUrl: `https://music.163.com/outchain/player?type=0&id=${id}&auto=0&height=66`,
-        label: `歌单 ${id}`
-      };
-    }
-    // 单曲
-    m = str.match(/song\?id=(\d+)/i) || str.match(/song\/(\d+)/i) || str.match(/[#&?]id=(\d+)/i);
+
+    // 2) 歌单链接（优先判断，避免被通用 id 误伤）
+    // 支持: music.163.com/playlist?id= / #/playlist?id= / y.music.163.com/m/playlist?id=
+    m = str.match(/(?:playlist|歌单)[^\d]{0,20}id[=/:](\d+)/i)
+      || str.match(/\/playlist\/(\d+)/i)
+      || str.match(/[?&#]id=(\d+)[^\s]*playlist/i);
     if (m) {
       const id = m[1];
-      return {
-        type: 2,
-        id,
-        embedUrl: `https://music.163.com/outchain/player?type=2&id=${id}&auto=0&height=66`,
-        label: `单曲 ${id}`
-      };
+      return { type: 0, id, embedUrl: buildEmbedUrl(0, id), label: `歌单 ${id}` };
     }
+    if (/playlist/i.test(str)) {
+      m = str.match(/[?&#]id=(\d+)/i);
+      if (m) {
+        const id = m[1];
+        return { type: 0, id, embedUrl: buildEmbedUrl(0, id), label: `歌单 ${id}` };
+      }
+    }
+
+    // 3) 单曲链接
+    // 支持: song?id= / #/song?id= / y.music.163.com/m/song?id= / song/123
+    m = str.match(/(?:song|单曲)[^\d]{0,20}id[=/:](\d+)/i)
+      || str.match(/\/song\/(\d+)/i);
+    if (m) {
+      const id = m[1];
+      return { type: 2, id, embedUrl: buildEmbedUrl(2, id), label: `单曲 ${id}` };
+    }
+    if (/song|单曲/i.test(str)) {
+      m = str.match(/[?&#]id=(\d+)/i);
+      if (m) {
+        const id = m[1];
+        return { type: 2, id, embedUrl: buildEmbedUrl(2, id), label: `单曲 ${id}` };
+      }
+    }
+
+    // 4) 纯数字 id（默认当单曲）
+    m = str.match(/^\s*(\d{5,})\s*$/);
+    if (m) {
+      const id = m[1];
+      return { type: 2, id, embedUrl: buildEmbedUrl(2, id), label: `单曲 ${id}` };
+    }
+
+    // 5) 最后兜底：任意 id= 数字（当单曲）
+    m = str.match(/[?&#]id=(\d{5,})/i);
+    if (m) {
+      const id = m[1];
+      return { type: 2, id, embedUrl: buildEmbedUrl(2, id), label: `单曲 ${id}` };
+    }
+
     return null;
   }
 
@@ -247,13 +283,32 @@
     if (!music || !music.embedUrl) {
       musicIframe.classList.add('hidden');
       musicEmpty.classList.remove('hidden');
-      musicIframe.src = '';
+      musicEmpty.textContent = '粘贴网易云链接开始一起听';
+      musicIframe.removeAttribute('src');
       stopMusicStatus();
       return;
     }
-    musicEmpty.classList.add('hidden');
-    musicIframe.classList.remove('hidden');
-    musicIframe.src = music.embedUrl;
+    musicEmpty.classList.remove('hidden');
+    musicEmpty.textContent = '正在加载播放器…';
+    musicIframe.classList.add('hidden');
+
+    // 先清空再设置，避免缓存旧页面
+    musicIframe.removeAttribute('src');
+    // 下一帧再赋值，确保重新加载
+    requestAnimationFrame(() => {
+      const h = music.type === 0 ? 110 : 86;
+      musicIframe.style.height = h + 'px';
+      musicIframe.src = music.embedUrl;
+      musicIframe.onload = () => {
+        musicEmpty.classList.add('hidden');
+        musicIframe.classList.remove('hidden');
+      };
+      // 超时兜底：即使 onload 异常也显示 iframe
+      setTimeout(() => {
+        musicEmpty.classList.add('hidden');
+        musicIframe.classList.remove('hidden');
+      }, 2500);
+    });
     startMusicStatus();
   }
 
@@ -319,9 +374,10 @@
   }
 
   function onMusicLoadClick() {
-    const parsed = parseNeteaseLink(musicLinkInput.value);
+    const raw = musicLinkInput.value;
+    const parsed = parseNeteaseLink(raw);
     if (!parsed) {
-      alert('无法识别链接。请粘贴网易云单曲或歌单链接\n例如：\nhttps://music.163.com/song?id=xxx\nhttps://music.163.com/playlist?id=xxx');
+      alert('无法识别链接。请粘贴网易云单曲或歌单链接\n例如：\nhttps://music.163.com/song?id=xxx\nhttps://music.163.com/playlist?id=xxx\n或直接粘贴纯数字歌曲ID');
       return;
     }
     const contact = state.contacts.find((c) => c.id === state.chatContactId);
@@ -330,6 +386,8 @@
     saveData();
     loadMusicForContact(parsed);
     musicLinkInput.value = '';
+    // 控制台便于排查
+    console.log('[一起听] 已加载', parsed);
   }
 
   function onMusicFavSelect() {

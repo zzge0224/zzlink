@@ -1094,9 +1094,10 @@ html, body {
 .music-player-wrap {
   border-radius: 10px;
   overflow: hidden;
-  background: #1a1a1a;
-  min-height: 66px;
+  background: #2a2a2a;
+  min-height: 86px;
   margin-bottom: 8px;
+  position: relative;
 }
 
 .music-iframe {
@@ -1104,7 +1105,7 @@ html, body {
   width: 100%;
   height: 86px;
   border: none;
-  background: #1a1a1a;
+  background: transparent;
 }
 
 .music-iframe.hidden {
@@ -1112,13 +1113,15 @@ html, body {
 }
 
 .music-empty {
-  height: 66px;
+  min-height: 66px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--muted);
+  color: #aaa;
   font-size: 13px;
-  background: rgba(0,0,0,0.2);
+  background: #2a2a2a;
+  padding: 12px;
+  text-align: center;
 }
 
 .music-status {
