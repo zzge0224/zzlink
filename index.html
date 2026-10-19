@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="app">
+  <div id="app" data-theme="classic">
     <!-- 顶部标题栏 -->
     <header class="app-header">
       <button id="btn-back" class="btn-back hidden" title="返回">‹</button>
@@ -22,7 +22,6 @@
     <main class="app-main">
       <!-- 聊天页 -->
       <section id="page-chat" class="page active">
-        <!-- 会话列表 -->
         <div id="chat-list-view">
           <div id="chat-list" class="chat-list"></div>
           <div id="chat-list-empty" class="empty-state">
@@ -32,11 +31,9 @@
           </div>
         </div>
 
-        <!-- 单聊视图 -->
         <div id="chat-detail-view" class="hidden">
           <div id="message-list" class="message-list"></div>
 
-          <!-- 引用预览条 -->
           <div id="quote-bar" class="quote-bar hidden">
             <div class="quote-bar-content">
               <span class="quote-bar-label">引用</span>
@@ -45,7 +42,6 @@
             <button id="quote-bar-close" class="quote-bar-close">✕</button>
           </div>
 
-          <!-- 附件面板 -->
           <div id="attach-panel" class="attach-panel hidden">
             <button class="attach-btn" data-action="transfer">
               <span class="attach-icon">💸</span>
@@ -80,7 +76,7 @@
       <!-- 我页 -->
       <section id="page-me" class="page">
         <div class="me-content">
-          <div class="avatar-large" style="background:#3D9A62">昕</div>
+          <div class="avatar-large" id="me-avatar" style="background:#3D9A62">昕</div>
           <h2>昕</h2>
           <p class="subtitle">字笺 · 纸上心意</p>
 
@@ -91,6 +87,29 @@
               <span class="balance-unit">★</span>
             </div>
             <button class="btn-sm" id="btn-edit-balance">修改余额</button>
+          </div>
+
+          <!-- 主题选择 -->
+          <div class="theme-section">
+            <div class="section-label">主题皮肤</div>
+            <div class="theme-grid" id="theme-grid">
+              <button class="theme-card active" data-theme="classic">
+                <div class="theme-preview classic-preview"></div>
+                <span>经典绿</span>
+              </button>
+              <button class="theme-card" data-theme="dark">
+                <div class="theme-preview dark-preview"></div>
+                <span>暗夜黑</span>
+              </button>
+              <button class="theme-card" data-theme="cream">
+                <div class="theme-preview cream-preview"></div>
+                <span>奶油白</span>
+              </button>
+              <button class="theme-card" data-theme="lavender">
+                <div class="theme-preview lavender-preview"></div>
+                <span>淡紫</span>
+              </button>
+            </div>
           </div>
 
           <div class="stats">
@@ -125,7 +144,7 @@
     </nav>
   </div>
 
-  <!-- 消息操作菜单（长按） -->
+  <!-- 消息操作菜单 -->
   <div id="msg-action-menu" class="msg-action-menu hidden">
     <button data-action="quote">引用</button>
   </div>
@@ -141,6 +160,10 @@
       </div>
     </div>
   </div>
+
+  <!-- 隐藏文件选择 -->
+  <input type="file" id="file-avatar" accept="image/*" class="hidden" />
+  <input type="file" id="file-bg" accept="image/*" class="hidden" />
 
   <script src="app.js"></script>
 </body>
