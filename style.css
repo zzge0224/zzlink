@@ -741,3 +741,110 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 .msg-transfer.pending, .msg-redpacket.pending { opacity:1; }
 .msg-transfer.returned, .msg-redpacket.returned { opacity:.7; filter:grayscale(.3); }
 .contact-balance { font-size:11px; color:var(--accent); margin-top:2px; }
+
+/* 入站问卷 */
+.entry-quiz {
+  position: fixed; inset: 0; z-index: 600;
+  background: rgba(0,0,0,.72); display: flex;
+  align-items: center; justify-content: center; padding: 16px;
+}
+.entry-quiz.hidden { display: none; }
+.eqz-card {
+  background: var(--chrome); color: var(--paper);
+  border-radius: 16px; padding: 20px 18px; max-width: 420px; width: 100%;
+  max-height: 90vh; overflow-y: auto; border: 1px solid var(--border);
+}
+.eqz-card h2 { font-size: 18px; margin-bottom: 8px; }
+.eqz-hint { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+.eqz-age { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 14px; }
+.eqz-q { margin-bottom: 14px; }
+.eqz-q-title { font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+.eqz-opt {
+  display: block; padding: 8px 10px; margin: 4px 0;
+  background: var(--canvas); border-radius: 8px; font-size: 13px; cursor: pointer;
+  border: 1px solid transparent;
+}
+.eqz-opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.eqz-opt input { margin-right: 8px; }
+.eqz-result { font-size: 13px; margin: 10px 0; line-height: 1.5; }
+.eqz-result.ok { color: var(--accent); }
+.eqz-result.bad { color: #c45c5c; }
+.eqz-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.eqz-credit { font-size: 10px; color: var(--muted); margin-top: 14px; opacity: .8; }
+
+/* 头像池 */
+.avatar-pool-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px;
+}
+.avatar-pool-item {
+  position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden;
+  background: var(--canvas); border: 1px solid var(--border);
+  background-size: cover; background-position: center;
+}
+.avatar-pool-item button {
+  position: absolute; top: 2px; right: 2px; width: 18px; height: 18px;
+  border: none; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff;
+  font-size: 10px; cursor: pointer; line-height: 1;
+}
+.avatar-pool-add {
+  display: flex; align-items: center; justify-content: center;
+  border: 1px dashed var(--border); border-radius: 10px; aspect-ratio: 1;
+  font-size: 22px; color: var(--muted); cursor: pointer; background: transparent;
+}
+
+/* 查岗提问卡 */
+.ask-card {
+  background: var(--chrome); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px; margin: 8px 12px; max-width: 280px;
+}
+.ask-card-q { font-size: 14px; font-weight: 500; margin-bottom: 10px; color: var(--paper); }
+.ask-card-opts { display: flex; flex-direction: column; gap: 6px; }
+.ask-card-opts button {
+  border: 1px solid var(--border); background: var(--canvas); color: var(--paper);
+  border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer; text-align: left;
+}
+.ask-card-opts button:active { background: var(--accent-soft); border-color: var(--accent); }
+.ask-card-text { display: flex; gap: 6px; margin-top: 8px; }
+.ask-card-text input {
+  flex: 1; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--canvas); color: var(--paper); padding: 8px 10px; font-size: 13px;
+}
+
+/* 提问 / 问卷消息 */
+.msg-survey {
+  background: var(--chrome) !important;
+  border: 1px solid var(--border);
+  max-width: 280px;
+  padding: 12px !important;
+}
+.msg-survey .sv-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--paper); }
+.msg-survey .sv-q { margin: 10px 0 6px; font-size: 13px; color: var(--paper); }
+.msg-survey .sv-q-type { font-size: 11px; color: var(--muted); margin-left: 4px; }
+.msg-survey .sv-opt {
+  display: block; padding: 6px 10px; margin: 4px 0;
+  background: var(--canvas); border-radius: 8px; font-size: 12px;
+  border: 1px solid var(--border); cursor: pointer;
+}
+.msg-survey .sv-opt.selected, .msg-survey .sv-opt:has(input:checked) {
+  border-color: var(--accent); background: var(--accent-soft);
+}
+.msg-survey .sv-text {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--canvas); color: var(--paper); padding: 8px; font-size: 13px;
+  margin-top: 4px; box-sizing: border-box;
+}
+.msg-survey .sv-submit {
+  margin-top: 10px; width: 100%; border: none; border-radius: 10px;
+  background: var(--accent); color: #fff; padding: 8px; font-size: 13px; cursor: pointer;
+}
+.msg-survey .sv-done { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.msg-survey .sv-answer { font-size: 12px; color: var(--accent); margin-top: 4px; }
+.survey-editor-q {
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 10px;
+  background: var(--canvas);
+}
+.survey-editor-q select, .survey-editor-q input, .survey-editor-q textarea {
+  width: 100%; margin: 4px 0; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--chrome); color: var(--paper);
+  box-sizing: border-box; font-size: 13px;
+}

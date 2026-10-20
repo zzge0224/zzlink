@@ -19,7 +19,9 @@
     readNoReplyChance: 0.08,
     pokeChance: 0.1,
     // 每隔多少分钟主动给用户发一条消息；0 表示关闭
-    proactiveIntervalMin: 30
+    proactiveIntervalMin: 30,
+    avatarSwapChance: 0.08,
+    askChance: 0.1
   };
   const THEMES = [
     'classic', 'dark', 'seasalt', 'mintchoc', 'taro', 'peach',
@@ -69,6 +71,7 @@
 
   let state = {
     contacts: [], songs: [], chats: {}, stickers: [], moments: [], memorials: [],
+    questionnaires: [],
     userBalance: 888, theme: 'classic', userAvatar: null, userName: '昕',
     currentContactId: null, chatContactId: null,
     editingCardIndex: null, editingCardType: 'normal', editingGroup: '默认', modalMode: null,
@@ -123,10 +126,12 @@
       stickers: Array.isArray(p.stickers) ? p.stickers : [],
       moments: Array.isArray(p.moments) ? p.moments : [],
       memorials: Array.isArray(p.memorials) ? p.memorials : [],
+      questionnaires: Array.isArray(p.questionnaires) ? p.questionnaires : [],
       userBalance: typeof p.userBalance === 'number' ? p.userBalance : 888,
       theme: THEMES.includes(p.theme) ? p.theme : 'classic',
       playMode: p.playMode || 'order',
       userAvatar: p.userAvatar || null,
+      userAvatarPool: Array.isArray(p.userAvatarPool) ? p.userAvatarPool : [],
       userName: p.userName || '昕',
       lastProactiveAt: p.lastProactiveAt || {},
       momentsCover: p.momentsCover || null
@@ -187,10 +192,12 @@
       stickers: state.stickers || [],
       moments: (state.moments || []).slice(-100),
       memorials: state.memorials || [],
+      questionnaires: state.questionnaires || [],
       userBalance: state.userBalance,
       theme: state.theme,
       playMode: state.playMode || 'order',
       userAvatar: state.userAvatar || null,
+      userAvatarPool: state.userAvatarPool || [],
       userName: state.userName || '昕',
       lastProactiveAt: state.lastProactiveAt || {},
       momentsCover: state.momentsCover || null,
@@ -417,6 +424,8 @@
     if (msg.type === 'redpacket') return `[红包] ${msg.note || '恭喜发财'}`;
     if (msg.type === 'sticker') return '[表情]';
     if (msg.type === 'image') return '[图片]';
+    if (msg.type === 'survey') return '[问卷] ' + (msg.title || '');
+    if (msg.type === 'ask') return '[提问] ' + (msg.title || msg.text || '');
     return (msg.from === 'user' ? '我: ' : '') + (msg.text || '');
   }
   function renderChatList() {
@@ -514,9 +523,16 @@
       <div class="settings-cell"><span>主动拍一拍概率</span><input type="number" id="cs-poke" step="0.01" min="0" max="1" value="${lc.pokeChance}"/></div>
       <div class="settings-cell"><span>主动发消息间隔(分钟)</span><input type="number" id="cs-proactive" min="0" max="10080" value="${lc.proactiveIntervalMin == null ? 30 : lc.proactiveIntervalMin}"/></div>
       <div class="settings-section-title" style="padding-top:0">间隔为 0 则关闭主动发消息</div>
+      <div class="settings-section-title">头像池 · 提问</div>
+      <div class="settings-cell" id="cs-avatar-pool"><span>对方头像池</span><span class="val">›</span></div>
+      <div class="settings-cell" id="cs-user-avatar-pool"><span>我的头像池</span><span class="val">›</span></div>
+      <div class="settings-cell"><span>头像随机更换概率</span><input type="number" id="cs-av-swap" step="0.01" min="0" max="1" value="${lc.avatarSwapChance != null ? lc.avatarSwapChance : 0.08}"/></div>
+      <div class="settings-cell"><span>查岗提问概率</span><input type="number" id="cs-ask-chance" step="0.01" min="0" max="1" value="${lc.askChance != null ? lc.askChance : 0.1}"/></div>
       <div style="padding:16px"><button class="btn-primary" id="cs-save" style="width:100%">保存</button></div>`;
     page.classList.remove('hidden');
 
+    $('#cs-avatar-pool')?.addEventListener('click', () => openAvatarPoolModal('contact'));
+    $('#cs-user-avatar-pool')?.addEventListener('click', () => openAvatarPoolModal('user'));
     $('#cs-avatar')?.addEventListener('click', () => {
       state.currentContactId = c.id;
       $('#file-avatar')?.click();
@@ -547,7 +563,9 @@
         replyChance: clamp01(num('#cs-reply', 0.92)),
         readNoReplyChance: clamp01(num('#cs-noreply', 0.08)),
         pokeChance: clamp01(num('#cs-poke', 0.1)),
-        proactiveIntervalMin: Math.max(0, Math.min(10080, num('#cs-proactive', 30)))
+        proactiveIntervalMin: Math.max(0, Math.min(10080, num('#cs-proactive', 30))),
+        avatarSwapChance: clamp01(num('#cs-av-swap', 0.08)),
+        askChance: clamp01(num('#cs-ask-chance', 0.1))
       };
       scheduleProactiveMessages();
       saveData();
@@ -567,6 +585,43 @@
     }
     if (m.type === 'image') {
       return `<div class="msg-bubble msg-photo" style="padding:4px;background:transparent;box-shadow:none"><img src="${m.imageData || ''}" alt="图片"/></div>`;
+    }
+    if (m.type === 'survey' || m.type === 'ask') {
+      const done = !!m.answered;
+      const qs = m.questions || [];
+      let html = `<div class="msg-bubble msg-survey" data-survey-id="${m.id}"><div class="sv-title">${escapeHtml(m.title || (m.type === 'ask' ? '提问' : '问卷'))}</div>`;
+      qs.forEach((q, qi) => {
+        const typeLabel = q.type === 'multi' ? '多选' : (q.type === 'text' ? '简答' : '单选');
+        html += `<div class="sv-q">${qi + 1}. ${escapeHtml(q.text)}<span class="sv-q-type">·${typeLabel}</span></div>`;
+        if (done) {
+          const ans = (m.answers && m.answers[qi]) || '';
+          html += `<div class="sv-answer">答：${escapeHtml(Array.isArray(ans) ? ans.join('、') : String(ans))}</div>`;
+        } else if (q.type === 'text') {
+          // 对方发来的问卷：用户填写；用户发出的：等待对方
+          if (m.from === 'contact') {
+            html += `<input class="sv-text" data-qi="${qi}" placeholder="填写回答…"/>`;
+          } else {
+            html += `<div class="sv-done">等待对方回答…</div>`;
+          }
+        } else {
+          const inputType = q.type === 'multi' ? 'checkbox' : 'radio';
+          const name = `sv_${m.id}_${qi}`;
+          (q.options || []).forEach((opt, oi) => {
+            if (m.from === 'contact') {
+              html += `<label class="sv-opt"><input type="${inputType}" name="${name}" value="${escapeHtml(opt)}" data-qi="${qi}"/> ${escapeHtml(opt)}</label>`;
+            } else {
+              html += `<div class="sv-opt">${escapeHtml(opt)}</div>`;
+            }
+          });
+        }
+      });
+      if (!done && m.from === 'contact') {
+        html += `<button type="button" class="sv-submit" data-survey-submit>提交回答</button>`;
+      } else if (done) {
+        html += `<div class="sv-done">已回答</div>`;
+      }
+      html += `</div>`;
+      return html;
     }
     if (m.type === 'transfer' || m.type === 'redpacket') {
       const st = m.moneyStatus || (m.opened ? 'accepted' : 'pending');
@@ -1747,6 +1802,51 @@
       if (state.chatContactId === contactId) updateChatPinMemorial(contactId);
       return;
     }
+    if (state.modalMode === 'contact-avatar-pool' || state.modalMode === 'user-avatar-pool') {
+      if (state.modalMode === 'contact-avatar-pool') {
+        const c = state.contacts.find(x => x.id === (state.poolContactId || state.chatContactId));
+        if (c) {
+          ensureContactShape(c);
+          const v = parseFloat($('#pool-chance')?.value);
+          if (!isNaN(v)) c.listenConfig.avatarSwapChance = Math.max(0, Math.min(1, v));
+        }
+      }
+      saveData();
+      closeModal();
+      return;
+    }
+    if (state.modalMode === 'quick-ask') {
+      const text = ($('#ask-text')?.value || '').trim();
+      if (!text) { alert('请输入问题'); return; }
+      const type = $('#ask-type')?.value || 'text';
+      const opts = ($('#ask-opts')?.value || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      if (type === 'single' && opts.length < 2) { alert('单选题至少 2 个选项'); return; }
+      const msg = {
+        id: genId('m'), from: 'user', type: 'ask',
+        title: text,
+        questions: [{ id: genId('sq'), type, text, options: type === 'single' ? opts : [] }],
+        answered: false, answers: {}, time: Date.now()
+      };
+      pushMsg(msg); appendMessage(msg); closeModal();
+      scheduleContactAnswerSurvey(msg);
+      return;
+    }
+    if (state.modalMode === 'survey-editor') {
+      syncSurveyDraftFromDom();
+      const d = state._surveyDraft;
+      if (!d || !(d.title || '').trim()) { alert('请填写标题'); return; }
+      d.questions = (d.questions || []).filter(q => (q.text || '').trim());
+      if (!d.questions.length) { alert('至少一题'); return; }
+      ensureQuestionnaires();
+      const idx = state.questionnaires.findIndex(x => x.id === d.id);
+      if (idx >= 0) state.questionnaires[idx] = d;
+      else state.questionnaires.push(d);
+      state._surveyDraft = null;
+      saveData();
+      closeModal();
+      openSurveyPickerModal();
+      return;
+    }
   }
 
   function updateStats() {
@@ -2342,9 +2442,11 @@
     state.contacts = data.contacts; state.songs = data.songs; state.chats = data.chats;
     state.stickers = data.stickers || []; state.moments = data.moments || [];
     state.memorials = data.memorials || [];
+    state.questionnaires = data.questionnaires || [];
     state.userBalance = data.userBalance; state.theme = data.theme;
     state.playMode = data.playMode || 'order';
     state.userAvatar = data.userAvatar || null;
+    state.userAvatarPool = Array.isArray(data.userAvatarPool) ? data.userAvatarPool : [];
     state.userName = data.userName || '昕';
     state.lastProactiveAt = data.lastProactiveAt || {};
     state.momentsCover = data.momentsCover || null;
@@ -2416,12 +2518,23 @@
       else hideAttachPanel();
     });
     attachPanel.querySelectorAll('.attach-btn').forEach(b => b.addEventListener('click', () => {
-      if (b.dataset.action === 'photo') {
+      const act = b.dataset.action;
+      if (act === 'photo') {
         $('#file-chat-photo')?.click();
         hideAttachPanel();
         return;
       }
-      openMoneyModal(b.dataset.action);
+      if (act === 'ask') {
+        hideAttachPanel();
+        openQuickAskModal();
+        return;
+      }
+      if (act === 'survey') {
+        hideAttachPanel();
+        openSurveyPickerModal();
+        return;
+      }
+      openMoneyModal(act);
     }));
     $('#file-chat-photo')?.addEventListener('change', e => {
       const f = e.target.files?.[0]; e.target.value = '';
@@ -2605,8 +2718,518 @@
     updateStats();
     updateThemeUI();
     updatePlayModeBtn();
+    wireAvatarPoolFiles();
+    wireAskSurvey();
   }
+
+  // ========== 头像池随机更换（灵感：Mochi 字卡 · 小红书@言序）==========
+  function getContactAvatarPool(c) {
+    ensureContactShape(c);
+    if (!Array.isArray(c.avatarPool)) c.avatarPool = [];
+    return c.avatarPool;
+  }
+  function getUserAvatarPool() {
+    if (!Array.isArray(state.userAvatarPool)) state.userAvatarPool = [];
+    return state.userAvatarPool;
+  }
+
+  function tryRandomAvatarSwap(contact) {
+    if (!contact) return;
+    ensureContactShape(contact);
+    const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
+    const chance = lc.avatarSwapChance != null ? Number(lc.avatarSwapChance) : 0.08;
+    if (Math.random() > chance) return;
+
+    const pool = getContactAvatarPool(contact);
+    const mePool = getUserAvatarPool();
+    let changed = false;
+    const sysMsgs = [];
+
+    if (pool.length >= 1) {
+      const candidates = pool.filter(x => x && x !== contact.avatarImg);
+      if (candidates.length) {
+        contact.avatarImg = candidates[Math.floor(Math.random() * candidates.length)];
+        changed = true;
+        sysMsgs.push({
+          id: genId('m'), from: 'system', type: 'system',
+          text: `${contact.name} 更换了头像`, time: Date.now()
+        });
+      }
+    }
+    if (mePool.length >= 1 && Math.random() < 0.55) {
+      const candidates = mePool.filter(x => x && x !== state.userAvatar);
+      if (candidates.length) {
+        state.userAvatar = candidates[Math.floor(Math.random() * candidates.length)];
+        changed = true;
+        sysMsgs.push({
+          id: genId('m'), from: 'system', type: 'system',
+          text: `${contact.name} 给你更换了头像`, time: Date.now()
+        });
+      }
+    }
+    if (!changed) return;
+    if (!state.chats[contact.id]) state.chats[contact.id] = [];
+    sysMsgs.forEach(m => state.chats[contact.id].push(m));
+    saveData();
+    updateMeAvatarUI();
+    if (state.chatContactId === contact.id) {
+      sysMsgs.forEach(m => appendMessage(m));
+      const ha = $('#header-avatar');
+      if (ha && contact.avatarImg) {
+        ha.style.backgroundImage = `url(${contact.avatarImg})`;
+        ha.textContent = '';
+      }
+      renderMessages();
+    } else {
+      renderChatList();
+    }
+  }
+
+  // ========== 查岗提问（灵感：Mochi 查岗卡）==========
+  const DEFAULT_ASK_QUESTIONS = [
+    {
+      type: 'single', text: '你在干嘛呀？',
+      options: [
+        { t: '在想你', reply: '就知道你会这样说' },
+        { t: '在忙', reply: '忙完记得找我' },
+        { t: '摸鱼', reply: '被抓到了吧' },
+        { t: '发呆', reply: '发呆的时候在想我吗' }
+      ]
+    },
+    {
+      type: 'single', text: '吃饭了没？',
+      options: [
+        { t: '吃过了', reply: '乖，好好吃饭' },
+        { t: '还没', reply: '快去吃，我等你' },
+        { t: '正在吃', reply: '慢慢吃，别噎着' }
+      ]
+    },
+    {
+      type: 'single', text: '今天有没有想我？',
+      options: [
+        { t: '想了', reply: '我也想你' },
+        { t: '一直在想', reply: '嘴真甜' },
+        { t: '才没有', reply: '哼，嘴硬' }
+      ]
+    },
+    { type: 'text', text: '快说说，今天过得怎么样？', reply: '嗯，我听着呢' },
+    { type: 'text', text: '现在最想做的一件事是什么？', reply: '说出来我就当听到了' }
+  ];
+
+  function tryContactAsk(contact) {
+    if (!contact || state.chatContactId !== contact.id) return;
+    const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
+    const chance = lc.askChance != null ? Number(lc.askChance) : 0.1;
+    if (Math.random() > chance) return;
+    if (messageList.querySelector('.ask-card')) return;
+
+    const qs = (contact.askQuestions && contact.askQuestions.length)
+      ? contact.askQuestions : DEFAULT_ASK_QUESTIONS;
+    const q = qs[Math.floor(Math.random() * qs.length)];
+    if (!q) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-row contact';
+    const av = msgAvatarHtml('contact');
+    let body = `<div class="msg-col"><div class="ask-card"><div class="ask-card-q">${escapeHtml(q.text)}</div>`;
+    if (q.type === 'single' && q.options) {
+      body += `<div class="ask-card-opts">${q.options.map((o, i) =>
+        `<button type="button" data-oi="${i}">${escapeHtml(o.t)}</button>`).join('')}</div>`;
+    } else {
+      body += `<div class="ask-card-text"><input type="text" placeholder="输入回答…"/><button type="button" class="btn-xs" data-text-send>发送</button></div>`;
+    }
+    body += `</div><div class="msg-time">${formatTime(Date.now())}</div></div>`;
+    wrap.innerHTML = av + body;
+    messageList.appendChild(wrap);
+    messageList.scrollTop = messageList.scrollHeight;
+
+    const card = wrap.querySelector('.ask-card');
+    const finish = (answerText, replyText) => {
+      card.innerHTML = `<div class="ask-card-q">${escapeHtml(q.text)}</div><div style="font-size:12px;color:var(--muted);margin-top:6px">你：${escapeHtml(answerText)}</div>`;
+      const reply = {
+        id: genId('m'), from: 'contact', type: 'text',
+        text: replyText || '嗯，收到了', time: Date.now()
+      };
+      pushMsg(reply);
+      setTimeout(() => appendMessage(reply), 600 + Math.random() * 800);
+    };
+    card.querySelectorAll('[data-oi]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const oi = +btn.dataset.oi;
+        const opt = q.options[oi];
+        finish(opt.t, Array.isArray(opt.reply) ? opt.reply[0] : opt.reply);
+      });
+    });
+    card.querySelector('[data-text-send]')?.addEventListener('click', () => {
+      const inp = card.querySelector('input');
+      const t = (inp?.value || '').trim();
+      if (!t) return;
+      finish(t, q.reply || '嗯，我记下了');
+    });
+  }
+
+  // ========== 提问 / 问卷（用户向联系人） ==========
+  function ensureQuestionnaires() {
+    if (!Array.isArray(state.questionnaires)) state.questionnaires = [];
+    return state.questionnaires;
+  }
+
+  function openQuickAskModal() {
+    if (!state.chatContactId) { alert('请先进入聊天'); return; }
+    state.modalMode = 'quick-ask';
+    modalTitle.textContent = '向对方提问';
+    modalBody.innerHTML = [
+      '<div class="form-row"><label>问题</label><input type="text" id="ask-text" placeholder="例如：今天过得怎么样？"/></div>',
+      '<div class="form-row"><label>类型</label>',
+      '<select id="ask-type">',
+      '<option value="text">简答题（对方用字卡回复）</option>',
+      '<option value="single">单选题</option>',
+      '</select></div>',
+      '<div class="form-row" id="ask-opts-row" style="display:none">',
+      '<label>选项（每行一个）</label>',
+      '<textarea id="ask-opts" rows="4" placeholder="选项A&#10;选项B"></textarea></div>'
+    ].join('');
+    modalOverlay.classList.remove('hidden');
+    $('#ask-type')?.addEventListener('change', function () {
+      $('#ask-opts-row').style.display = $('#ask-type').value === 'single' ? 'block' : 'none';
+    });
+  }
+
+  function openSurveyPickerModal() {
+    if (!state.chatContactId) { alert('请先进入聊天'); return; }
+    ensureQuestionnaires();
+    state.modalMode = 'survey-picker';
+    modalTitle.textContent = '发送问卷';
+    var list = state.questionnaires;
+    var items = list.length ? list.map(function (s) {
+      return '<div class="settings-cell" data-sid="' + s.id + '" style="cursor:pointer"><span>' +
+        escapeHtml(s.title) + '</span><span class="val">' + (s.questions || []).length + ' 题 ›</span></div>';
+    }).join('') : '<p style="font-size:13px;color:var(--muted)">还没有问卷，请先新建</p>';
+    modalBody.innerHTML = '<div class="toolbar-row" style="margin-bottom:10px">' +
+      '<button type="button" class="btn-xs" id="btn-new-survey">＋ 新建问卷</button>' +
+      '<button type="button" class="btn-xs" id="btn-manage-survey">管理</button></div>' +
+      '<div id="survey-pick-list">' + items + '</div>';
+    modalOverlay.classList.remove('hidden');
+    $('#btn-new-survey')?.addEventListener('click', function () { openSurveyEditor(null); });
+    $('#btn-manage-survey')?.addEventListener('click', openSurveyManager);
+    modalBody.querySelectorAll('[data-sid]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var s = state.questionnaires.find(function (x) { return x.id === el.dataset.sid; });
+        if (s) sendSurveyMessage(s);
+      });
+    });
+  }
+
+  function openSurveyManager() {
+    ensureQuestionnaires();
+    state.modalMode = 'survey-manager';
+    modalTitle.textContent = '管理问卷';
+    var rows = state.questionnaires.map(function (s) {
+      return '<div class="settings-cell"><span>' + escapeHtml(s.title) + '（' + (s.questions || []).length +
+        '题）</span><span><button type="button" class="btn-xs" data-edit="' + s.id +
+        '">编辑</button> <button type="button" class="btn-xs" data-del="' + s.id + '">删除</button></span></div>';
+    }).join('') || '<p style="color:var(--muted);font-size:13px">暂无</p>';
+    modalBody.innerHTML = '<button type="button" class="btn-xs" id="btn-new-survey2">＋ 新建</button><div style="margin-top:10px">' + rows + '</div>';
+    modalOverlay.classList.remove('hidden');
+    $('#btn-new-survey2')?.addEventListener('click', function () { openSurveyEditor(null); });
+    modalBody.querySelectorAll('[data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () { openSurveyEditor(b.dataset.edit); });
+    });
+    modalBody.querySelectorAll('[data-del]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('删除该问卷？')) return;
+        state.questionnaires = state.questionnaires.filter(function (x) { return x.id !== b.dataset.del; });
+        saveData();
+        openSurveyManager();
+      });
+    });
+  }
+
+  function openSurveyEditor(id) {
+    ensureQuestionnaires();
+    var existing = id ? state.questionnaires.find(function (x) { return x.id === id; }) : null;
+    state.modalMode = 'survey-editor';
+    state._surveyDraft = existing
+      ? JSON.parse(JSON.stringify(existing))
+      : { id: genId('sv'), title: '未命名问卷', questions: [{ id: genId('sq'), type: 'single', text: '', options: ['选项1', '选项2'] }] };
+    renderSurveyEditor();
+    modalOverlay.classList.remove('hidden');
+  }
+
+  function renderSurveyEditor() {
+    var d = state._surveyDraft;
+    if (!d) return;
+    modalTitle.textContent = '编辑问卷';
+    var qHtml = (d.questions || []).map(function (q, qi) {
+      var opts = q.type !== 'text'
+        ? '<textarea data-qopts="' + qi + '" rows="3" placeholder="选项，每行一个">' + escapeHtml((q.options || []).join('\n')) + '</textarea>'
+        : '<p style="font-size:11px;color:var(--muted)">简答题：对方将从字卡库随机回复</p>';
+      return '<div class="survey-editor-q" data-qi="' + qi + '">' +
+        '<div style="display:flex;justify-content:space-between"><strong>第 ' + (qi + 1) + ' 题</strong>' +
+        '<button type="button" class="btn-xs" data-rm-q="' + qi + '">删除题</button></div>' +
+        '<select data-type="' + qi + '">' +
+        '<option value="single"' + (q.type === 'single' ? ' selected' : '') + '>单选题</option>' +
+        '<option value="multi"' + (q.type === 'multi' ? ' selected' : '') + '>多选题</option>' +
+        '<option value="text"' + (q.type === 'text' ? ' selected' : '') + '>简答题（字卡回复）</option>' +
+        '</select>' +
+        '<input type="text" data-qtext="' + qi + '" placeholder="题目内容" value="' + escapeHtml(q.text || '') + '"/>' +
+        opts + '</div>';
+    }).join('');
+    modalBody.innerHTML = '<div class="form-row"><label>问卷标题</label><input type="text" id="sv-title" value="' +
+      escapeHtml(d.title || '') + '"/></div><div id="sv-q-list">' + qHtml +
+      '</div><button type="button" class="btn-xs" id="sv-add-q">＋ 添加题目</button>' +
+      '<p style="font-size:11px;color:var(--muted);margin-top:8px">点「确定」保存问卷</p>';
+    $('#sv-title')?.addEventListener('input', function (e) { d.title = e.target.value; });
+    modalBody.querySelectorAll('[data-type]').forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        syncSurveyDraftFromDom();
+        d.questions[+sel.dataset.type].type = sel.value;
+        if (sel.value !== 'text' && !(d.questions[+sel.dataset.type].options || []).length) {
+          d.questions[+sel.dataset.type].options = ['选项1', '选项2'];
+        }
+        renderSurveyEditor();
+      });
+    });
+    modalBody.querySelectorAll('[data-rm-q]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        syncSurveyDraftFromDom();
+        d.questions.splice(+b.dataset.rmQ, 1);
+        if (!d.questions.length) d.questions.push({ id: genId('sq'), type: 'text', text: '' });
+        renderSurveyEditor();
+      });
+    });
+    $('#sv-add-q')?.addEventListener('click', function () {
+      syncSurveyDraftFromDom();
+      d.questions.push({ id: genId('sq'), type: 'single', text: '', options: ['选项1', '选项2'] });
+      renderSurveyEditor();
+    });
+  }
+
+  function syncSurveyDraftFromDom() {
+    var d = state._surveyDraft;
+    if (!d) return;
+    d.title = ($('#sv-title') && $('#sv-title').value) || d.title;
+    (d.questions || []).forEach(function (q, qi) {
+      var t = modalBody.querySelector('[data-qtext="' + qi + '"]');
+      if (t) q.text = t.value;
+      var o = modalBody.querySelector('[data-qopts="' + qi + '"]');
+      if (o) q.options = o.value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+      var ty = modalBody.querySelector('[data-type="' + qi + '"]');
+      if (ty) q.type = ty.value;
+    });
+  }
+
+  function sendSurveyMessage(survey) {
+    if (!state.chatContactId || !survey) return;
+    var msg = {
+      id: genId('m'), from: 'user', type: 'survey',
+      title: survey.title || '问卷',
+      questions: (survey.questions || []).map(function (q) {
+        return { id: q.id || genId('sq'), type: q.type || 'text', text: q.text || '', options: q.options ? q.options.slice() : [] };
+      }),
+      answered: false, answers: {}, time: Date.now()
+    };
+    pushMsg(msg); appendMessage(msg); closeModal();
+    scheduleContactAnswerSurvey(msg);
+  }
+
+  function scheduleContactAnswerSurvey(msg) {
+    var c = state.contacts.find(function (x) { return x.id === state.chatContactId; });
+    if (!c || !msg) return;
+    state.pendingTimers.push(setTimeout(function () {
+      autoAnswerSurveyAsContact(msg, c);
+    }, randomDelay(2, 6) * 1000));
+  }
+
+  function autoAnswerSurveyAsContact(msg, contact) {
+    if (!msg || msg.answered) return;
+    var pool = getContactCardPool(contact);
+    var answers = {};
+    (msg.questions || []).forEach(function (q, qi) {
+      if (q.type === 'text') {
+        answers[qi] = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '嗯……';
+      } else if (q.type === 'multi') {
+        var opts = q.options || [];
+        var n = Math.max(1, Math.min(opts.length, 1 + Math.floor(Math.random() * Math.min(2, opts.length))));
+        answers[qi] = opts.slice().sort(function () { return Math.random() - 0.5; }).slice(0, n);
+      } else {
+        var opts2 = q.options || ['好的'];
+        answers[qi] = opts2[Math.floor(Math.random() * opts2.length)];
+      }
+    });
+    msg.answered = true;
+    msg.answers = answers;
+    saveData();
+    if (state.chatContactId) {
+      renderMessages();
+      if (pool.length) {
+        var follow = { id: genId('m'), from: 'contact', type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: Date.now() };
+        pushMsg(follow);
+        appendMessage(follow);
+      }
+    }
+  }
+
+  function bindSurveySubmit(row) {
+    var btn = row.querySelector('[data-survey-submit]');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var bubble = row.querySelector('[data-survey-id]');
+      var id = bubble && bubble.getAttribute('data-survey-id');
+      var msgs = state.chats[state.chatContactId] || [];
+      var m = msgs.find(function (x) { return x.id === id; });
+      if (!m || m.answered) return;
+      var answers = {};
+      (m.questions || []).forEach(function (q, qi) {
+        if (q.type === 'text') {
+          var inp = bubble.querySelector('.sv-text[data-qi="' + qi + '"]');
+          answers[qi] = (inp && inp.value.trim()) || '（未填）';
+        } else {
+          var name = 'sv_' + m.id + '_' + qi;
+          var selected = Array.prototype.slice.call(bubble.querySelectorAll('input[name="' + name + '"]:checked')).map(function (i) { return i.value; });
+          answers[qi] = q.type === 'multi' ? selected : (selected[0] || '');
+        }
+      });
+      m.answered = true;
+      m.answers = answers;
+      saveData();
+      renderMessages();
+      var c = state.contacts.find(function (x) { return x.id === state.chatContactId; });
+      if (c) scheduleReplies(c, 1);
+    });
+  }
+
+  var _bindMsgRowEventsOrig = bindMsgRowEvents;
+  bindMsgRowEvents = function (row) {
+    _bindMsgRowEventsOrig(row);
+    bindSurveySubmit(row);
+  };
+
+  function wireAskSurvey() {}
+
+
+  function openAvatarPoolModal(kind) {
+    const isUser = kind === 'user';
+    const c = state.contacts.find(x => x.id === (state.chatContactId || state.currentContactId));
+    if (!isUser && !c) { alert('请先选择联系人'); return; }
+    const pool = isUser ? getUserAvatarPool() : getContactAvatarPool(c);
+    state.modalMode = isUser ? 'user-avatar-pool' : 'contact-avatar-pool';
+    modalTitle.textContent = isUser ? '我的头像池' : `${c.name} 的头像池`;
+    modalBody.innerHTML = `
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">上传多张后，对方有概率随机更换头像（聊天内会提示）。灵感参考 Mochi 字卡。</p>
+      <div class="avatar-pool-grid" id="pool-grid">
+        ${pool.map((src, i) => `<div class="avatar-pool-item" style="background-image:url(${src})"><button type="button" data-del="${i}">✕</button></div>`).join('')}
+        <button type="button" class="avatar-pool-add" id="pool-add">＋</button>
+      </div>
+      ${!isUser ? `<div class="form-row" style="margin-top:12px"><label>随机更换概率 (0~1)</label>
+        <input type="number" id="pool-chance" min="0" max="1" step="0.01" value="${(c.listenConfig && c.listenConfig.avatarSwapChance != null) ? c.listenConfig.avatarSwapChance : 0.08}"/></div>` : ''}`;
+    modalOverlay.classList.remove('hidden');
+    $('#pool-add')?.addEventListener('click', () => {
+      state.uploadTarget = isUser ? 'user-pool' : 'contact-pool';
+      if (!isUser) state.poolContactId = c.id;
+      $(isUser ? '#file-user-avatar-pool' : '#file-avatar-pool')?.click();
+    });
+    modalBody.querySelectorAll('[data-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pool.splice(+btn.dataset.del, 1);
+        if (!isUser) {
+          const v = parseFloat($('#pool-chance')?.value);
+          if (!isNaN(v)) {
+            ensureContactShape(c);
+            c.listenConfig.avatarSwapChance = Math.max(0, Math.min(1, v));
+          }
+        }
+        saveData();
+        openAvatarPoolModal(kind);
+      });
+    });
+  }
+
+  function wireAvatarPoolFiles() {
+    const handlePool = async (files, isUser) => {
+      if (!files?.length) return;
+      let target;
+      if (isUser) target = getUserAvatarPool();
+      else {
+        const c = state.contacts.find(x => x.id === state.poolContactId);
+        target = c ? getContactAvatarPool(c) : null;
+      }
+      if (!target) return;
+      for (const f of files) {
+        try {
+          const url = await compressImage(f, 200, 0.65);
+          if (url) target.push(url);
+        } catch (_) {}
+      }
+      saveData();
+      openAvatarPoolModal(isUser ? 'user' : 'contact');
+    };
+    $('#file-avatar-pool')?.addEventListener('change', e => {
+      const files = [...(e.target.files || [])]; e.target.value = '';
+      handlePool(files, false);
+    });
+    $('#file-user-avatar-pool')?.addEventListener('change', e => {
+      const files = [...(e.target.files || [])]; e.target.value = '';
+      handlePool(files, true);
+    });
+  }
+
+  document.addEventListener('click', e => {
+    if (e.target?.id === 'cs-save' || e.target?.closest?.('#cs-save')) {
+      const c = state.contacts.find(x => x.id === state.chatContactId);
+      if (!c) return;
+      ensureContactShape(c);
+      const ask = parseFloat($('#cs-ask-chance')?.value);
+      if (!isNaN(ask)) c.listenConfig.askChance = Math.max(0, Math.min(1, ask));
+      const avc = parseFloat($('#pool-chance')?.value);
+      if (!isNaN(avc)) c.listenConfig.avatarSwapChance = Math.max(0, Math.min(1, avc));
+    }
+  }, true);
+
+  // 扩展 proactive：头像更换 + 查岗
+  const _sp = scheduleProactiveMessages;
+  scheduleProactiveMessages = function () {
+    if (state.proactiveTimer) clearInterval(state.proactiveTimer);
+    if (!state.lastProactiveAt) state.lastProactiveAt = {};
+    state.proactiveTimer = setInterval(() => {
+      const now = Date.now();
+      state.contacts.forEach(c => {
+        tryRandomAvatarSwap(c);
+        const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
+        const intervalMin = Number(lc.proactiveIntervalMin);
+        if (!intervalMin || intervalMin <= 0) return;
+        const last = state.lastProactiveAt[c.id] || 0;
+        if (now - last < intervalMin * 60 * 1000) return;
+        state.lastProactiveAt[c.id] = now;
+        tryContactSendMoney(c);
+        if (state.chatContactId === c.id) tryContactAsk(c);
+        const pool = getContactCardPool(c);
+        const stickers = state.stickers || [];
+        let msg;
+        if (stickers.length && Math.random() < 0.25) {
+          const st = stickers[Math.floor(Math.random() * stickers.length)];
+          msg = { id: genId('m'), from: 'contact', type: 'sticker', stickerId: st.id, stickerData: st.data, time: now };
+        } else if (pool.length) {
+          msg = { id: genId('m'), from: 'contact', type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: now };
+        } else return;
+        if (!state.chats[c.id]) state.chats[c.id] = [];
+        state.chats[c.id].push(msg);
+        saveData();
+        if (state.chatContactId === c.id) appendMessage(msg);
+        else renderChatList();
+      });
+    }, 60000);
+  };
+
+  // persist userAvatarPool
+  const _serialize = (typeof serializeState === 'function') ? null : null;
+  // patch via wrapping existing save path: inject into contacts already have avatarPool field on contact object
+
+  // load userAvatarPool
+  const origLoadNormalize = normalizeLoaded;
+  // handled in init path after load
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
+
