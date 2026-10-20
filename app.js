@@ -12,7 +12,8 @@
   const DEFAULT_INTERACTION = ['轻轻拍了拍', '重重拍了拍', '拍了拍', '戳了戳', '碰了碰'];
   const DEFAULT_LISTEN = {
     pauseChance: 0.18,
-    favoriteChance: 0.12,
+    favoriteChance: 0.12,       // 一起听时收藏「整首歌」的概率
+    lyricFavoriteChance: 0.2,   // 播放中独立：随机收藏一句歌词
     pauseDurationMax: 6,
     momentsChance: 0.15,
     replyChance: 0.92,
@@ -23,7 +24,11 @@
     avatarSwapChance: 0.08,
     askChance: 0.1,
     momentsSticker: true,
-    momentCommentChance: 0.65
+    momentCommentChance: 0.65,
+    // 拼字卡：把多条短字卡拼成一句再发送
+    spliceChance: 0.35,
+    spliceMin: 2,
+    spliceMax: 4
   };
   const THEMES = [
     'classic', 'dark', 'seasalt', 'mintchoc', 'taro', 'peach',
@@ -722,8 +727,12 @@
       <div class="settings-cell"><span>已读不回概率</span><input type="number" id="cs-noreply" step="0.01" min="0" max="1" value="${lc.readNoReplyChance}"/></div>
       <div class="settings-section-title">互动概率</div>
       <div class="settings-cell"><span>一起听·暂停概率</span><input type="number" id="cs-pause" step="0.01" min="0" max="1" value="${lc.pauseChance}"/></div>
-      <div class="settings-cell"><span>一起听·收藏概率</span><input type="number" id="cs-fav" step="0.01" min="0" max="1" value="${lc.favoriteChance}"/></div>
+      <div class="settings-cell"><span>一起听·收藏歌曲概率</span><input type="number" id="cs-fav" step="0.01" min="0" max="1" value="${lc.favoriteChance}"/></div>
+      <div class="settings-cell"><span>一起听·收藏歌词概率</span><input type="number" id="cs-lyric-fav" step="0.01" min="0" max="1" value="${lc.lyricFavoriteChance != null ? lc.lyricFavoriteChance : 0.2}"/></div>
       <div class="settings-cell"><span>暂停最长秒数</span><input type="number" id="cs-pdur" min="1" max="30" value="${lc.pauseDurationMax}"/></div>
+      <div class="settings-cell"><span>拼字卡概率</span><input type="number" id="cs-splice" step="0.01" min="0" max="1" value="${lc.spliceChance != null ? lc.spliceChance : 0.35}"/></div>
+      <div class="settings-cell"><span>拼字最少片数</span><input type="number" id="cs-splice-min" min="2" max="6" value="${lc.spliceMin != null ? lc.spliceMin : 2}"/></div>
+      <div class="settings-cell"><span>拼字最多片数</span><input type="number" id="cs-splice-max" min="2" max="8" value="${lc.spliceMax != null ? lc.spliceMax : 4}"/></div>
       <div class="settings-cell"><span>朋友圈发动态概率</span><input type="number" id="cs-moments" step="0.01" min="0" max="1" value="${lc.momentsChance}"/></div>
       <div class="settings-cell"><span>主动拍一拍概率</span><input type="number" id="cs-poke" step="0.01" min="0" max="1" value="${lc.pokeChance}"/></div>
       <div class="settings-cell"><span>主动发消息间隔(分钟)</span><input type="number" id="cs-proactive" min="0" max="10080" value="${lc.proactiveIntervalMin == null ? 30 : lc.proactiveIntervalMin}"/></div>
@@ -768,9 +777,12 @@
       let count = Math.max(1, Math.min(3, parseInt($('#cs-count')?.value, 10) || 2));
       c.settings = { minDelay: min, maxDelay: max, maxReplies: count };
       const clamp01 = v => Math.max(0, Math.min(1, v));
-      c.listenConfig = {
+      let spliceMin = Math.max(2, Math.min(6, parseInt($('#cs-splice-min')?.value, 10) || 2));
+      let spliceMax = Math.max(spliceMin, Math.min(8, parseInt($('#cs-splice-max')?.value, 10) || 4));
+      c.listenConfig = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {}, {
         pauseChance: clamp01(num('#cs-pause', 0.18)),
         favoriteChance: clamp01(num('#cs-fav', 0.12)),
+        lyricFavoriteChance: clamp01(num('#cs-lyric-fav', 0.2)),
         pauseDurationMax: Math.max(1, Math.min(30, num('#cs-pdur', 6))),
         momentsChance: clamp01(num('#cs-moments', 0.15)),
         replyChance: clamp01(num('#cs-reply', 0.92)),
@@ -778,8 +790,14 @@
         pokeChance: clamp01(num('#cs-poke', 0.1)),
         proactiveIntervalMin: Math.max(0, Math.min(10080, num('#cs-proactive', 30))),
         avatarSwapChance: clamp01(num('#cs-av-swap', 0.08)),
-        askChance: clamp01(num('#cs-ask-chance', 0.1))
-      };
+        askChance: clamp01(num('#cs-ask-chance', 0.1)),
+        spliceChance: clamp01(num('#cs-splice', 0.35)),
+        spliceMin,
+        spliceMax,
+        momentsSticker: (c.listenConfig && c.listenConfig.momentsSticker) !== false,
+        momentCommentChance: (c.listenConfig && c.listenConfig.momentCommentChance != null)
+          ? c.listenConfig.momentCommentChance : 0.65
+      });
       scheduleProactiveMessages();
       saveData();
       page.classList.add('hidden');
@@ -1126,6 +1144,42 @@
     return contact.cards || [];
   }
 
+  /** 拼字卡：从字卡库抽多片短句拼成一条回复（灵感来自词典/拼字玩法） */
+  function composeSplicedCard(contact) {
+    const pool = getContactCardPool(contact).filter(Boolean);
+    if (!pool.length) return null;
+    const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
+    const chance = Number(lc.spliceChance != null ? lc.spliceChance : 0.35);
+    if (Math.random() > chance) {
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+    const minN = Math.max(2, Math.min(6, parseInt(lc.spliceMin, 10) || 2));
+    const maxN = Math.max(minN, Math.min(8, parseInt(lc.spliceMax, 10) || 4));
+    const n = minN + Math.floor(Math.random() * (maxN - minN + 1));
+    // 优先用较短字卡更像「词片」
+    const sorted = pool.slice().sort((a, b) => String(a).length - String(b).length);
+    const short = sorted.filter(t => String(t).length <= 24);
+    const src = short.length >= n ? short : pool;
+    const picked = [];
+    const used = new Set();
+    for (let i = 0; i < n && i < src.length; i++) {
+      let guard = 0;
+      while (guard++ < 20) {
+        const t = src[Math.floor(Math.random() * src.length)];
+        const key = String(t);
+        if (!used.has(key)) {
+          used.add(key);
+          picked.push(String(t).trim());
+          break;
+        }
+      }
+    }
+    if (picked.length < 2) return pool[Math.floor(Math.random() * pool.length)];
+    // 用空格或直接拼接（中文无空格更自然）
+    const hasAscii = picked.some(p => /[a-zA-Z]/.test(p));
+    return hasAscii ? picked.join(' ') : picked.join('');
+  }
+
   function scheduleReplies(contact, forceCount) {
     clearPendingTimers();
     const s = contact.settings || DEFAULT_SETTINGS;
@@ -1176,10 +1230,12 @@
             const st = stickers[Math.floor(Math.random() * stickers.length)];
             msg = { id: genId('m'), from: 'contact', type: 'sticker', stickerId: st.id, stickerData: st.data, time: Date.now() };
           } else if (pool.length) {
-            msg = { id: genId('m'), from: 'contact', type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: Date.now() };
+            const text = composeSplicedCard(contact) || pool[Math.floor(Math.random() * pool.length)];
+            msg = { id: genId('m'), from: 'contact', type: 'text', text, time: Date.now() };
           } else return;
           if (!state.chats[contact.id]) state.chats[contact.id] = [];
           state.chats[contact.id].push(msg);
+          notifyContactMessage(contact.id, msg);
           saveData();
           return;
         }
@@ -1188,7 +1244,7 @@
           const st = stickers[Math.floor(Math.random() * stickers.length)];
           msg = { id: genId('m'), from: 'contact', type: 'sticker', stickerId: st.id, stickerData: st.data, time: Date.now() };
         } else if (pool.length) {
-          const text = pool[Math.floor(Math.random() * pool.length)];
+          const text = composeSplicedCard(contact) || pool[Math.floor(Math.random() * pool.length)];
           msg = { id: genId('m'), from: 'contact', type: 'text', text, time: Date.now() };
         } else return;
         pushMsg(msg);
@@ -1385,7 +1441,11 @@
       <div class="card-list">${(c.interactionCards || []).map((t, i) => mk(t, i, 'interaction')).join('') || '<div class="empty-state small"><p>暂无</p></div>'}</div>
       <div class="section-title">TA 收藏的歌</div>
       <div>${favSongs.map(sg => `<div class="fav-song-item" data-sid="${sg.id}"><div class="song-cover" style="${sg.cover ? `background-image:url(${sg.cover})` : ''}">${sg.cover ? '' : '🎵'}</div>
-        <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist || '')}</div></div></div>`).join('') || '<div class="empty-state small"><p>暂无收藏</p></div>'}</div>`;
+        <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist || '')}</div></div></div>`).join('') || '<div class="empty-state small"><p>暂无收藏</p></div>'}</div>
+      <div class="section-title">TA 收藏的歌词</div>
+      <div class="card-list">${(c.favoriteLyrics || []).slice().reverse().slice(0, 30).map(t =>
+        `<div class="card-item"><div class="card-text">${escapeHtml(t)}</div></div>`
+      ).join('') || '<div class="empty-state small"><p>一起听时可能会收藏歌词</p></div>'}</div>`;
 
     $('#group-tabs')?.querySelectorAll('.group-tab[data-g]').forEach(btn => {
       btn.addEventListener('click', () => { state.activeCardGroup = btn.dataset.g; state.cardSelected = new Set(); renderCardsPanel(); });
@@ -1974,15 +2034,49 @@
     showListenToast._t = setTimeout(() => listenToast.classList.add('hidden'), 2200);
   }
 
+  function pickCurrentOrRandomLyric() {
+    const lines = (state.listenLyrics || []).filter(x => x && x.text && String(x.text).trim());
+    if (!lines.length) return null;
+    // 优先当前高亮行，否则随机
+    const idx = typeof state.listenLyricIdx === 'number' ? state.listenLyricIdx : -1;
+    if (idx >= 0 && idx < lines.length) return String(lines[idx].text).trim();
+    // listenLyrics 可能与过滤后不同：用时间匹配
+    try {
+      const t = listenAudio && isFinite(listenAudio.currentTime) ? listenAudio.currentTime : 0;
+      let cur = null;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].time <= t) cur = lines[i];
+        else break;
+      }
+      if (cur) return String(cur.text).trim();
+    } catch (_) {}
+    return String(lines[Math.floor(Math.random() * lines.length)].text).trim();
+  }
+
+  function collectLyricLine(contact, line) {
+    if (!contact || !line) return false;
+    if (!contact.favoriteLyrics) contact.favoriteLyrics = [];
+    if (contact.favoriteLyrics.includes(line)) return false;
+    contact.favoriteLyrics.push(line);
+    if (contact.favoriteLyrics.length > 80) contact.favoriteLyrics = contact.favoriteLyrics.slice(-80);
+    return true;
+  }
+
   function startListenSimulation() {
     stopListenSimulation();
     const contact = state.contacts.find(c => c.id === state.listenContactId);
     if (!contact) return;
-    const cfg = contact.listenConfig || DEFAULT_LISTEN;
+    ensureContactShape(contact);
+    const cfg = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
     state.listenInterval = setInterval(() => {
       if (listenAudio.paused) return;
       const r = Math.random();
-      if (r < cfg.pauseChance) {
+      const pPause = Number(cfg.pauseChance) || 0;
+      const pSong = Number(cfg.favoriteChance) || 0;
+      const pLyric = Number(cfg.lyricFavoriteChance != null ? cfg.lyricFavoriteChance : 0.2) || 0;
+
+      // 三段互斥：暂停 | 收藏歌 | 收藏歌词（剩余为无事）
+      if (r < pPause) {
         listenAudio.pause();
         listenPlay.textContent = '▶';
         listenCover.classList.remove('spinning');
@@ -1997,29 +2091,22 @@
           updateFloatPlaying(true);
           showListenToast('继续播放');
         }, dur);
-      } else if (r < cfg.pauseChance + cfg.favoriteChance) {
+      } else if (r < pPause + pSong) {
         if (!contact.favorites) contact.favorites = [];
         if (state.listenSongId && !contact.favorites.includes(state.listenSongId)) {
           contact.favorites.push(state.listenSongId);
+          saveData();
         }
-        // 随机收藏当前歌词行
-        try {
-          const lines = (state.listenLyrics || []).filter(x => x && x.text && String(x.text).trim());
-          if (lines.length) {
-            if (!contact.favoriteLyrics) contact.favoriteLyrics = [];
-            const line = String(lines[Math.floor(Math.random() * lines.length)].text).trim();
-            if (line && !contact.favoriteLyrics.includes(line)) {
-              contact.favoriteLyrics.push(line);
-              if (contact.favoriteLyrics.length > 50) contact.favoriteLyrics = contact.favoriteLyrics.slice(-50);
-            }
-            showListenToast(`${contact.name} 收藏了歌词「${truncate(line, 18)}」`);
-          } else {
-            showListenToast(`${contact.name} 收藏了这首歌`);
-          }
-        } catch (_) {
-          showListenToast(`${contact.name} 收藏了这首歌`);
+        showListenToast(`${contact.name} 收藏了这首歌`);
+      } else if (r < pPause + pSong + pLyric) {
+        // 播放过程中独立收藏一句歌词（不依赖是否收藏歌曲）
+        const line = pickCurrentOrRandomLyric();
+        if (line && collectLyricLine(contact, line)) {
+          saveData();
+          showListenToast(`${contact.name} 收藏了歌词「${truncate(line, 18)}」`);
+        } else if (line) {
+          showListenToast(`${contact.name} 又念了句「${truncate(line, 14)}」`);
         }
-        saveData();
       }
     }, 3000 + Math.random() * 2000);
   }
