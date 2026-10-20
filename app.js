@@ -1128,30 +1128,46 @@
     const c = state.contacts.find(x => x.id === state.currentContactId);
     if (!c) { cardsPanel.innerHTML = `<div class="empty-state small"><p>选择一位联系人查看字卡库</p></div>`; return; }
     ensureContactShape(c);
-    const s = c.settings || DEFAULT_SETTINGS;
     const groups = Object.keys(c.cardGroups);
     if (!groups.includes(state.activeCardGroup)) state.activeCardGroup = groups[0] || '默认';
     const gName = state.activeCardGroup;
     const list = c.cardGroups[gName] || [];
-    const mk = (text, idx, type) => `<div class="card-item ${type === 'interaction' ? 'interaction' : ''}"><div class="card-text">${escapeHtml(text)}</div>
-      <div class="card-actions"><button class="card-btn edit" data-i="${idx}" data-t="${type}">✎</button><button class="card-btn delete" data-i="${idx}" data-t="${type}">✕</button></div></div>`;
+    const selectMode = !!state.cardSelectMode;
+    const selected = state.cardSelected || new Set();
+    const mk = (text, idx, type) => {
+      const checked = selected.has(type + ':' + idx) ? 'checked' : '';
+      const selCls = selected.has(type + ':' + idx) ? ' selected' : '';
+      const check = selectMode && type === 'normal'
+        ? `<input type="checkbox" class="card-check" data-i="${idx}" data-t="${type}" ${checked}/>`
+        : '';
+      const actions = selectMode ? '' : `<div class="card-actions"><button class="card-btn edit" data-i="${idx}" data-t="${type}">✎</button><button class="card-btn delete" data-i="${idx}" data-t="${type}">✕</button></div>`;
+      return `<div class="card-item ${type === 'interaction' ? 'interaction' : ''}${selectMode ? ' select-mode' : ''}${selCls}" data-i="${idx}" data-t="${type}">${check}<div class="card-text">${escapeHtml(text)}</div>${actions}</div>`;
+    };
     const favSongs = (c.favorites || []).map(fid => state.songs.find(s => s.id === fid)).filter(Boolean);
     cardsPanel.innerHTML = `
       <div class="cards-header"><h2>${escapeHtml(c.name)}</h2>
         <button class="btn-xs" id="btn-open-chat">去聊天</button>
       </div>
-      <div class="settings-summary">状态 <strong>${escapeHtml(c.currentStatus || '')}</strong> · 字卡设置请在聊天页右上角 ⋯</div>
-      <div class="contact-custom-bar"></div>
+      <div class="settings-summary">状态 <strong>${escapeHtml(c.currentStatus || '')}</strong> · 本组 ${list.length} 条</div>
       <div class="section-title">字卡分组</div>
       <div class="group-tabs" id="group-tabs">
         ${groups.map(g => `<button class="group-tab ${g === gName ? 'active' : ''}" data-g="${escapeHtml(g)}">${escapeHtml(g)}</button>`).join('')}
         <button class="group-tab" id="btn-add-group">+组</button>
       </div>
-      <div class="toolbar-row">
+      <div class="toolbar-row" style="flex-wrap:wrap">
         <button class="btn-xs" id="btn-add-card">+ 字卡</button>
         <button class="btn-xs" id="btn-batch-cards">批量导入</button>
         <button class="btn-xs" id="btn-file-cards">文件导入</button>
+        <button class="btn-xs" id="btn-dedup-cards">去重</button>
+        <button class="btn-xs" id="btn-export-cards">导出</button>
+        <button class="btn-xs" id="btn-select-cards">${selectMode ? '取消多选' : '多选整理'}</button>
       </div>
+      ${selectMode ? `<div class="card-batch-bar">
+        <button class="btn-xs" id="btn-sel-all">全选</button>
+        <button class="btn-xs" id="btn-sel-del">删除所选</button>
+        <button class="btn-xs" id="btn-sel-move">移到分组</button>
+        <span style="font-size:12px;color:var(--muted)">已选 ${[...selected].filter(k => k.startsWith('normal:')).length}</span>
+      </div>` : ''}
       <div class="card-list">${list.map((t, i) => mk(t, i, 'normal')).join('') || '<div class="empty-state small"><p>暂无字卡</p></div>'}</div>
       <div class="section-title">互动字卡 <button class="btn-add" id="btn-add-inter" style="margin-left:8px">+</button></div>
       <div class="card-list">${(c.interactionCards || []).map((t, i) => mk(t, i, 'interaction')).join('') || '<div class="empty-state small"><p>暂无</p></div>'}</div>
@@ -1160,7 +1176,7 @@
         <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist || '')}</div></div></div>`).join('') || '<div class="empty-state small"><p>暂无收藏</p></div>'}</div>`;
 
     $('#group-tabs')?.querySelectorAll('.group-tab[data-g]').forEach(btn => {
-      btn.addEventListener('click', () => { state.activeCardGroup = btn.dataset.g; renderCardsPanel(); });
+      btn.addEventListener('click', () => { state.activeCardGroup = btn.dataset.g; state.cardSelected = new Set(); renderCardsPanel(); });
     });
     $('#btn-add-group')?.addEventListener('click', () => {
       const name = prompt('新分组名称');
@@ -1173,10 +1189,89 @@
     $('#btn-add-card')?.addEventListener('click', () => openCardModal('add', 'normal'));
     $('#btn-add-inter')?.addEventListener('click', () => openCardModal('add', 'interaction'));
     $('#btn-batch-cards')?.addEventListener('click', openBatchCardModal);
-    $('#btn-file-cards')?.addEventListener('click', () => $('#file-cards-txt')?.click());
+    $('#btn-file-cards')?.addEventListener('click', () => document.getElementById('file-cards-txt')?.click());
+    $('#btn-dedup-cards')?.addEventListener('click', () => {
+      const arr = c.cardGroups[gName] || [];
+      const seen = new Set();
+      const next = [];
+      let removed = 0;
+      arr.forEach(t => {
+        const key = String(t).trim();
+        if (!key || seen.has(key)) { removed++; return; }
+        seen.add(key);
+        next.push(t);
+      });
+      c.cardGroups[gName] = next;
+      c.cards = Object.values(c.cardGroups).flat();
+      saveData(); renderCardsPanel();
+      alert(removed ? `已去除 ${removed} 条重复字卡` : '当前分组没有重复');
+    });
+    $('#btn-export-cards')?.addEventListener('click', () => {
+      const arr = c.cardGroups[gName] || [];
+      const blob = new Blob([arr.join('\n')], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${c.name}-${gName}-字卡.txt`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    $('#btn-select-cards')?.addEventListener('click', () => {
+      state.cardSelectMode = !state.cardSelectMode;
+      state.cardSelected = new Set();
+      renderCardsPanel();
+    });
+    $('#btn-sel-all')?.addEventListener('click', () => {
+      state.cardSelected = new Set(list.map((_, i) => 'normal:' + i));
+      renderCardsPanel();
+    });
+    $('#btn-sel-del')?.addEventListener('click', () => {
+      const idxs = [...(state.cardSelected || [])]
+        .filter(k => k.startsWith('normal:'))
+        .map(k => +k.split(':')[1])
+        .sort((a, b) => b - a);
+      if (!idxs.length) { alert('请先选择字卡'); return; }
+      if (!confirm(`删除选中的 ${idxs.length} 条？`)) return;
+      const arr = (c.cardGroups[gName] || []).slice();
+      idxs.forEach(i => arr.splice(i, 1));
+      c.cardGroups[gName] = arr;
+      c.cards = Object.values(c.cardGroups).flat();
+      state.cardSelected = new Set();
+      saveData(); renderCardsPanel();
+    });
+    $('#btn-sel-move')?.addEventListener('click', () => {
+      const idxs = [...(state.cardSelected || [])]
+        .filter(k => k.startsWith('normal:'))
+        .map(k => +k.split(':')[1])
+        .sort((a, b) => b - a);
+      if (!idxs.length) { alert('请先选择字卡'); return; }
+      const target = prompt('移动到哪个分组？\n现有：' + groups.join('、'));
+      if (!target || !target.trim()) return;
+      const tg = target.trim();
+      if (!c.cardGroups[tg]) c.cardGroups[tg] = [];
+      const arr = (c.cardGroups[gName] || []).slice();
+      const moved = [];
+      idxs.forEach(i => { moved.push(arr[i]); arr.splice(i, 1); });
+      c.cardGroups[gName] = arr;
+      c.cardGroups[tg] = c.cardGroups[tg].concat(moved.reverse());
+      c.cards = Object.values(c.cardGroups).flat();
+      state.cardSelected = new Set();
+      state.cardSelectMode = false;
+      state.activeCardGroup = tg;
+      saveData(); renderCardsPanel();
+      alert(`已移动 ${moved.length} 条到「${tg}」`);
+    });
     $('#btn-open-chat')?.addEventListener('click', () => {
       switchPage('chat');
       enterChat(c.id);
+    });
+    cardsPanel.querySelectorAll('.card-check').forEach(ck => {
+      ck.addEventListener('change', () => {
+        if (!state.cardSelected) state.cardSelected = new Set();
+        const key = ck.dataset.t + ':' + ck.dataset.i;
+        if (ck.checked) state.cardSelected.add(key);
+        else state.cardSelected.delete(key);
+        renderCardsPanel();
+      });
     });
     cardsPanel.querySelectorAll('.card-btn.edit').forEach(b => b.addEventListener('click', e => {
       e.stopPropagation(); openCardModal('edit', b.dataset.t, +b.dataset.i);
@@ -2504,13 +2599,19 @@
   }
 
   function exportBackup() {
-    const payload = buildPersistPayload();
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `zijian-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    try {
+      const payload = buildPersistPayload();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'zijian-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+      alert('备份已开始下载');
+    } catch (err) {
+      alert('导出失败：' + (err && err.message));
+    }
   }
 
   function importBackupFile(file) {
@@ -2831,15 +2932,16 @@
         $('#file-moments-cover')?.click();
         return;
       }
-      if (t.closest('#btn-manage-stickers') || t.closest('#sm-add')) {
-        if (t.closest('#sm-add')) {
-          e.preventDefault();
-          const inp = $('#file-stickers');
-          if (inp) { inp.value = ''; inp.click(); }
-          return;
-        }
+      if (t.closest('#btn-manage-stickers')) {
         e.preventDefault();
         openStickerManager();
+        return;
+      }
+      if (t.closest('#sm-add')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const inp = document.getElementById('file-stickers');
+        if (inp) { inp.value = ''; inp.click(); }
         return;
       }
       // 朋友圈 ··· 菜单
@@ -3033,25 +3135,45 @@
       state.uploadTarget = 'user';
       $('#file-avatar')?.click();
     });
-    $('#file-stickers')?.addEventListener('change', async e => {
-      const files = Array.from(e.target.files || []);
-      e.target.value = '';
-      if (!files.length) return;
-      if (!Array.isArray(state.stickers)) state.stickers = [];
-      let ok = 0;
-      for (const f of files.slice(0, 40)) {
-        try {
-          const data = await compressImage(f, 200, 0.7);
-          if (data) {
-            state.stickers.push({ id: genId('st'), data });
-            ok++;
+    const stickerInput = document.getElementById('file-stickers');
+    if (stickerInput) {
+      stickerInput.addEventListener('change', async e => {
+        const files = Array.from(e.target.files || []);
+        e.target.value = '';
+        if (!files.length) return;
+        if (!Array.isArray(state.stickers)) state.stickers = [];
+        let ok = 0;
+        for (const f of files.slice(0, 40)) {
+          try {
+            // 表情保留透明通道优先用原图 dataURL，过大再压缩
+            let data;
+            if (f.size < 120 * 1024) {
+              data = await new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = () => resolve(r.result);
+                r.onerror = reject;
+                r.readAsDataURL(f);
+              });
+            } else {
+              data = await compressImage(f, 240, 0.8);
+            }
+            if (data && typeof data === 'string' && data.startsWith('data:')) {
+              state.stickers.push({ id: genId('st'), data });
+              ok++;
+            }
+          } catch (err) {
+            console.warn('sticker fail', err);
+            try {
+              const data = await compressImage(f, 160, 0.65);
+              if (data) { state.stickers.push({ id: genId('st'), data }); ok++; }
+            } catch (_) {}
           }
-        } catch (err) { console.warn('sticker fail', err); }
-      }
-      saveData();
-      if (state.modalMode === 'sticker-manage') openStickerManager();
-      alert(ok ? `已导入 ${ok} 个表情，当前共 ${state.stickers.length} 个` : '导入失败，请换一张较小的图片重试');
-    });
+        }
+        saveData();
+        if (state.modalMode === 'sticker-manage') openStickerManager();
+        alert(ok ? `已导入 ${ok} 个表情，当前共 ${state.stickers.length} 个` : '导入失败，请使用 JPG/PNG 图片重试');
+      });
+    }
     $('#moments-back')?.addEventListener('click', closeMomentsPage);
     $('#moments-refresh')?.addEventListener('click', () => {
       const m = genRandomMoment();

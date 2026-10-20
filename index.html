@@ -132,10 +132,11 @@
             </div>
           </div>
           <div class="me-menu">
-            <button class="me-menu-item" id="btn-manage-stickers"><span class="mm-icon">😊</span><span>表情包</span><span class="mm-arrow">›</span></button>
-            <button class="me-menu-item" id="btn-moments-cover"><span class="mm-icon">🖼️</span><span>朋友圈封面</span><span class="mm-arrow">›</span></button>
-            <button class="me-menu-item" id="btn-export-data"><span class="mm-icon">📦</span><span>导出备份</span><span class="mm-arrow">›</span></button>
-            <button class="me-menu-item" id="btn-import-data"><span class="mm-icon">📥</span><span>导入备份</span><span class="mm-arrow">›</span></button>
+            <div class="section-label" style="padding:0 4px 8px">数据与资源</div>
+            <button class="me-menu-item" id="btn-manage-stickers" type="button"><span class="mm-icon">😊</span><span>表情包管理</span><span class="mm-arrow">›</span></button>
+            <button class="me-menu-item" id="btn-moments-cover" type="button"><span class="mm-icon">🖼️</span><span>朋友圈封面</span><span class="mm-arrow">›</span></button>
+            <button class="me-menu-item" id="btn-export-data" type="button"><span class="mm-icon">📦</span><span>导出全部数据</span><span class="mm-arrow">›</span></button>
+            <button class="me-menu-item" id="btn-import-data" type="button"><span class="mm-icon">📥</span><span>导入备份数据</span><span class="mm-arrow">›</span></button>
           </div>
           <div class="theme-section">
             <div class="section-label">主题皮肤</div>
@@ -235,10 +236,10 @@
     </div>
   </div>
 
-  <input type="file" id="file-avatar" accept="image/*" class="hidden" />
-  <input type="file" id="file-avatar-pool" accept="image/*" multiple class="hidden" />
-  <input type="file" id="file-user-avatar-pool" accept="image/*" multiple class="hidden" />
-  <input type="file" id="file-bg" accept="image/*" class="hidden" />
+  <input type="file" id="file-avatar" accept="image/*" class="visually-hidden" />
+  <input type="file" id="file-avatar-pool" accept="image/*" multiple class="visually-hidden" />
+  <input type="file" id="file-user-avatar-pool" accept="image/*" multiple class="visually-hidden" />
+  <input type="file" id="file-bg" accept="image/*" class="visually-hidden" />
   
   <!-- 朋友圈 -->
   <div id="moments-page" class="moments-page hidden">
@@ -265,7 +266,7 @@
       <button id="moment-comment-send" class="mcb-send">发送</button>
     </div>
   </div>
-  <input type="file" id="file-moments-cover" accept="image/*" class="hidden" />
+  <input type="file" id="file-moments-cover" accept="image/*" class="visually-hidden" />
 
 
   <!-- 群聊 -->
@@ -299,11 +300,11 @@
     </div>
   </div>
 
-  <input type="file" id="file-backup" accept="application/json,.json" class="hidden" />
-  <input type="file" id="file-cards-txt" accept=".txt,text/plain" class="hidden" />
-  <input type="file" id="file-chat-photo" accept="image/*" multiple class="hidden" />
-  <input type="file" id="file-moment-photo" accept="image/*" class="hidden" />
-  <input type="file" id="file-stickers" accept="image/*" multiple class="hidden" />
+  <input type="file" id="file-backup" accept="application/json,.json" class="visually-hidden" />
+  <input type="file" id="file-cards-txt" accept=".txt,text/plain" class="visually-hidden" />
+  <input type="file" id="file-chat-photo" accept="image/*" multiple class="visually-hidden" />
+  <input type="file" id="file-moment-photo" accept="image/*" class="visually-hidden" />
+  <input type="file" id="file-stickers" accept="image/*" multiple class="visually-hidden" />
 
   
   <div id="chat-settings-page" class="chat-settings-page hidden">
