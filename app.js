@@ -21,7 +21,10 @@
     // 每隔多少分钟主动给用户发一条消息；0 表示关闭
     proactiveIntervalMin: 30
   };
-  const THEMES = ['classic', 'dark', 'cream', 'lavender', 'rose', 'ocean', 'ink', 'amber', 'mint'];
+  const THEMES = [
+    'classic', 'dark', 'seasalt', 'mintchoc', 'taro', 'peach',
+    'yuzu', 'algae', 'lavender', 'cream', 'rose', 'ocean'
+  ];
 
   const SAMPLE_LRC = `[00:00.00]示例歌词第一行
 [00:05.00]这是第二行歌词

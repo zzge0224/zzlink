@@ -1,23 +1,64 @@
 :root, [data-theme="classic"] {
   --canvas:#141311; --chrome:#1C1A17; --paper:#F6F1E7; --ink:#1C1915;
   --accent:#3D9A62; --accent-soft:rgba(61,154,98,.15); --seal:#B23A3A;
-  --muted:#8A857C; --border:#2A2722; --gold:#E8B84A;
+  --muted:#8A8478; --border:#2A2824; --gold:#D4A84B;
   --bubble-user:#3D9A62; --bubble-user-text:#fff;
   --bubble-contact:#F6F1E7; --bubble-contact-text:#1C1915; --msg-list-bg:#141311;
 }
 [data-theme="dark"] {
-  --canvas:#0D0D0D; --chrome:#161616; --paper:#E8E8E8; --ink:#111;
+  --canvas:#0D0D0D; --chrome:#1A1A1A; --paper:#E8E8E8; --ink:#0D0D0D;
   --accent:#5B9BD5; --accent-soft:rgba(91,155,213,.18); --seal:#C75050;
-  --muted:#7A7A7A; --border:#2A2A2A; --gold:#D4A84B;
-  --bubble-user:#2B6CB0; --bubble-user-text:#fff;
+  --muted:#888; --border:#2A2A2A; --gold:#A0C4E8;
+  --bubble-user:#3A7A9E; --bubble-user-text:#fff;
   --bubble-contact:#2A2A2A; --bubble-contact-text:#E8E8E8; --msg-list-bg:#0D0D0D;
 }
-[data-theme="cream"] {
-  --canvas:#F7F3EB; --chrome:#EFE9DE; --paper:#FFF; --ink:#3D3830;
-  --accent:#C17B4A; --accent-soft:rgba(193,123,74,.15); --seal:#B23A3A;
-  --muted:#9A9285; --border:#E0D8CC; --gold:#C9A227;
-  --bubble-user:#C17B4A; --bubble-user-text:#fff;
-  --bubble-contact:#FFF; --bubble-contact-text:#3D3830; --msg-list-bg:#F0EBE1;
+/* 海盐芝士 */
+[data-theme="seasalt"] {
+  --canvas:#f0f9ff; --chrome:#ffffff; --paper:#2a3a45; --ink:#2a3a45;
+  --accent:#c09ded; --accent-soft:rgba(192,157,237,.22); --seal:#c5e0e0;
+  --muted:#7a8a95; --border:#d5e5f0; --gold:#c5e0e0;
+  --bubble-user:#c09ded; --bubble-user-text:#fff;
+  --bubble-contact:#ffffff; --bubble-contact-text:#2a3a45; --msg-list-bg:#e8f4fc;
+}
+/* 薄荷黑巧 */
+[data-theme="mintchoc"] {
+  --canvas:#ddf6e8; --chrome:#fffef2; --paper:#3a2e22; --ink:#3a2e22;
+  --accent:#775c3c; --accent-soft:rgba(119,92,60,.18); --seal:#c4b39d;
+  --muted:#8a7a68; --border:#c8e0d0; --gold:#c4b39d;
+  --bubble-user:#775c3c; --bubble-user-text:#fffef2;
+  --bubble-contact:#fffef2; --bubble-contact-text:#3a2e22; --msg-list-bg:#cfeede;
+}
+/* 芋泥小方 */
+[data-theme="taro"] {
+  --canvas:#f2ebff; --chrome:#fffef8; --paper:#3a3050; --ink:#3a3050;
+  --accent:#c6b6ce; --accent-soft:rgba(187,164,222,.25); --seal:#bba4de;
+  --muted:#8a8098; --border:#e0d4f0; --gold:#bba4de;
+  --bubble-user:#bba4de; --bubble-user-text:#fff;
+  --bubble-contact:#fffef8; --bubble-contact-text:#3a3050; --msg-list-bg:#ebe0fa;
+}
+/* 蜜桃荔枝 */
+[data-theme="peach"] {
+  --canvas:#ffeded; --chrome:#faf2ed; --paper:#4a3038; --ink:#4a3038;
+  --accent:#fb88a3; --accent-soft:rgba(251,136,163,.2); --seal:#f8d7dc;
+  --muted:#a08088; --border:#f0d0d8; --gold:#f8d7dc;
+  --bubble-user:#fb88a3; --bubble-user-text:#fff;
+  --bubble-contact:#faf2ed; --bubble-contact-text:#4a3038; --msg-list-bg:#ffe0e6;
+}
+/* 柚见青柠 */
+[data-theme="yuzu"] {
+  --canvas:#f2fff5; --chrome:#d2fadc; --paper:#2a4030; --ink:#2a4030;
+  --accent:#5bb89a; --accent-soft:rgba(91,184,154,.2); --seal:#b7e8e2;
+  --muted:#6a9078; --border:#c0e8cc; --gold:#fafcb6;
+  --bubble-user:#5bb89a; --bubble-user-text:#fff;
+  --bubble-contact:#ffffff; --bubble-contact-text:#2a4030; --msg-list-bg:#e0f8e8;
+}
+/* 蓝藻乳酪 */
+[data-theme="algae"] {
+  --canvas:#c7d3d8; --chrome:#fcf9e6; --paper:#3a2418; --ink:#3a2418;
+  --accent:#6a7a88; --accent-soft:rgba(106,122,136,.2); --seal:#b0a597;
+  --muted:#6a6058; --border:#a8b4b8; --gold:#b0a597;
+  --bubble-user:#6a7a88; --bubble-user-text:#fcf9e6;
+  --bubble-contact:#fcf9e6; --bubble-contact-text:#3a2418; --msg-list-bg:#b8c4c8;
 }
 [data-theme="lavender"] {
   --canvas:#1A1625; --chrome:#241E33; --paper:#F0EBF8; --ink:#1E1A28;
@@ -26,7 +67,13 @@
   --bubble-user:#7B5EA7; --bubble-user-text:#fff;
   --bubble-contact:#F0EBF8; --bubble-contact-text:#1E1A28; --msg-list-bg:#1A1625;
 }
-
+[data-theme="cream"] {
+  --canvas:#F5F0E6; --chrome:#FFFBF5; --paper:#3D3830; --ink:#3D3830;
+  --accent:#C17B4A; --accent-soft:rgba(193,123,74,.15); --seal:#B23A3A;
+  --muted:#9A9080; --border:#E5DCD0; --gold:#D4A84B;
+  --bubble-user:#C17B4A; --bubble-user-text:#fff;
+  --bubble-contact:#FFF; --bubble-contact-text:#3D3830; --msg-list-bg:#F0EBE1;
+}
 [data-theme="rose"] {
   --canvas:#1C1216; --chrome:#2A1A20; --paper:#FCE8EE; --ink:#2A151C;
   --accent:#E85A7A; --accent-soft:rgba(232,90,122,.2); --seal:#C73A5A;
@@ -41,28 +88,6 @@
   --bubble-user:#3D9EBF; --bubble-user-text:#fff;
   --bubble-contact:#E4F2F8; --bubble-contact-text:#0E1A22; --msg-list-bg:#0E1A22;
 }
-[data-theme="ink"] {
-  --canvas:#0A0A0A; --chrome:#161616; --paper:#F0F0F0; --ink:#0A0A0A;
-  --accent:#E8E8E8; --accent-soft:rgba(255,255,255,.12); --seal:#888;
-  --muted:#888; --border:#2A2A2A; --gold:#CCC;
-  --bubble-user:#E8E8E8; --bubble-user-text:#111;
-  --bubble-contact:#2A2A2A; --bubble-contact-text:#F0F0F0; --msg-list-bg:#0A0A0A;
-}
-[data-theme="amber"] {
-  --canvas:#1A140C; --chrome:#261E12; --paper:#F8F0E0; --ink:#1A140C;
-  --accent:#D4923A; --accent-soft:rgba(212,146,58,.2); --seal:#B86A20;
-  --muted:#A09070; --border:#3A3020; --gold:#E8C070;
-  --bubble-user:#D4923A; --bubble-user-text:#1A140C;
-  --bubble-contact:#F8F0E0; --bubble-contact-text:#1A140C; --msg-list-bg:#1A140C;
-}
-[data-theme="mint"] {
-  --canvas:#0F1A18; --chrome:#162420; --paper:#E6F5F0; --ink:#0F1A18;
-  --accent:#3DBB8A; --accent-soft:rgba(61,187,138,.2); --seal:#2A9070;
-  --muted:#7AAA98; --border:#1E3830; --gold:#7AD4B0;
-  --bubble-user:#3DBB8A; --bubble-user-text:#fff;
-  --bubble-contact:#E6F5F0; --bubble-contact-text:#0F1A18; --msg-list-bg:#0F1A18;
-}
-
 * { box-sizing:border-box; margin:0; padding:0; }
 html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:var(--canvas); color:var(--paper); -webkit-font-smoothing:antialiased; transition:background-color .35s,color .35s; }
 #app { display:flex; flex-direction:column; height:100%; max-width:480px; margin:0 auto; background:var(--canvas); position:relative; overflow:hidden; transition:background-color .35s; }
@@ -198,14 +223,14 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 .btn-sm { background:transparent; border:1px solid var(--border); color:var(--muted); border-radius:14px; padding:4px 14px; font-size:12px; cursor:pointer; }
 .theme-section { width:100%; max-width:320px; margin-bottom:28px; }
 .section-label { font-size:13px; color:var(--muted); margin-bottom:12px; text-align:center; }
-.theme-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.theme-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
 .theme-card { background:var(--chrome); border:2px solid var(--border); border-radius:14px; padding:12px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--paper); font-size:13px; }
 .theme-card.active { border-color:var(--accent); background:var(--accent-soft); }
 .theme-preview { width:100%; height:36px; border-radius:8px; }
-.classic-preview { background:linear-gradient(90deg,#141311 40%,#3D9A62 40%,#3D9A62 70%,#F6F1E7 70%); }
-.dark-preview { background:linear-gradient(90deg,#0D0D0D 40%,#5B9BD5 40%,#5B9BD5 70%,#2A2A2A 70%); }
-.cream-preview { background:linear-gradient(90deg,#F7F3EB 40%,#C17B4A 40%,#C17B4A 70%,#FFF 70%); }
-.lavender-preview { background:linear-gradient(90deg,#1A1625 40%,#9B7EBD 40%,#9B7EBD 70%,#F0EBF8 70%); }
+
+
+
+
 .stats { display:flex; gap:28px; margin-bottom:32px; }
 .stat-item { display:flex; flex-direction:column; align-items:center; }
 .stat-num { font-size:22px; font-weight:600; color:var(--accent); }
@@ -634,14 +659,14 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
   background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; margin-left:8px;
 }
 
-.rose-preview { background:linear-gradient(90deg,#1C1216 40%,#E85A7A 40%,#E85A7A 70%,#FCE8EE 70%); }
-.ocean-preview { background:linear-gradient(90deg,#0E1A22 40%,#3D9EBF 40%,#3D9EBF 70%,#E4F2F8 70%); }
-.ink-preview { background:linear-gradient(90deg,#0A0A0A 40%,#E8E8E8 40%,#E8E8E8 70%,#2A2A2A 70%); }
-.amber-preview { background:linear-gradient(90deg,#1A140C 40%,#D4923A 40%,#D4923A 70%,#F8F0E0 70%); }
-.mint-preview { background:linear-gradient(90deg,#0F1A18 40%,#3DBB8A 40%,#3DBB8A 70%,#E6F5F0 70%); }
-.dark-preview { background:linear-gradient(90deg,#0D0D0D 40%,#5B9BD5 40%,#5B9BD5 70%,#2A2A2A 70%); }
-.cream-preview { background:linear-gradient(90deg,#F5F0E6 40%,#C17B4A 40%,#C17B4A 70%,#FFF 70%); }
-.lavender-preview { background:linear-gradient(90deg,#1A1625 40%,#9B7EBD 40%,#9B7EBD 70%,#F0EBF8 70%); }
+
+
+
+
+
+
+
+
 
 /* 纪念 */
 .memorial-list { padding:12px 16px; }
@@ -659,3 +684,28 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
   margin:0 12px 6px; flex-shrink:0;
 }
 .chat-pin-memorial.hidden { display:none; }
+
+.classic-preview { background:linear-gradient(90deg,#141311 40%,#3D9A62 40%,#3D9A62 70%,#F6F1E7 70%); }
+.dark-preview { background:linear-gradient(90deg,#0D0D0D 40%,#5B9BD5 40%,#5B9BD5 70%,#2A2A2A 70%); }
+.seasalt-preview { background:linear-gradient(90deg,#f0f9ff 40%,#c09ded 40%,#c09ded 70%,#c5e0e0 70%); }
+.mintchoc-preview { background:linear-gradient(90deg,#ddf6e8 40%,#775c3c 40%,#775c3c 70%,#fffef2 70%); }
+.taro-preview { background:linear-gradient(90deg,#f2ebff 40%,#bba4de 40%,#bba4de 70%,#fffef8 70%); }
+.peach-preview { background:linear-gradient(90deg,#ffeded 40%,#fb88a3 40%,#fb88a3 70%,#faf2ed 70%); }
+.yuzu-preview { background:linear-gradient(90deg,#f2fff5 40%,#5bb89a 40%,#5bb89a 70%,#fafcb6 70%); }
+.algae-preview { background:linear-gradient(90deg,#c7d3d8 40%,#6a7a88 40%,#6a7a88 70%,#fcf9e6 70%); }
+.lavender-preview { background:linear-gradient(90deg,#1A1625 40%,#9B7EBD 40%,#9B7EBD 70%,#F0EBF8 70%); }
+.cream-preview { background:linear-gradient(90deg,#F5F0E6 40%,#C17B4A 40%,#C17B4A 70%,#FFF 70%); }
+.rose-preview { background:linear-gradient(90deg,#1C1216 40%,#E85A7A 40%,#E85A7A 70%,#FCE8EE 70%); }
+.ocean-preview { background:linear-gradient(90deg,#0E1A22 40%,#3D9EBF 40%,#3D9EBF 70%,#E4F2F8 70%); }
+.contacts-side { display:flex; flex-direction:column; min-width:0; overflow:hidden; }
+
+[data-theme="seasalt"] .tab-bar,
+[data-theme="mintchoc"] .tab-bar,
+[data-theme="taro"] .tab-bar,
+[data-theme="peach"] .tab-bar,
+[data-theme="yuzu"] .tab-bar,
+[data-theme="algae"] .tab-bar,
+[data-theme="cream"] .tab-bar {
+  background: var(--chrome);
+  border-top-color: var(--border);
+}
