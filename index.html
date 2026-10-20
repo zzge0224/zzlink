@@ -88,6 +88,11 @@
               <span class="discover-label">纪念</span>
               <span class="discover-arrow">›</span>
             </button>
+            <button class="discover-item" id="btn-goto-group">
+              <span class="discover-icon">👥</span>
+              <span class="discover-label">群聊</span>
+              <span class="discover-arrow">›</span>
+            </button>
           </div>
           <div id="memorial-subpage" class="music-subpage hidden">
             <div class="music-page-toolbar">
@@ -244,6 +249,7 @@
     <div class="moments-top transparent">
       <button id="moments-back" class="listen-back">‹</button>
       <h2>朋友圈</h2>
+      <button id="moments-settings" class="btn-xs">设置</button>
       <button id="moments-post" class="btn-xs">发表</button>
       <button id="moments-refresh" class="btn-xs">刷新</button>
     </div>
@@ -263,6 +269,24 @@
     </div>
   </div>
   <input type="file" id="file-moments-cover" accept="image/*" class="hidden" />
+
+
+  <!-- 群聊 -->
+  <div id="group-page" class="moments-page hidden">
+    <div class="moments-top">
+      <button id="group-back" class="listen-back">‹</button>
+      <h2 id="group-title">群聊</h2>
+      <button id="group-new" class="btn-xs">新建</button>
+    </div>
+    <div id="group-list" class="memorial-list"></div>
+    <div id="group-chat-view" class="hidden" style="display:none;flex-direction:column;flex:1;min-height:0">
+      <div id="group-messages" class="message-list" style="flex:1"></div>
+      <div class="composer">
+        <textarea id="group-input" placeholder="说点什么..." rows="1"></textarea>
+        <button id="group-send" class="btn-send">发送</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 红包打开 -->
   <div id="rp-open-overlay" class="rp-open-overlay hidden">

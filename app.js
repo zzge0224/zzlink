@@ -21,7 +21,8 @@
     // 每隔多少分钟主动给用户发一条消息；0 表示关闭
     proactiveIntervalMin: 30,
     avatarSwapChance: 0.08,
-    askChance: 0.1
+    askChance: 0.1,
+    momentsSticker: true
   };
   const THEMES = [
     'classic', 'dark', 'seasalt', 'mintchoc', 'taro', 'peach',
@@ -72,6 +73,7 @@
   let state = {
     contacts: [], songs: [], chats: {}, stickers: [], moments: [], memorials: [],
     questionnaires: [],
+    groups: [],
     userBalance: 888, theme: 'classic', userAvatar: null, userName: '昕',
     currentContactId: null, chatContactId: null,
     editingCardIndex: null, editingCardType: 'normal', editingGroup: '默认', modalMode: null,
@@ -127,6 +129,7 @@
       moments: Array.isArray(p.moments) ? p.moments : [],
       memorials: Array.isArray(p.memorials) ? p.memorials : [],
       questionnaires: Array.isArray(p.questionnaires) ? p.questionnaires : [],
+      groups: Array.isArray(p.groups) ? p.groups : [],
       userBalance: typeof p.userBalance === 'number' ? p.userBalance : 888,
       theme: THEMES.includes(p.theme) ? p.theme : 'classic',
       playMode: p.playMode || 'order',
@@ -193,6 +196,7 @@
       moments: (state.moments || []).slice(-100),
       memorials: state.memorials || [],
       questionnaires: state.questionnaires || [],
+      groups: state.groups || [],
       userBalance: state.userBalance,
       theme: state.theme,
       playMode: state.playMode || 'order',
@@ -1847,6 +1851,35 @@
       openSurveyPickerModal();
       return;
     }
+    if (state.modalMode === 'moments-settings') {
+      (state.contacts || []).forEach(c => {
+        ensureContactShape(c);
+        const ch = modalBody.querySelector(`input[data-cid="${c.id}"][data-k="momentsChance"]`);
+        const st = modalBody.querySelector(`input[data-cid="${c.id}"][data-k="momentsSticker"]`);
+        if (ch) {
+          const v = parseFloat(ch.value);
+          if (!isNaN(v)) c.listenConfig.momentsChance = Math.max(0, Math.min(1, v));
+        }
+        if (st) c.listenConfig.momentsSticker = !!st.checked;
+      });
+      saveData();
+      closeModal();
+      alert('朋友圈设置已保存');
+      return;
+    }
+    if (state.modalMode === 'new-group') {
+      const name = ($('#group-name')?.value || '').trim() || '未命名群聊';
+      const ids = [...modalBody.querySelectorAll('input[data-gc]:checked')].map(i => i.value);
+      if (ids.length < 1) { alert('至少选择一位联系人'); return; }
+      if (!state.groups) state.groups = [];
+      const g = { id: genId('g'), name, memberIds: ids, messages: [] };
+      state.groups.push(g);
+      saveData();
+      closeModal();
+      openGroupPage();
+      enterGroup(g.id);
+      return;
+    }
   }
 
   function updateStats() {
@@ -2099,12 +2132,22 @@
   }
 
   function genRandomMoment() {
-    const c = state.contacts[Math.floor(Math.random() * state.contacts.length)];
+    // 按各自 momentsChance 加权抽联系人
+    const candidates = (state.contacts || []).filter(c => {
+      ensureContactShape(c);
+      const ch = (c.listenConfig && c.listenConfig.momentsChance != null)
+        ? Number(c.listenConfig.momentsChance) : 0.15;
+      return ch > 0 && Math.random() < Math.max(ch, 0.05);
+    });
+    const poolC = candidates.length ? candidates : (state.contacts || []);
+    const c = poolC[Math.floor(Math.random() * poolC.length)];
     if (!c) return null;
+    ensureContactShape(c);
     const pool = getContactCardPool(c);
     const text = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '今天天气不错。';
     let stickerData = null, stickerId = null;
-    if ((state.stickers || []).length && Math.random() < 0.35) {
+    const allowSticker = c.listenConfig?.momentsSticker !== false;
+    if (allowSticker && (state.stickers || []).length && Math.random() < 0.35) {
       const st = state.stickers[Math.floor(Math.random() * state.stickers.length)];
       stickerId = st.id; stickerData = st.data;
     }
@@ -2132,10 +2175,12 @@
   function replyToMomentLater(m) {
     const c = state.contacts.find(x => x.id === m.contactId);
     if (!c || Math.random() > 0.65) return;
+    ensureContactShape(c);
+    const allowSticker = c.listenConfig?.momentsSticker !== false;
     setTimeout(() => {
       if (!m.comments) m.comments = [];
       const pool = getContactCardPool(c);
-      if ((state.stickers || []).length && Math.random() < 0.3) {
+      if (allowSticker && (state.stickers || []).length && Math.random() < 0.3) {
         const st = state.stickers[Math.floor(Math.random() * state.stickers.length)];
         m.comments.push({ from: c.name, stickerData: st.data, time: Date.now() });
       } else {
@@ -2150,11 +2195,13 @@
     const list = $('#moments-list');
     if (!list) return;
     if (!state.moments) state.moments = [];
-    if (state.moments.length < 3) {
-      for (let i = 0; i < 3; i++) {
+    // 仅首次空列表时种子，删除后不再自动补回
+    if (!state.moments.length && !state._momentsSeeded) {
+      for (let i = 0; i < 2; i++) {
         const m = genRandomMoment();
         if (m) state.moments.unshift(m);
       }
+      state._momentsSeeded = true;
       saveData();
     }
     const sorted = state.moments.slice().sort((a, b) => b.time - a.time);
@@ -2185,7 +2232,7 @@
             ${m.stickerData ? `<div class="moment-sticker"><img src="${m.stickerData}"/></div>` : ''}
             <div class="moment-foot">
               <span class="moment-time">${ago}</span>
-              ${m.contactId === 'me' || true ? `<button class="moment-del" data-act="del" type="button">删除</button>` : ''}
+              <button class="moment-del" data-act="del" type="button">删除</button>
               <button class="moment-more" data-act="menu" type="button">···</button>
             </div>
             <div class="moment-action-bar hidden" data-bar>
@@ -2226,14 +2273,42 @@
         bar?.classList.add('hidden');
         showMomentCommentBar(m.id);
       });
-      card.querySelector('[data-act="del"]')?.addEventListener('click', e => {
-        e.stopPropagation();
-        if (!confirm('删除这条朋友圈？')) return;
-        state.moments = (state.moments || []).filter(x => x.id !== m.id);
-        saveData();
-        renderMoments();
-      });
+      const delBtn = card.querySelector('[data-act="del"]');
+      if (delBtn) {
+        const doDel = e => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!confirm('删除这条朋友圈？')) return;
+          state.moments = (state.moments || []).filter(x => x.id !== id);
+          state._momentsSeeded = true;
+          saveData();
+          renderMoments();
+        };
+        delBtn.addEventListener('click', doDel);
+        delBtn.addEventListener('touchend', doDel, { passive: false });
+      }
     });
+  }
+
+  function openMomentsSettings() {
+    state.modalMode = 'moments-settings';
+    modalTitle.textContent = '朋友圈设置';
+    const rows = (state.contacts || []).map(c => {
+      ensureContactShape(c);
+      const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
+      return `<div class="survey-editor-q">
+        <strong>${escapeHtml(c.name)}</strong>
+        <div class="form-row"><label>发动态概率 (0~1)</label>
+          <input type="number" data-cid="${c.id}" data-k="momentsChance" min="0" max="1" step="0.01" value="${lc.momentsChance != null ? lc.momentsChance : 0.15}"/>
+        </div>
+        <label style="font-size:13px;display:flex;align-items:center;gap:8px;margin-top:6px">
+          <input type="checkbox" data-cid="${c.id}" data-k="momentsSticker" ${lc.momentsSticker !== false ? 'checked' : ''}/>
+          发动态 / 评论时可带表情包
+        </label>
+      </div>`;
+    }).join('') || '<p style="color:var(--muted)">暂无联系人</p>';
+    modalBody.innerHTML = `<p style="font-size:12px;color:var(--muted);margin-bottom:8px">为每位联系人单独设置朋友圈行为。点确定保存。</p>${rows}`;
+    modalOverlay.classList.remove('hidden');
   }
 
   function submitMomentComment(text, stickerData) {
@@ -2443,6 +2518,7 @@
     state.stickers = data.stickers || []; state.moments = data.moments || [];
     state.memorials = data.memorials || [];
     state.questionnaires = data.questionnaires || [];
+    state.groups = data.groups || [];
     state.userBalance = data.userBalance; state.theme = data.theme;
     state.playMode = data.playMode || 'order';
     state.userAvatar = data.userAvatar || null;
@@ -2551,6 +2627,29 @@
     });
     $('#btn-add-contact')?.addEventListener('click', openAddContactModal);
     $('#moments-post')?.addEventListener('click', openPostMomentModal);
+    $('#moments-settings')?.addEventListener('click', openMomentsSettings);
+    $('#moments-cover')?.addEventListener('click', () => $('#file-moments-cover')?.click());
+    $('#btn-goto-group')?.addEventListener('click', openGroupPage);
+    $('#group-back')?.addEventListener('click', () => {
+      if (state.activeGroupId && !$('#group-list')?.classList.contains('hidden') === false) {
+        // if in chat view, back to list
+      }
+      if (state.activeGroupId && $('#group-chat-view') && !$('#group-chat-view').classList.contains('hidden')) {
+        state.activeGroupId = null;
+        $('#group-chat-view').classList.add('hidden');
+        $('#group-chat-view').style.display = 'none';
+        $('#group-list')?.classList.remove('hidden');
+        $('#group-title').textContent = '群聊';
+        renderGroupList();
+        return;
+      }
+      closeGroupPage();
+    });
+    $('#group-new')?.addEventListener('click', openNewGroupModal);
+    $('#group-send')?.addEventListener('click', sendGroupMessage);
+    $('#group-input')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); }
+    });
     $('#quote-bar-close').addEventListener('click', () => { state.quotingMsg=null; updateQuoteBar(); });
     msgActionMenu.querySelector('[data-action="quote"]').addEventListener('click', () => {
       if (state.longPressMsg) { state.quotingMsg=state.longPressMsg; updateQuoteBar(); hideMsgMenu(); msgInput.focus(); }
@@ -3107,6 +3206,119 @@
 
   function wireAskSurvey() {}
 
+
+
+  // ========== 群聊（轻量） ==========
+  function openGroupPage() {
+    const page = $('#group-page');
+    if (!page) return;
+    page.classList.remove('hidden');
+    $('#group-chat-view')?.classList.add('hidden');
+    if ($('#group-chat-view')) $('#group-chat-view').style.display = 'none';
+    $('#group-list')?.classList.remove('hidden');
+    $('#group-title').textContent = '群聊';
+    renderGroupList();
+  }
+  function closeGroupPage() {
+    $('#group-page')?.classList.add('hidden');
+    state.activeGroupId = null;
+  }
+  function renderGroupList() {
+    const list = $('#group-list');
+    if (!list) return;
+    if (!state.groups) state.groups = [];
+    if (!state.groups.length) {
+      list.innerHTML = '<div class="empty-state small"><p>还没有群聊</p><p class="hint">点右上角新建</p></div>';
+      return;
+    }
+    list.innerHTML = state.groups.map(g => {
+      const names = (g.memberIds || []).map(id => state.contacts.find(c => c.id === id)?.name || '?').join('、');
+      const last = (g.messages || [])[(g.messages || []).length - 1];
+      const prev = last ? (last.text || '[消息]') : '暂无消息';
+      return `<div class="group-item" data-gid="${g.id}">
+        <div class="g-av">群</div>
+        <div style="flex:1;min-width:0">
+          <div class="g-name">${escapeHtml(g.name)}</div>
+          <div class="g-meta">${escapeHtml(names)} · ${escapeHtml(truncate(prev, 24))}</div>
+        </div>
+        <button class="btn-xs" data-gdel="${g.id}">删</button>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('.group-item').forEach(el => {
+      el.addEventListener('click', e => {
+        if (e.target.closest('[data-gdel]')) return;
+        enterGroup(el.dataset.gid);
+      });
+    });
+    list.querySelectorAll('[data-gdel]').forEach(b => {
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!confirm('删除该群聊？')) return;
+        state.groups = state.groups.filter(x => x.id !== b.dataset.gdel);
+        saveData();
+        renderGroupList();
+      });
+    });
+  }
+  function openNewGroupModal() {
+    if (!(state.contacts || []).length) { alert('请先添加联系人'); return; }
+    state.modalMode = 'new-group';
+    modalTitle.textContent = '新建群聊';
+    modalBody.innerHTML = `<div class="form-row"><label>群名称</label><input type="text" id="group-name" placeholder="例如：周末小队"/></div>
+      <p style="font-size:13px;margin:8px 0">选择成员</p>
+      ${(state.contacts || []).map(c => `<label class="eqz-opt"><input type="checkbox" data-gc value="${c.id}"/> ${escapeHtml(c.name)}</label>`).join('')}`;
+    modalOverlay.classList.remove('hidden');
+  }
+  function enterGroup(gid) {
+    const g = (state.groups || []).find(x => x.id === gid);
+    if (!g) return;
+    state.activeGroupId = gid;
+    $('#group-list')?.classList.add('hidden');
+    const view = $('#group-chat-view');
+    if (view) { view.classList.remove('hidden'); view.style.display = 'flex'; }
+    $('#group-title').textContent = g.name;
+    renderGroupMessages();
+  }
+  function renderGroupMessages() {
+    const box = $('#group-messages');
+    const g = (state.groups || []).find(x => x.id === state.activeGroupId);
+    if (!box || !g) return;
+    const msgs = g.messages || [];
+    box.innerHTML = msgs.map(m => {
+      if (m.from === 'user') {
+        return `<div class="group-msg-row me"><div class="gm-bubble">${escapeHtml(m.text)}</div></div>`;
+      }
+      return `<div class="group-msg-row other"><span class="gm-name">${escapeHtml(m.name || '')}</span><div class="gm-bubble">${escapeHtml(m.text)}</div></div>`;
+    }).join('') || '<div class="empty-state small"><p>开始群聊吧</p></div>';
+    box.scrollTop = box.scrollHeight;
+  }
+  function sendGroupMessage() {
+    const g = (state.groups || []).find(x => x.id === state.activeGroupId);
+    const input = $('#group-input');
+    const text = (input?.value || '').trim();
+    if (!g || !text) return;
+    if (!g.messages) g.messages = [];
+    g.messages.push({ id: genId('gm'), from: 'user', text, time: Date.now() });
+    input.value = '';
+    saveData();
+    renderGroupMessages();
+    // 成员随机用字卡回复
+    const members = (g.memberIds || []).map(id => state.contacts.find(c => c.id === id)).filter(Boolean);
+    members.forEach(c => {
+      if (Math.random() > 0.55) return;
+      const delay = randomDelay(1, 4);
+      setTimeout(() => {
+        const pool = getContactCardPool(c);
+        if (!pool.length) return;
+        g.messages.push({
+          id: genId('gm'), from: 'contact', contactId: c.id, name: c.name,
+          text: pool[Math.floor(Math.random() * pool.length)], time: Date.now()
+        });
+        saveData();
+        if (state.activeGroupId === g.id) renderGroupMessages();
+      }, delay * 1000);
+    });
+  }
 
   function openAvatarPoolModal(kind) {
     const isUser = kind === 'user';
