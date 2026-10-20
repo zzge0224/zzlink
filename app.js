@@ -1694,9 +1694,25 @@
         if (!contact.favorites) contact.favorites = [];
         if (state.listenSongId && !contact.favorites.includes(state.listenSongId)) {
           contact.favorites.push(state.listenSongId);
-          saveData();
         }
-        showListenToast(`${contact.name} 收藏了这首歌`);
+        // 随机收藏当前歌词行
+        try {
+          const lines = (state.listenLyrics || []).filter(x => x && x.text && String(x.text).trim());
+          if (lines.length) {
+            if (!contact.favoriteLyrics) contact.favoriteLyrics = [];
+            const line = String(lines[Math.floor(Math.random() * lines.length)].text).trim();
+            if (line && !contact.favoriteLyrics.includes(line)) {
+              contact.favoriteLyrics.push(line);
+              if (contact.favoriteLyrics.length > 50) contact.favoriteLyrics = contact.favoriteLyrics.slice(-50);
+            }
+            showListenToast(`${contact.name} 收藏了歌词「${truncate(line, 18)}」`);
+          } else {
+            showListenToast(`${contact.name} 收藏了这首歌`);
+          }
+        } catch (_) {
+          showListenToast(`${contact.name} 收藏了这首歌`);
+        }
+        saveData();
       }
     }, 3000 + Math.random() * 2000);
   }
@@ -1976,6 +1992,7 @@
         return isNaN(v) ? def : v;
       };
       g.name = ($('#gs-name')?.value || '').trim() || g.name;
+      g.chatBgColor = $('#gs-bg-color')?.value || g.chatBgColor || null;
       let min = Math.max(0.5, Math.min(30, num('#gs-min', 1.5)));
       let max = Math.max(min, Math.min(60, num('#gs-max', 4)));
       g.settings = {
@@ -1986,6 +2003,8 @@
       g.listenConfig.replyChance = Math.max(0, Math.min(1, num('#gs-reply', 0.85)));
       saveData();
       $('#group-title').textContent = g.name;
+      applyGroupChatBg(g);
+      renderGroupList();
       closeModal();
       alert('群聊设置已保存');
       return;
@@ -2445,26 +2464,39 @@
   }
 
   function openStickerManager() {
+    if (!Array.isArray(state.stickers)) state.stickers = [];
     state.modalMode = 'sticker-manage';
     modalTitle.textContent = '表情包管理';
-    const list = state.stickers || [];
-    modalBody.innerHTML = `
-      <div class="toolbar-row">
-        <button class="btn-primary" id="sm-add" style="flex:1">＋ 添加</button>
-      </div>
-      <div class="sticker-panel" style="max-height:280px">${list.map(s =>
-        `<div class="sticker-item sm-item" data-id="${s.id}" style="position:relative">
-          <img src="${s.data}"/>
-          <button class="sm-del" data-id="${s.id}" title="删除">✕</button>
-        </div>`).join('') || '<div style="color:var(--muted);font-size:13px;padding:12px">暂无表情</div>'}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:8px">点击 ✕ 删除；点添加可多选图片导入</div>`;
+    const list = state.stickers;
+    modalBody.innerHTML = [
+      '<div class="toolbar-row" style="gap:8px;margin-bottom:10px">',
+      '<button type="button" class="btn-primary" id="sm-add" style="flex:1">＋ 添加表情</button>',
+      '</div>',
+      '<div class="sticker-panel" style="max-height:280px;display:flex;flex-wrap:wrap;gap:8px">',
+      list.map(s => (
+        '<div class="sticker-item sm-item" data-id="' + s.id + '" style="position:relative;width:64px;height:64px">' +
+        '<img src="' + s.data + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px"/>' +
+        '<button type="button" class="sm-del" data-id="' + s.id + '" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border:none;border-radius:50%;background:#c45c5c;color:#fff;font-size:10px;cursor:pointer">✕</button></div>'
+      )).join('') || '<div style="color:var(--muted);font-size:13px;padding:12px">暂无表情，点上方添加</div>',
+      '</div>',
+      '<div style="font-size:12px;color:var(--muted);margin-top:8px">支持多选图片导入；聊天与群聊中可发送</div>'
+    ].join('');
     modalOverlay.classList.remove('hidden');
-    $('#sm-add')?.addEventListener('click', () => $('#file-stickers')?.click());
-    modalBody.querySelectorAll('.sm-del').forEach(btn => {
-      btn.addEventListener('click', e => {
+    const addBtn = document.getElementById('sm-add');
+    if (addBtn) {
+      addBtn.onclick = function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const inp = document.getElementById('file-stickers');
+        if (!inp) { alert('文件选择器缺失，请刷新'); return; }
+        inp.value = '';
+        inp.click();
+      };
+    }
+    modalBody.querySelectorAll('.sm-del').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
         e.stopPropagation();
-        const id = btn.dataset.id;
-        state.stickers = (state.stickers || []).filter(s => s.id !== id);
+        state.stickers = (state.stickers || []).filter(function (s) { return s.id !== btn.dataset.id; });
         saveData();
         openStickerManager();
       });
@@ -2684,6 +2716,18 @@
           if (state.chatContactId) renderMessages();
           return;
         }
+        if (state.uploadTarget === 'group-avatar') {
+          const g = (state.groups || []).find(x => x.id === state.groupUploadId);
+          if (g) {
+            g.avatarImg = dataUrl;
+            saveData();
+            const prev = $('#gs-av-preview');
+            if (prev) prev.style.backgroundImage = `url(${dataUrl})`;
+            renderGroupList();
+          }
+          state.uploadTarget = null;
+          return;
+        }
         const c = state.contacts.find(x => x.id === state.currentContactId);
         if (!c) return;
         c.avatarImg = dataUrl;
@@ -2693,16 +2737,28 @@
       } catch (_) { alert('图片失败'); }
     });
     $('#file-bg').addEventListener('change', async e => {
-      const f=e.target.files?.[0]; e.target.value='';
-      const c=state.contacts.find(x=>x.id===state.currentContactId); if(!c||!f) return;
+      const f = e.target.files?.[0]; e.target.value = '';
+      if (!f) return;
       try {
-        // 居中裁剪 + 较强压缩，避免比例失衡与存储溢出
+        if (state.uploadTarget === 'group-bg') {
+          const g = (state.groups || []).find(x => x.id === state.groupUploadId);
+          if (g) {
+            g.chatBgImg = await compressImage(f, 900, 0.7);
+            g.chatBgColor = null;
+            saveData();
+            applyGroupChatBg(g);
+            alert('群聊背景已更新');
+          }
+          state.uploadTarget = null;
+          return;
+        }
+        const c = state.contacts.find(x => x.id === state.currentContactId); if (!c) return;
         c.chatBgImg = await compressImage(f, 900, 0.7);
         c.chatBgColor = null;
         if (!saveData()) alert('背景已应用，但存储空间不足，建议删除部分歌曲后再保存');
         closeModal();
         if (state.chatContactId === c.id) applyContactChatBg(c.id);
-      } catch(_){ alert('图片失败'); }
+      } catch (_) { alert('图片失败'); }
     });
 
     btnSend.addEventListener('click', sendMessage);
@@ -2761,7 +2817,7 @@
     });
     $('#btn-add-contact')?.addEventListener('click', openAddContactModal);
     $('#moments-post')?.addEventListener('click', openPostMomentModal);
-    // 事件委托：设置 / 封面 / 删除 / 群聊入口
+    // 事件委托：朋友圈 / 群聊 / 表情
     document.addEventListener('click', e => {
       const t = e.target;
       if (!(t instanceof Element)) return;
@@ -2773,6 +2829,55 @@
       if (t.closest('#moments-cover-btn') || (t.id === 'moments-cover')) {
         e.preventDefault();
         $('#file-moments-cover')?.click();
+        return;
+      }
+      if (t.closest('#btn-manage-stickers') || t.closest('#sm-add')) {
+        if (t.closest('#sm-add')) {
+          e.preventDefault();
+          const inp = $('#file-stickers');
+          if (inp) { inp.value = ''; inp.click(); }
+          return;
+        }
+        e.preventDefault();
+        openStickerManager();
+        return;
+      }
+      // 朋友圈 ··· 菜单
+      const more = t.closest('[data-act="menu"], .moment-more');
+      if (more && more.closest('.moment-card')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = more.closest('.moment-card');
+        const bar = card.querySelector('[data-bar]');
+        document.querySelectorAll('.moment-action-bar').forEach(b => {
+          if (b !== bar) b.classList.add('hidden');
+        });
+        bar?.classList.toggle('hidden');
+        return;
+      }
+      const likeBtn = t.closest('[data-act="like"]');
+      if (likeBtn && likeBtn.closest('.moment-card')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = likeBtn.closest('.moment-card');
+        const mid = card?.dataset?.id;
+        const m = (state.moments || []).find(x => x.id === mid);
+        if (!m) return;
+        if (!m.likes) m.likes = [];
+        if (m.likes.includes('me')) m.likes = m.likes.filter(x => x !== 'me');
+        else m.likes.push('me');
+        saveData();
+        renderMoments();
+        return;
+      }
+      const cmtBtn = t.closest('[data-act="comment"]');
+      if (cmtBtn && cmtBtn.closest('.moment-card')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = cmtBtn.closest('.moment-card');
+        const mid = card?.dataset?.id;
+        card.querySelector('[data-bar]')?.classList.add('hidden');
+        showMomentCommentBar(mid);
         return;
       }
       const del = t.closest('.moment-del, [data-act="del"]');
@@ -2793,6 +2898,10 @@
         e.preventDefault();
         openGroupPage();
         return;
+      }
+      // 点击空白关闭朋友圈菜单
+      if (!t.closest('.moment-action-bar') && !t.closest('.moment-more')) {
+        document.querySelectorAll('.moment-action-bar').forEach(b => b.classList.add('hidden'));
       }
     });
     $('#group-back')?.addEventListener('click', () => {
@@ -2928,15 +3037,20 @@
       const files = Array.from(e.target.files || []);
       e.target.value = '';
       if (!files.length) return;
+      if (!Array.isArray(state.stickers)) state.stickers = [];
+      let ok = 0;
       for (const f of files.slice(0, 40)) {
         try {
           const data = await compressImage(f, 200, 0.7);
-          state.stickers.push({ id: genId('st'), data });
-        } catch (_) {}
+          if (data) {
+            state.stickers.push({ id: genId('st'), data });
+            ok++;
+          }
+        } catch (err) { console.warn('sticker fail', err); }
       }
       saveData();
       if (state.modalMode === 'sticker-manage') openStickerManager();
-      else alert(`已导入表情，当前共 ${state.stickers.length} 个`);
+      alert(ok ? `已导入 ${ok} 个表情，当前共 ${state.stickers.length} 个` : '导入失败，请换一张较小的图片重试');
     });
     $('#moments-back')?.addEventListener('click', closeMomentsPage);
     $('#moments-refresh')?.addEventListener('click', () => {
@@ -3407,7 +3521,7 @@
       const last = (g.messages || [])[(g.messages || []).length - 1];
       const prev = last ? (last.text || '[消息]') : '暂无消息';
       return `<div class="group-item" data-gid="${g.id}">
-        <div class="g-av">群</div>
+        <div class="g-av" style="${g.avatarImg ? 'background-image:url('+g.avatarImg+');background-size:cover' : ''}">${g.avatarImg ? '' : '群'}</div>
         <div style="flex:1;min-width:0">
           <div class="g-name">${escapeHtml(g.name)}</div>
           <div class="g-meta">${escapeHtml(names)} · ${escapeHtml(truncate(prev, 24))}</div>
@@ -3452,6 +3566,7 @@
     $('#group-settings')?.classList.remove('hidden');
     $('#group-new')?.classList.add('hidden');
     renderGroupMessages();
+    applyGroupChatBg(g);
   }
 
   function ensureGroupShape(g) {
@@ -3478,17 +3593,61 @@
     const s = g.settings;
     const lc = g.listenConfig;
     state.modalMode = 'group-settings';
+    state.poolContactId = g.id; // 复用上传目标
     modalTitle.textContent = '群聊设置 · ' + (g.name || '');
     const memberNames = (g.memberIds || []).map(id => state.contacts.find(c => c.id === id)?.name || id).join('、');
+    const avStyle = g.avatarImg ? `background-image:url(${g.avatarImg})` : '';
     modalBody.innerHTML = `
       <div class="form-row"><label>群名称</label><input type="text" id="gs-name" value="${escapeHtml(g.name || '')}"/></div>
       <p style="font-size:12px;color:var(--muted);margin:6px 0">成员：${escapeHtml(memberNames)}</p>
+      <div class="form-row"><label>群头像</label>
+        <div class="group-avatar-preview" id="gs-av-preview" style="${avStyle}"></div>
+        <button type="button" class="btn-xs" id="gs-pick-av">上传头像</button>
+      </div>
+      <div class="form-row"><label>聊天背景色</label><input type="color" id="gs-bg-color" value="${g.chatBgColor || '#1a1a22'}"/></div>
+      <div class="form-row"><label>聊天背景图</label>
+        <button type="button" class="btn-xs" id="gs-pick-bg">上传背景图</button>
+        <button type="button" class="btn-xs" id="gs-clear-bg">清除背景图</button>
+      </div>
       <div class="form-row"><label>回复最小延迟(秒)</label><input type="number" id="gs-min" step="0.5" value="${s.minDelay}"/></div>
       <div class="form-row"><label>回复最大延迟(秒)</label><input type="number" id="gs-max" step="0.5" value="${s.maxDelay}"/></div>
       <div class="form-row"><label>每次最多回复人数</label><input type="number" id="gs-count" min="1" max="5" value="${s.maxReplies}"/></div>
       <div class="form-row"><label>成员回复概率</label><input type="number" id="gs-reply" step="0.01" min="0" max="1" value="${lc.replyChance}"/></div>
       <p style="font-size:11px;color:var(--muted)">成员将从各自字卡库中随机回复</p>`;
     modalOverlay.classList.remove('hidden');
+    $('#gs-pick-av')?.addEventListener('click', () => {
+      state.uploadTarget = 'group-avatar';
+      state.groupUploadId = g.id;
+      $('#file-avatar')?.click();
+    });
+    $('#gs-pick-bg')?.addEventListener('click', () => {
+      state.uploadTarget = 'group-bg';
+      state.groupUploadId = g.id;
+      $('#file-bg')?.click();
+    });
+    $('#gs-clear-bg')?.addEventListener('click', () => {
+      g.chatBgImg = null;
+      saveData();
+      applyGroupChatBg(g);
+      alert('已清除背景图');
+    });
+  }
+
+  function applyGroupChatBg(g) {
+    const box = $('#group-messages');
+    if (!box || !g) return;
+    if (g.chatBgImg) {
+      box.style.backgroundImage = `url(${g.chatBgImg})`;
+      box.style.backgroundSize = 'cover';
+      box.style.backgroundPosition = 'center';
+      box.style.backgroundColor = '';
+    } else if (g.chatBgColor) {
+      box.style.backgroundImage = '';
+      box.style.backgroundColor = g.chatBgColor;
+    } else {
+      box.style.backgroundImage = '';
+      box.style.backgroundColor = '';
+    }
   }
   function renderGroupMessages() {
     const box = $('#group-messages');

@@ -624,20 +624,45 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 }
 .moments-list { padding:36px 14px 80px; }
 .moment-action-bar {
-  position:absolute; right:40px; background:#4a4a4a; border-radius:6px;
-  display:flex; gap:0; padding:0; z-index:3;
+  display: inline-flex !important;
+  gap: 0;
+  margin-top: 8px;
+  background: #4a4a4a !important;
+  border-radius: 8px;
+  padding: 0;
+  z-index: 20;
+  position: relative;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
 }
+.moment-action-bar.hidden { display: none !important; }
 .moment-action-bar button {
-  color:#fff !important; padding:8px 14px; font-size:13px;
-  border-right:1px solid rgba(255,255,255,.15);
+  color: #fff !important;
+  padding: 10px 16px !important;
+  font-size: 13px !important;
+  border: none !important;
+  border-right: 1px solid rgba(255,255,255,.15) !important;
+  background: transparent !important;
+  cursor: pointer;
 }
-.moment-action-bar button:last-child { border-right:none; }
-.moment-foot { position:relative; }
+.moment-action-bar button:last-child { border-right: none !important; }
+.moment-foot { position: relative; flex-wrap: wrap; }
 .moment-more {
-  background:rgba(100,100,120,.25) !important;
-  color:var(--accent) !important; border-radius:4px;
-  padding:2px 10px !important; letter-spacing:2px;
+  background: rgba(100,100,120,.25) !important;
+  color: var(--accent) !important;
+  border-radius: 4px;
+  padding: 4px 12px !important;
+  letter-spacing: 2px;
+  cursor: pointer;
+  pointer-events: auto !important;
+  z-index: 6;
+  position: relative;
 }
+.group-avatar-preview {
+  width: 56px; height: 56px; border-radius: 12px;
+  background: var(--accent-soft); background-size: cover; background-position: center;
+  margin-bottom: 8px;
+}
+
 
 /* 底部评论条 */
 .moment-comment-bar {
