@@ -22,7 +22,8 @@
     proactiveIntervalMin: 30,
     avatarSwapChance: 0.08,
     askChance: 0.1,
-    momentsSticker: true
+    momentsSticker: true,
+    momentCommentChance: 0.65
   };
   const THEMES = [
     'classic', 'dark', 'seasalt', 'mintchoc', 'taro', 'peach',
@@ -588,7 +589,10 @@
       return `<div class="msg-bubble msg-sticker" style="background:transparent;box-shadow:none;padding:4px">${src ? `<img src="${src}" alt="表情"/>` : '[表情]'}</div>`;
     }
     if (m.type === 'image') {
-      return `<div class="msg-bubble msg-photo" style="padding:4px;background:transparent;box-shadow:none"><img src="${m.imageData || ''}" alt="图片"/></div>`;
+      const imgs = (m.images && m.images.length) ? m.images : (m.imageData ? [m.imageData] : []);
+      const grid = imgs.map(src => `<img src="${src}" alt="图片"/>`).join('');
+      const cap = m.text ? `<div class="msg-photo-cap">${escapeHtml(m.text)}</div>` : '';
+      return `<div class="msg-bubble msg-photo ${imgs.length > 1 ? 'multi' : ''}" style="padding:4px;background:transparent;box-shadow:none"><div class="msg-photo-grid n${Math.min(imgs.length, 9)}">${grid}</div>${cap}</div>`;
     }
     if (m.type === 'survey' || m.type === 'ask') {
       const done = !!m.answered;
@@ -671,11 +675,11 @@
     bindMsgRowEvents(row);
   }
 
-  function settleMoney(msg, action) {
+  function settleMoney(msg, action, contactOpt) {
     // action: accept | return
     if (!msg || (msg.moneyStatus && msg.moneyStatus !== 'pending')) return;
-    const contactId = state.chatContactId;
-    const c = state.contacts.find(x => x.id === contactId);
+    const contactId = msg._contactId || contactOpt?.id || state.chatContactId;
+    const c = contactOpt || state.contacts.find(x => x.id === contactId);
     if (!c) return;
     ensureContactShape(c);
     const amt = Number(msg.amount) || 0;
@@ -683,28 +687,28 @@
       msg.moneyStatus = 'accepted';
       msg.opened = true;
       if (msg.from === 'contact') {
-        // 用户收 → 用户加钱，联系人已在发送时扣过
         state.userBalance = Math.round((state.userBalance + amt) * 100) / 100;
       } else {
-        // 联系人收用户的 → 联系人加钱，用户发送时已扣
         c.balance = Math.round((c.balance + amt) * 100) / 100;
       }
     } else {
       msg.moneyStatus = 'returned';
       msg.opened = true;
       if (msg.from === 'contact') {
-        // 用户退还 → 钱回联系人
         c.balance = Math.round((c.balance + amt) * 100) / 100;
       } else {
-        // 联系人退还 → 钱回用户
         state.userBalance = Math.round((state.userBalance + amt) * 100) / 100;
       }
     }
     const ub = $('#user-balance');
     if (ub) ub.textContent = state.userBalance;
     saveData();
-    refreshMoneyRow(msg.id);
-    if (msg.type === 'redpacket' && action === 'accept' && msg.from === 'contact') {
+    if (state.chatContactId === c.id) {
+      refreshMoneyRow(msg.id);
+      // 整表重绘更稳妥
+      renderMessages();
+    }
+    if (msg.type === 'redpacket' && action === 'accept' && msg.from === 'contact' && state.chatContactId === c.id) {
       const overlay = $('#rp-open-overlay');
       if (overlay) {
         $('#rp-open-amount').textContent = amt;
@@ -715,14 +719,32 @@
   }
 
   function scheduleContactMoneyResponse(msg, contact) {
-    // 联系人处理用户发来的红包/转账
-    const delay = randomDelay(1.5, 5);
+    if (!msg || !contact) return;
+    msg._contactId = contact.id;
+    const delay = randomDelay(1.2, 3.5);
     state.pendingTimers.push(setTimeout(() => {
       if (!msg || msg.moneyStatus !== 'pending') return;
-      // 70% 接收，30% 退还
-      settleMoney(msg, Math.random() < 0.7 ? 'accept' : 'return');
+      const act = Math.random() < 0.72 ? 'accept' : 'return';
+      settleMoney(msg, act, contact);
+      // 系统提示一条
       if (state.chatContactId === contact.id) {
-        // settleMoney 已刷新
+        const tip = {
+          id: genId('m'), from: 'system', type: 'system',
+          text: act === 'accept'
+            ? `${contact.name}已收款`
+            : `${contact.name}已退还转账/红包`,
+          time: Date.now()
+        };
+        pushMsg(tip);
+        appendMessage(tip);
+      } else {
+        if (!state.chats[contact.id]) state.chats[contact.id] = [];
+        state.chats[contact.id].push({
+          id: genId('m'), from: 'system', type: 'system',
+          text: act === 'accept' ? `${contact.name}已收款` : `${contact.name}已退还`,
+          time: Date.now()
+        });
+        saveData();
       }
     }, delay * 1000));
   }
@@ -998,14 +1020,57 @@
     pushMsg(msg); appendMessage(msg); msgInput.value=''; state.quotingMsg=null; updateQuoteBar(); hideAttachPanel(); hideStickerPanel(); scheduleReplies(c);
   }
 
-  async function sendChatPhoto(file) {
-    if (!file || !state.chatContactId) return;
+  async function sendChatPhotos(files, caption) {
+    if (!files?.length || !state.chatContactId) return;
     const c = state.contacts.find(x => x.id === state.chatContactId); if (!c) return;
-    try {
-      const imageData = await compressImage(file, 720, 0.72);
-      const msg = { id: genId('m'), from: 'user', type: 'image', imageData, time: Date.now(), read: false };
-      pushMsg(msg); appendMessage(msg); hideAttachPanel(); scheduleReplies(c);
-    } catch (_) { alert('图片发送失败'); }
+    const imgs = [];
+    for (const f of Array.from(files).slice(0, 9)) {
+      try {
+        const imageData = await compressImage(f, 720, 0.72);
+        if (imageData) imgs.push(imageData);
+      } catch (_) {}
+    }
+    if (!imgs.length) { alert('图片发送失败'); return; }
+    const text = (caption || '').trim();
+    if (imgs.length === 1 && !text) {
+      const msg = { id: genId('m'), from: 'user', type: 'image', imageData: imgs[0], time: Date.now(), read: false };
+      pushMsg(msg); appendMessage(msg);
+    } else {
+      const msg = {
+        id: genId('m'), from: 'user', type: 'image',
+        imageData: imgs[0], images: imgs, text: text || '',
+        time: Date.now(), read: false
+      };
+      pushMsg(msg); appendMessage(msg);
+    }
+    hideAttachPanel();
+    scheduleReplies(c);
+  }
+  async function sendChatPhoto(file) {
+    return sendChatPhotos(file ? [file] : [], '');
+  }
+
+  function openChatPhotoComposer() {
+    if (!state.chatContactId) return;
+    state.modalMode = 'chat-photos';
+    state._photoDraft = [];
+    modalTitle.textContent = '发送图片';
+    modalBody.innerHTML = `
+      <div class="form-row"><label>文字说明（可选）</label>
+        <textarea id="photo-caption" rows="2" placeholder="配一句说明…"></textarea>
+      </div>
+      <div class="toolbar-row" style="margin:8px 0">
+        <button type="button" class="btn-xs" id="photo-pick">选择图片（可多选，最多9张）</button>
+        <span id="photo-count" style="font-size:12px;color:var(--muted)">未选</span>
+      </div>
+      <div id="photo-preview-row" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px">点「确定」发送</p>`;
+    modalOverlay.classList.remove('hidden');
+    hideAttachPanel();
+    $('#photo-pick')?.addEventListener('click', () => {
+      const inp = $('#file-chat-photo');
+      if (inp) { inp.multiple = true; inp.click(); }
+    });
   }
   function hideAttachPanel() { attachPanel.classList.add('hidden'); btnAttach.classList.remove('active'); }
   function openMoneyModal(kind) {
@@ -1667,17 +1732,33 @@
       if (state.userBalance < amount) { alert('星币不足'); return; }
       state.userBalance = Math.round((state.userBalance - amount) * 100) / 100;
       const ub = $('#user-balance'); if (ub) ub.textContent = state.userBalance;
+      const c = state.contacts.find(x => x.id === state.chatContactId);
       const msg = {
         id: genId('m'), from: 'user', type: state.modalMode, text: '',
         amount, note: note || (state.modalMode === 'redpacket' ? '恭喜发财' : ''),
-        time: Date.now(), moneyStatus: 'pending', opened: false
+        time: Date.now(), moneyStatus: 'pending', opened: false,
+        _contactId: c?.id || null
       };
       pushMsg(msg); appendMessage(msg); saveData(); closeModal();
-      const c = state.contacts.find(x => x.id === state.chatContactId);
       if (c) {
         scheduleContactMoneyResponse(msg, c);
-        scheduleReplies(c, 1);
       }
+      return;
+    }
+    if (state.modalMode === 'chat-photos') {
+      const caption = ($('#photo-caption')?.value || '').trim();
+      const imgs = state._photoDraft || [];
+      if (!imgs.length) { alert('请先选择图片'); return; }
+      const c = state.contacts.find(x => x.id === state.chatContactId);
+      const msg = {
+        id: genId('m'), from: 'user', type: 'image',
+        imageData: imgs[0], images: imgs.slice(), text: caption,
+        time: Date.now(), read: false
+      };
+      pushMsg(msg); appendMessage(msg);
+      state._photoDraft = [];
+      closeModal();
+      if (c) scheduleReplies(c);
       return;
     }
     if (state.modalMode === 'balance') {
@@ -1855,10 +1936,15 @@
       (state.contacts || []).forEach(c => {
         ensureContactShape(c);
         const ch = modalBody.querySelector(`input[data-cid="${c.id}"][data-k="momentsChance"]`);
+        const cc = modalBody.querySelector(`input[data-cid="${c.id}"][data-k="momentCommentChance"]`);
         const st = modalBody.querySelector(`input[data-cid="${c.id}"][data-k="momentsSticker"]`);
         if (ch) {
           const v = parseFloat(ch.value);
           if (!isNaN(v)) c.listenConfig.momentsChance = Math.max(0, Math.min(1, v));
+        }
+        if (cc) {
+          const v = parseFloat(cc.value);
+          if (!isNaN(v)) c.listenConfig.momentCommentChance = Math.max(0, Math.min(1, v));
         }
         if (st) c.listenConfig.momentsSticker = !!st.checked;
       });
@@ -2197,9 +2283,18 @@
   }
 
   function replyToMomentLater(m) {
-    const c = state.contacts.find(x => x.id === m.contactId);
-    if (!c || Math.random() > 0.65) return;
+    // 用户评论后：按「评论回复概率」决定联系人是否回复
+    let c = state.contacts.find(x => x.id === m.contactId);
+    if (!c && m.contactId === 'me') {
+      // 用户自己的动态：随机抽一个联系人回复
+      const poolC = state.contacts || [];
+      c = poolC[Math.floor(Math.random() * poolC.length)];
+    }
+    if (!c) return;
     ensureContactShape(c);
+    const chance = c.listenConfig?.momentCommentChance != null
+      ? Number(c.listenConfig.momentCommentChance) : 0.65;
+    if (Math.random() > chance) return;
     const allowSticker = c.listenConfig?.momentsSticker !== false;
     setTimeout(() => {
       if (!m.comments) m.comments = [];
@@ -2316,6 +2411,9 @@
           <strong>${escapeHtml(c.name)}</strong>
           <div class="form-row"><label>发动态概率 (0~1)</label>
             <input type="number" data-cid="${c.id}" data-k="momentsChance" min="0" max="1" step="0.01" value="${lc.momentsChance != null ? lc.momentsChance : 0.15}"/>
+          </div>
+          <div class="form-row"><label>回复你评论的概率 (0~1)</label>
+            <input type="number" data-cid="${c.id}" data-k="momentCommentChance" min="0" max="1" step="0.01" value="${lc.momentCommentChance != null ? lc.momentCommentChance : 0.65}"/>
           </div>
           <label style="font-size:13px;display:flex;align-items:center;gap:8px;margin-top:6px">
             <input type="checkbox" data-cid="${c.id}" data-k="momentsSticker" ${lc.momentsSticker !== false ? 'checked' : ''}/>
@@ -2616,8 +2714,7 @@
     attachPanel.querySelectorAll('.attach-btn').forEach(b => b.addEventListener('click', () => {
       const act = b.dataset.action;
       if (act === 'photo') {
-        $('#file-chat-photo')?.click();
-        hideAttachPanel();
+        openChatPhotoComposer();
         return;
       }
       if (act === 'ask') {
@@ -2632,9 +2729,26 @@
       }
       openMoneyModal(act);
     }));
-    $('#file-chat-photo')?.addEventListener('change', e => {
-      const f = e.target.files?.[0]; e.target.value = '';
-      if (f) sendChatPhoto(f);
+    $('#file-chat-photo')?.addEventListener('change', async e => {
+      const files = Array.from(e.target.files || []);
+      e.target.value = '';
+      if (!files.length) return;
+      // 多图选择器：若在照片发送弹层中，只预览；否则直接发送
+      if (state.modalMode === 'chat-photos') {
+        state._photoDraft = state._photoDraft || [];
+        for (const f of files.slice(0, 9 - state._photoDraft.length)) {
+          try {
+            const url = await compressImage(f, 720, 0.72);
+            if (url) state._photoDraft.push(url);
+          } catch (_) {}
+        }
+        const row = $('#photo-preview-row');
+        const cnt = $('#photo-count');
+        if (row) row.innerHTML = state._photoDraft.map(src => `<img src="${src}" style="width:56px;height:56px;object-fit:cover;border-radius:8px"/>`).join('');
+        if (cnt) cnt.textContent = `已选 ${state._photoDraft.length} 张`;
+        return;
+      }
+      sendChatPhotos(files, '');
     });
     $('#file-moment-photo')?.addEventListener('change', async e => {
       const f = e.target.files?.[0]; e.target.value = '';
@@ -2698,7 +2812,12 @@
     });
     $('#group-new')?.addEventListener('click', openNewGroupModal);
     $('#group-settings')?.addEventListener('click', openGroupSettings);
-    $('#group-send')?.addEventListener('click', sendGroupMessage);
+    $('#group-send')?.addEventListener('click', () => sendGroupMessage());
+    $('#group-sticker-btn')?.addEventListener('click', toggleGroupStickerPanel);
+    $('#group-quote-close')?.addEventListener('click', () => {
+      state.groupQuoting = null;
+      $('#group-quote-bar')?.classList.add('hidden');
+    });
     $('#group-input')?.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); }
     });
@@ -3377,23 +3496,76 @@
     if (!box || !g) return;
     const msgs = g.messages || [];
     box.innerHTML = msgs.map(m => {
-      if (m.from === 'user') {
-        return `<div class="group-msg-row me"><div class="gm-bubble">${escapeHtml(m.text)}</div></div>`;
+      const isMe = m.from === 'user';
+      const cls = isMe ? 'me' : 'other';
+      let body = '';
+      if (m.quote) {
+        body += `<div class="gm-quote">${escapeHtml(m.quote.fromName || '')}: ${escapeHtml(truncate(m.quote.text || '[消息]', 40))}</div>`;
       }
-      return `<div class="group-msg-row other"><span class="gm-name">${escapeHtml(m.name || '')}</span><div class="gm-bubble">${escapeHtml(m.text)}</div></div>`;
+      if (m.type === 'sticker' && m.stickerData) {
+        body += `<div class="gm-sticker"><img src="${m.stickerData}" alt="表情"/></div>`;
+      } else {
+        body += escapeHtml(m.text || '');
+      }
+      const name = isMe ? '' : `<span class="gm-name">${escapeHtml(m.name || '')}</span>`;
+      return `<div class="group-msg-row ${cls}" data-gmid="${m.id}">
+        ${name}
+        <div class="gm-bubble">${body}</div>
+        <div class="gm-time">${formatTime(m.time)}</div>
+      </div>`;
     }).join('') || '<div class="empty-state small"><p>开始群聊吧</p></div>';
     box.scrollTop = box.scrollHeight;
+    // 长按引用
+    box.querySelectorAll('.group-msg-row').forEach(row => {
+      let timer = null;
+      const start = () => { timer = setTimeout(() => {
+        const id = row.dataset.gmid;
+        const msg = (g.messages || []).find(x => x.id === id);
+        if (!msg) return;
+        state.groupQuoting = {
+          id: msg.id,
+          text: msg.text || (msg.type === 'sticker' ? '[表情]' : ''),
+          fromName: msg.from === 'user' ? (state.userName || '我') : (msg.name || '')
+        };
+        const bar = $('#group-quote-bar');
+        const tx = $('#group-quote-text');
+        if (tx) tx.textContent = `${state.groupQuoting.fromName}: ${truncate(state.groupQuoting.text, 36)}`;
+        bar?.classList.remove('hidden');
+      }, 480); };
+      const end = () => { if (timer) clearTimeout(timer); };
+      row.addEventListener('touchstart', start, { passive: true });
+      row.addEventListener('mousedown', start);
+      row.addEventListener('touchend', end);
+      row.addEventListener('mouseup', end);
+      row.addEventListener('mouseleave', end);
+    });
   }
-  function sendGroupMessage() {
+  function sendGroupMessage(extra) {
     const g = (state.groups || []).find(x => x.id === state.activeGroupId);
     const input = $('#group-input');
-    const text = (input?.value || '').trim();
-    if (!g || !text) return;
+    const text = (extra && extra.text != null) ? extra.text : (input?.value || '').trim();
+    const isSticker = extra && extra.type === 'sticker';
+    if (!g) return;
+    if (!isSticker && !text) return;
     ensureGroupShape(g);
-    g.messages.push({ id: genId('gm'), from: 'user', text, time: Date.now() });
-    input.value = '';
+    const msg = {
+      id: genId('gm'), from: 'user', time: Date.now(),
+      text: isSticker ? '' : text,
+      type: isSticker ? 'sticker' : 'text',
+      stickerData: isSticker ? extra.stickerData : null
+    };
+    if (state.groupQuoting) {
+      msg.quote = state.groupQuoting;
+      state.groupQuoting = null;
+      $('#group-quote-bar')?.classList.add('hidden');
+    }
+    g.messages.push(msg);
+    if (input && !isSticker) input.value = '';
     saveData();
     renderGroupMessages();
+    triggerGroupReplies(g);
+  }
+  function triggerGroupReplies(g) {
     const members = (g.memberIds || []).map(id => state.contacts.find(c => c.id === id)).filter(Boolean);
     const s = g.settings || { minDelay: 1.5, maxDelay: 4, maxReplies: 2 };
     const replyChance = g.listenConfig?.replyChance != null ? g.listenConfig.replyChance : 0.85;
@@ -3407,16 +3579,38 @@
       const delay = randomDelay(s.minDelay || 1.5, s.maxDelay || 4);
       setTimeout(() => {
         const pool = getContactCardPool(c);
-        if (!pool.length) return;
-        g.messages.push({
-          id: genId('gm'), from: 'contact', contactId: c.id, name: c.name,
-          text: pool[Math.floor(Math.random() * pool.length)], time: Date.now()
-        });
+        const stickers = state.stickers || [];
+        let m;
+        if (stickers.length && Math.random() < 0.22) {
+          const st = stickers[Math.floor(Math.random() * stickers.length)];
+          m = { id: genId('gm'), from: 'contact', contactId: c.id, name: c.name, type: 'sticker', stickerData: st.data, text: '', time: Date.now() };
+        } else if (pool.length) {
+          m = { id: genId('gm'), from: 'contact', contactId: c.id, name: c.name, type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: Date.now() };
+        } else return;
+        g.messages.push(m);
         saveData();
         if (state.activeGroupId === g.id) renderGroupMessages();
       }, delay * 1000);
     });
   }
+  function toggleGroupStickerPanel() {
+    const panel = $('#group-sticker-panel');
+    if (!panel) return;
+    if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
+    const list = state.stickers || [];
+    if (!list.length) { alert('请先在「我」页面导入表情包'); return; }
+    panel.innerHTML = list.map(st => `<button type="button" class="sticker-item" data-sid="${st.id}"><img src="${st.data}"/></button>`).join('');
+    panel.classList.remove('hidden');
+    panel.querySelectorAll('[data-sid]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const st = list.find(x => x.id === btn.dataset.sid);
+        if (!st) return;
+        panel.classList.add('hidden');
+        sendGroupMessage({ type: 'sticker', stickerData: st.data, text: '' });
+      });
+    });
+  }
+
 
   function openAvatarPoolModal(kind) {
     const isUser = kind === 'user';

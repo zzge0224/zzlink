@@ -279,7 +279,10 @@
     <div id="group-list" class="memorial-list"></div>
     <div id="group-chat-view" class="hidden" style="display:none;flex-direction:column;flex:1;min-height:0">
       <div id="group-messages" class="message-list" style="flex:1"></div>
+      <div id="group-quote-bar" class="quote-bar hidden"><span id="group-quote-text"></span><button type="button" id="group-quote-close">✕</button></div>
+      <div id="group-sticker-panel" class="sticker-panel hidden"></div>
       <div class="composer">
+        <button type="button" id="group-sticker-btn" class="btn-attach" title="表情">☺</button>
         <textarea id="group-input" placeholder="说点什么..." rows="1"></textarea>
         <button id="group-send" class="btn-send">发送</button>
       </div>
@@ -298,7 +301,7 @@
 
   <input type="file" id="file-backup" accept="application/json,.json" class="hidden" />
   <input type="file" id="file-cards-txt" accept=".txt,text/plain" class="hidden" />
-  <input type="file" id="file-chat-photo" accept="image/*" class="hidden" />
+  <input type="file" id="file-chat-photo" accept="image/*" multiple class="hidden" />
   <input type="file" id="file-moment-photo" accept="image/*" class="hidden" />
   <input type="file" id="file-stickers" accept="image/*" multiple class="hidden" />
 
