@@ -18,7 +18,8 @@
     replyChance: 0.92,
     readNoReplyChance: 0.08,
     pokeChance: 0.1,
-    proactiveMsgChance: 0.05
+    // 每隔多少分钟主动给用户发一条消息；0 表示关闭
+    proactiveIntervalMin: 30
   };
   const THEMES = ['classic', 'dark', 'cream', 'lavender'];
 
@@ -65,7 +66,7 @@
 
   let state = {
     contacts: [], songs: [], chats: {}, stickers: [], moments: [],
-    userBalance: 888, theme: 'classic',
+    userBalance: 888, theme: 'classic', userAvatar: null, userName: '昕',
     currentContactId: null, chatContactId: null,
     editingCardIndex: null, editingCardType: 'normal', editingGroup: '默认', modalMode: null,
     pendingTimers: [], quotingMsg: null, longPressMsg: null,
@@ -73,7 +74,8 @@
     listenSongId: null, listenContactId: null, listenInterval: null,
     listenLyrics: [], listenLyricIdx: -1, pendingSong: null,
     listenQueue: [], listenIndex: 0, floatVisible: false,
-    statusTimer: null, activeCardGroup: '默认'
+    statusTimer: null, proactiveTimer: null, activeCardGroup: '默认',
+    lastProactiveAt: {}
   };
 
   function ensureContactShape(c) {
@@ -81,6 +83,12 @@
     if (!c.interactionCards) c.interactionCards = [...DEFAULT_INTERACTION];
     if (!c.favorites) c.favorites = [];
     if (!c.listenConfig) c.listenConfig = { ...DEFAULT_LISTEN };
+    else {
+      c.listenConfig = Object.assign({}, DEFAULT_LISTEN, c.listenConfig);
+      if (c.listenConfig.proactiveIntervalMin == null) {
+        c.listenConfig.proactiveIntervalMin = c.listenConfig.proactiveMsgChance > 0 ? 30 : 0;
+      }
+    }
     if (c.avatarImg === undefined) c.avatarImg = null;
     if (c.chatBgImg === undefined) c.chatBgImg = null;
     if (c.chatBgColor === undefined) c.chatBgColor = null;
@@ -112,7 +120,10 @@
       moments: Array.isArray(p.moments) ? p.moments : [],
       userBalance: typeof p.userBalance === 'number' ? p.userBalance : 888,
       theme: THEMES.includes(p.theme) ? p.theme : 'classic',
-      playMode: p.playMode || 'order'
+      playMode: p.playMode || 'order',
+      userAvatar: p.userAvatar || null,
+      userName: p.userName || '昕',
+      lastProactiveAt: p.lastProactiveAt || {}
     };
   }
 
@@ -172,7 +183,10 @@
       userBalance: state.userBalance,
       theme: state.theme,
       playMode: state.playMode || 'order',
-      _v: 8
+      userAvatar: state.userAvatar || null,
+      userName: state.userName || '昕',
+      lastProactiveAt: state.lastProactiveAt || {},
+      _v: 9
     };
   }
 
@@ -481,7 +495,8 @@
       <div class="settings-cell"><span>暂停最长秒数</span><input type="number" id="cs-pdur" min="1" max="30" value="${lc.pauseDurationMax}"/></div>
       <div class="settings-cell"><span>朋友圈发动态概率</span><input type="number" id="cs-moments" step="0.01" min="0" max="1" value="${lc.momentsChance}"/></div>
       <div class="settings-cell"><span>主动拍一拍概率</span><input type="number" id="cs-poke" step="0.01" min="0" max="1" value="${lc.pokeChance}"/></div>
-      <div class="settings-cell"><span>主动发消息概率</span><input type="number" id="cs-proactive" step="0.01" min="0" max="1" value="${lc.proactiveMsgChance}"/></div>
+      <div class="settings-cell"><span>主动发消息间隔(分钟)</span><input type="number" id="cs-proactive" min="0" max="10080" value="${lc.proactiveIntervalMin == null ? 30 : lc.proactiveIntervalMin}"/></div>
+      <div class="settings-section-title" style="padding-top:0">间隔为 0 则关闭主动发消息</div>
       <div style="padding:16px"><button class="btn-primary" id="cs-save" style="width:100%">保存</button></div>`;
     page.classList.remove('hidden');
 
@@ -515,8 +530,9 @@
         replyChance: clamp01(num('#cs-reply', 0.92)),
         readNoReplyChance: clamp01(num('#cs-noreply', 0.08)),
         pokeChance: clamp01(num('#cs-poke', 0.1)),
-        proactiveMsgChance: clamp01(num('#cs-proactive', 0.05))
+        proactiveIntervalMin: Math.max(0, Math.min(10080, num('#cs-proactive', 30)))
       };
+      scheduleProactiveMessages();
       saveData();
       page.classList.add('hidden');
       alert('已保存');
@@ -571,26 +587,74 @@
       if (m.type !== 'redpacket') showListenToast && showListenToast('已收款');
     });
   }
+  function msgAvatarHtml(from) {
+    if (from === 'user') {
+      if (state.userAvatar) return `<div class="msg-avatar" style="background-image:url(${state.userAvatar})"></div>`;
+      return `<div class="msg-avatar" style="background:var(--accent)">我</div>`;
+    }
+    const c = state.contacts.find(x => x.id === state.chatContactId);
+    if (!c) return `<div class="msg-avatar" style="background:#666">?</div>`;
+    if (c.avatarImg) return `<div class="msg-avatar msg-avatar-contact" style="background-image:url(${c.avatarImg})"></div>`;
+    return `<div class="msg-avatar msg-avatar-contact" style="background:${c.avatarColor}">${c.name.charAt(0)}</div>`;
+  }
+
   function renderMessages() {
     const msgs = state.chats[state.chatContactId] || [];
     messageList.innerHTML = msgs.map(m => {
-      let cls = m.from; if (m.type === 'system' || m.type === 'poke') cls = 'system';
-      return `<div class="msg-row ${cls}" data-id="${m.id}">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div></div>`;
+      if (m.type === 'system' || m.type === 'poke') {
+        return `<div class="msg-row system" data-id="${m.id}">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div></div>`;
+      }
+      const cls = m.from === 'user' ? 'user' : 'contact';
+      const av = msgAvatarHtml(m.from);
+      const body = `<div class="msg-col">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div></div>`;
+      return `<div class="msg-row ${cls}" data-id="${m.id}">${cls === 'contact' ? av + body : body + av}</div>`;
     }).join('');
     messageList.querySelectorAll('.msg-row:not(.system)').forEach(row => {
       bindLongPress(row);
       bindMoneyOpen(row);
     });
+    messageList.querySelectorAll('.msg-avatar-contact').forEach(av => {
+      av.addEventListener('dblclick', e => { e.stopPropagation(); doPoke(); });
+      // 移动端双击
+      let last = 0;
+      av.addEventListener('click', e => {
+        e.stopPropagation();
+        const now = Date.now();
+        if (now - last < 350) { doPoke(); last = 0; } else last = now;
+      });
+    });
     requestAnimationFrame(() => { messageList.scrollTop = messageList.scrollHeight; });
   }
   function appendMessage(msg) {
     const typing = messageList.querySelector('.typing-row'); if (typing) typing.remove();
-    let cls = msg.from; if (msg.type === 'system' || msg.type === 'poke') cls = 'system';
+    if (msg.type === 'system' || msg.type === 'poke') {
+      const row = document.createElement('div');
+      row.className = 'msg-row system'; row.dataset.id = msg.id;
+      row.innerHTML = `${renderMsgBubble(msg)}<div class="msg-time">${formatTime(msg.time)}</div>`;
+      messageList.appendChild(row);
+      messageList.scrollTop = messageList.scrollHeight;
+      return;
+    }
+    const cls = msg.from === 'user' ? 'user' : 'contact';
+    const av = msgAvatarHtml(msg.from);
+    const body = `<div class="msg-col">${renderMsgBubble(msg)}<div class="msg-time">${formatTime(msg.time)}</div></div>`;
     const row = document.createElement('div');
     row.className = `msg-row ${cls}`; row.dataset.id = msg.id;
-    row.innerHTML = `${renderMsgBubble(msg)}<div class="msg-time">${formatTime(msg.time)}</div>`;
+    row.innerHTML = cls === 'contact' ? av + body : body + av;
     messageList.appendChild(row);
-    if (cls !== 'system') { bindLongPress(row); bindMoneyOpen(row); }
+    bindLongPress(row); bindMoneyOpen(row);
+    if (cls === 'contact') {
+      const avEl = row.querySelector('.msg-avatar-contact');
+      if (avEl) {
+        avEl.addEventListener('dblclick', e => { e.stopPropagation(); doPoke(); });
+        let last = 0;
+        avEl.addEventListener('click', e => {
+          e.stopPropagation();
+          const now = Date.now();
+          if (now - last < 350) { doPoke(); last = 0; } else last = now;
+        });
+      }
+    }
     messageList.scrollTop = messageList.scrollHeight;
   }
   function showTyping() {
@@ -866,36 +930,55 @@
 
   function parseNeteaseResource(input) {
     if (!input || typeof input !== 'string') return null;
-    const str = input.trim();
-    // 歌单
-    let m = str.match(/playlist\?id=(\d+)/i) || str.match(/\/playlist\/(\d+)/i);
+    let str = input.trim();
+    // 清理分享文案、中文标点
+    str = str.replace(/[\u200b-\u200f\ufeff]/g, '');
+    // 歌单：支持 /m/playlist、#/playlist、playlist?id=
+    let m = str.match(/playlist(?:\?id=|\/|#\/playlist\?id=)(\d+)/i)
+      || str.match(/[?&#]id=(\d+)/i) && /playlist|歌单/i.test(str) && str.match(/[?&#]id=(\d+)/i);
+    if (m && /playlist|歌单/i.test(str)) return { kind: 'playlist', id: m[1] };
+    m = str.match(/\/playlist\/(\d+)/i) || str.match(/playlist\?id=(\d+)/i);
     if (m) return { kind: 'playlist', id: m[1] };
-    if (/playlist|歌单/i.test(str)) {
-      m = str.match(/[?&#]id=(\d+)/i);
-      if (m) return { kind: 'playlist', id: m[1] };
-    }
     // 单曲
-    m = str.match(/song\?id=(\d+)/i) || str.match(/\/song\/(\d+)/i);
+    m = str.match(/song(?:\?id=|\/|#\/song\?id=)(\d+)/i);
     if (m) return { kind: 'song', id: m[1] };
     if (/song|单曲/i.test(str)) {
       m = str.match(/[?&#]id=(\d+)/i);
       if (m) return { kind: 'song', id: m[1] };
     }
-    // 纯数字
+    // 纯数字（>=5 位当单曲；也可手动指定歌单）
     m = str.match(/^\s*(\d{5,})\s*$/);
     if (m) return { kind: 'song', id: m[1] };
     m = str.match(/[?&#]id=(\d{5,})/i);
-    if (m) return { kind: 'song', id: m[1] };
+    if (m) return { kind: /playlist|歌单/i.test(str) ? 'playlist' : 'song', id: m[1] };
     return null;
   }
 
   async function fetchMeting(type, id) {
-    const url = `${METING}?server=netease&type=${type}&id=${encodeURIComponent(id)}&r=${Date.now()}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('接口请求失败 ' + res.status);
-    const ct = res.headers.get('content-type') || '';
-    if (type === 'lrc') return await res.text();
-    return await res.json();
+    const bases = [
+      'https://api.injahow.cn/meting/',
+      'https://api.qijieya.cn/meting/'
+    ];
+    let lastErr = null;
+    for (const base of bases) {
+      try {
+        const url = `${base}?server=netease&type=${type}&id=${encodeURIComponent(id)}&r=${Date.now()}`;
+        const res = await fetch(url, { mode: 'cors' });
+        if (!res.ok) { lastErr = new Error('HTTP ' + res.status); continue; }
+        if (type === 'lrc') return await res.text();
+        const text = await res.text();
+        if (!text || text.startsWith('<')) { lastErr = new Error('返回非 JSON'); continue; }
+        const data = JSON.parse(text);
+        if (type === 'playlist' && (!Array.isArray(data) || !data.length)) {
+          lastErr = new Error('歌单为空（可能是隐私歌单或 ID 无效）');
+          continue;
+        }
+        return data;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr || new Error('接口不可用');
   }
 
   function metingItemToSong(item) {
@@ -1435,6 +1518,37 @@
     }, 45000 + Math.random() * 30000);
   }
 
+  function scheduleProactiveMessages() {
+    if (state.proactiveTimer) clearInterval(state.proactiveTimer);
+    if (!state.lastProactiveAt) state.lastProactiveAt = {};
+    // 每分钟检查一次
+    state.proactiveTimer = setInterval(() => {
+      const now = Date.now();
+      state.contacts.forEach(c => {
+        const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
+        const intervalMin = Number(lc.proactiveIntervalMin);
+        if (!intervalMin || intervalMin <= 0) return;
+        const last = state.lastProactiveAt[c.id] || 0;
+        if (now - last < intervalMin * 60 * 1000) return;
+        state.lastProactiveAt[c.id] = now;
+        const pool = getContactCardPool(c);
+        const stickers = state.stickers || [];
+        let msg;
+        if (stickers.length && Math.random() < 0.25) {
+          const st = stickers[Math.floor(Math.random() * stickers.length)];
+          msg = { id: genId('m'), from: 'contact', type: 'sticker', stickerId: st.id, stickerData: st.data, time: now };
+        } else if (pool.length) {
+          msg = { id: genId('m'), from: 'contact', type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: now };
+        } else return;
+        if (!state.chats[c.id]) state.chats[c.id] = [];
+        state.chats[c.id].push(msg);
+        saveData();
+        if (state.chatContactId === c.id) appendMessage(msg);
+        else renderChatList();
+      });
+    }, 60000);
+  }
+
   function openMomentsPage() {
     const page = $('#moments-page');
     if (!page) return;
@@ -1479,19 +1593,36 @@
       const c = state.contacts.find(x => x.id === m.contactId);
       const name = c ? c.name : '未知';
       const liked = (m.likes || []).includes('me');
-      return `<div class="moment-card" data-id="${m.id}">
-        <div class="moment-head">${c ? renderAvatarEl(c) : ''}<span class="moment-name">${escapeHtml(name)}</span>
-          <span class="moment-time">${formatTime(m.time)}</span></div>
-        <div class="moment-text">${escapeHtml(m.text || '')}</div>
-        ${m.stickerData ? `<div class="moment-sticker"><img src="${m.stickerData}"/></div>` : ''}
-        <div class="moment-actions">
-          <button data-act="like">${liked ? '已赞' : '赞'}</button>
-          <button data-act="comment">评论</button>
+      const ago = (() => {
+        const d = Date.now() - m.time;
+        if (d < 60000) return '刚刚';
+        if (d < 3600000) return Math.floor(d / 60000) + '分钟前';
+        if (d < 86400000) return Math.floor(d / 3600000) + '小时前';
+        return formatTime(m.time);
+      })();
+      return `<div class="moment-card wx" data-id="${m.id}">
+        <div class="moment-head">
+          ${c ? renderAvatarEl(c) : '<div class="avatar" style="background:#666">?</div>'}
+          <div class="moment-meta">
+            <div class="moment-name">${escapeHtml(name)}</div>
+            <div class="moment-text">${escapeHtml(m.text || '')}</div>
+            ${m.stickerData ? `<div class="moment-sticker"><img src="${m.stickerData}"/></div>` : ''}
+            <div class="moment-foot">
+              <span class="moment-time">${ago}</span>
+              <button class="moment-more" data-act="menu">···</button>
+            </div>
+            <div class="moment-action-bar hidden" data-bar>
+              <button data-act="like">${liked ? '取消' : '赞'}</button>
+              <button data-act="comment">评论</button>
+              <button data-act="sticker">表情</button>
+            </div>
+            ${(m.likes || []).length ? `<div class="moment-likes">♥ ${(m.likes || []).map(x => x === 'me' ? '我' : x).join('、')}</div>` : ''}
+            <div class="moment-comments">${(m.comments || []).map(cm => {
+              if (cm.stickerData) return `<div class="moment-comment"><span class="who">${escapeHtml(cm.from)}</span><img class="cm-sticker" src="${cm.stickerData}"/></div>`;
+              return `<div class="moment-comment"><span class="who">${escapeHtml(cm.from)}</span>${escapeHtml(cm.text || '')}</div>`;
+            }).join('')}</div>
+          </div>
         </div>
-        ${(m.likes || []).length ? `<div class="moment-likes">♥ ${(m.likes || []).length} 人觉得很赞</div>` : ''}
-        <div class="moment-comments">${(m.comments || []).map(cm =>
-          `<div class="moment-comment"><span class="who">${escapeHtml(cm.from)}</span>${escapeHtml(cm.text)}</div>`
-        ).join('')}</div>
       </div>`;
     }).join('') || '<div class="empty-state small"><p>暂无动态</p></div>';
 
@@ -1499,28 +1630,97 @@
       const id = card.dataset.id;
       const m = state.moments.find(x => x.id === id);
       if (!m) return;
+      const bar = card.querySelector('[data-bar]');
+      card.querySelector('[data-act="menu"]')?.addEventListener('click', e => {
+        e.stopPropagation();
+        bar?.classList.toggle('hidden');
+      });
       card.querySelector('[data-act="like"]')?.addEventListener('click', () => {
         if (!m.likes) m.likes = [];
         if (m.likes.includes('me')) m.likes = m.likes.filter(x => x !== 'me');
         else m.likes.push('me');
         saveData(); renderMoments();
       });
-      card.querySelector('[data-act="comment"]')?.addEventListener('click', () => {
-        const text = prompt('说点什么');
-        if (!text || !text.trim()) return;
+      const addComment = (payload) => {
         if (!m.comments) m.comments = [];
-        m.comments.push({ from: '我', text: text.trim(), time: Date.now() });
-        // 联系人回复
+        m.comments.push(payload);
         const c = state.contacts.find(x => x.id === m.contactId);
         if (c && Math.random() < 0.7) {
           setTimeout(() => {
             const pool = getContactCardPool(c);
-            const reply = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '收到~';
-            m.comments.push({ from: c.name, text: reply, time: Date.now() });
+            if ((state.stickers || []).length && Math.random() < 0.3) {
+              const st = state.stickers[Math.floor(Math.random() * state.stickers.length)];
+              m.comments.push({ from: c.name, stickerData: st.data, time: Date.now() });
+            } else {
+              const reply = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '收到~';
+              m.comments.push({ from: c.name, text: reply, time: Date.now() });
+            }
             saveData(); renderMoments();
           }, 800 + Math.random() * 1200);
         }
         saveData(); renderMoments();
+      };
+      card.querySelector('[data-act="comment"]')?.addEventListener('click', () => {
+        const text = prompt('说点什么');
+        if (!text || !text.trim()) return;
+        addComment({ from: '我', text: text.trim(), time: Date.now() });
+      });
+      card.querySelector('[data-act="sticker"]')?.addEventListener('click', () => {
+        if (!(state.stickers || []).length) { alert('请先在「我」页导入表情包'); return; }
+        // 简单选择：用最近导入的列表弹窗
+        state.modalMode = 'moment-sticker';
+        state._momentCommentId = m.id;
+        modalTitle.textContent = '选择表情评论';
+        modalBody.innerHTML = `<div class="sticker-panel" style="max-height:240px">${state.stickers.map(s =>
+          `<div class="sticker-item" data-id="${s.id}"><img src="${s.data}"/></div>`).join('')}</div>`;
+        modalOverlay.classList.remove('hidden');
+        modalBody.querySelectorAll('.sticker-item').forEach(el => {
+          el.addEventListener('click', () => {
+            const st = state.stickers.find(x => x.id === el.dataset.id);
+            if (!st) return;
+            closeModal();
+            const target = state.moments.find(x => x.id === state._momentCommentId);
+            if (!target) return;
+            if (!target.comments) target.comments = [];
+            target.comments.push({ from: '我', stickerData: st.data, time: Date.now() });
+            const c = state.contacts.find(x => x.id === target.contactId);
+            if (c && Math.random() < 0.6) {
+              setTimeout(() => {
+                const pool = getContactCardPool(c);
+                target.comments.push({ from: c.name, text: pool.length ? pool[Math.floor(Math.random() * pool.length)] : '哈哈', time: Date.now() });
+                saveData(); renderMoments();
+              }, 600);
+            }
+            saveData(); renderMoments();
+          });
+        });
+      });
+    });
+  }
+
+  function openStickerManager() {
+    state.modalMode = 'sticker-manage';
+    modalTitle.textContent = '表情包管理';
+    const list = state.stickers || [];
+    modalBody.innerHTML = `
+      <div class="toolbar-row">
+        <button class="btn-primary" id="sm-add" style="flex:1">＋ 添加</button>
+      </div>
+      <div class="sticker-panel" style="max-height:280px">${list.map(s =>
+        `<div class="sticker-item sm-item" data-id="${s.id}" style="position:relative">
+          <img src="${s.data}"/>
+          <button class="sm-del" data-id="${s.id}" title="删除">✕</button>
+        </div>`).join('') || '<div style="color:var(--muted);font-size:13px;padding:12px">暂无表情</div>'}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px">点击 ✕ 删除；点添加可多选图片导入</div>`;
+    modalOverlay.classList.remove('hidden');
+    $('#sm-add')?.addEventListener('click', () => $('#file-stickers')?.click());
+    modalBody.querySelectorAll('.sm-del').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        state.stickers = (state.stickers || []).filter(s => s.id !== id);
+        saveData();
+        openStickerManager();
       });
     });
   }
@@ -1667,15 +1867,37 @@
     renderContactsList(); renderCardsPanel(); renderChatList(); showChatListView(); renderSongList(); updateStats(); updateThemeUI();
   }
 
+  function updateMeAvatarUI() {
+    const el = $('#me-avatar');
+    const nameEl = $('#me-name');
+    if (nameEl) nameEl.textContent = state.userName || '昕';
+    if (!el) return;
+    if (state.userAvatar) {
+      el.style.backgroundImage = `url(${state.userAvatar})`;
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+      el.textContent = '';
+    } else {
+      el.style.backgroundImage = '';
+      el.style.background = '#3D9A62';
+      el.textContent = (state.userName || '昕').charAt(0);
+    }
+  }
+
   async function init() {
     const data = await loadDataAsync();
     state.contacts = data.contacts; state.songs = data.songs; state.chats = data.chats;
     state.stickers = data.stickers || []; state.moments = data.moments || [];
     state.userBalance = data.userBalance; state.theme = data.theme;
     state.playMode = data.playMode || 'order';
+    state.userAvatar = data.userAvatar || null;
+    state.userName = data.userName || '昕';
+    state.lastProactiveAt = data.lastProactiveAt || {};
     applyTheme(state.theme);
     startStatusRotation();
+    scheduleProactiveMessages();
     enableFloatDrag();
+    updateMeAvatarUI();
 
     $$('.tab-item').forEach(t => t.addEventListener('click', () => switchPage(t.dataset.page)));
     btnBack.addEventListener('click', leaveChat);
@@ -1699,14 +1921,25 @@
     });
 
     $('#file-avatar').addEventListener('change', async e => {
-      const f=e.target.files?.[0]; e.target.value='';
-      const c=state.contacts.find(x=>x.id===state.currentContactId); if(!c||!f) return;
+      const f = e.target.files?.[0]; e.target.value = '';
+      if (!f) return;
       try {
-        c.avatarImg = await compressImage(f, 200, 0.65);
-        if (!saveData()) alert('头像已设置，但存储空间不足，刷新后可能丢失');
+        const dataUrl = await compressImage(f, 200, 0.65);
+        if (state.uploadTarget === 'user') {
+          state.userAvatar = dataUrl;
+          state.uploadTarget = null;
+          saveData();
+          updateMeAvatarUI();
+          if (state.chatContactId) renderMessages();
+          return;
+        }
+        const c = state.contacts.find(x => x.id === state.currentContactId);
+        if (!c) return;
+        c.avatarImg = dataUrl;
+        saveData();
         renderContactsList(); renderCardsPanel();
         if (state.chatContactId === c.id) enterChat(c.id);
-      } catch(_){ alert('图片失败'); }
+      } catch (_) { alert('图片失败'); }
     });
     $('#file-bg').addEventListener('change', async e => {
       const f=e.target.files?.[0]; e.target.value='';
@@ -1811,7 +2044,11 @@
       };
       reader.readAsText(f);
     });
-    $('#btn-manage-stickers')?.addEventListener('click', () => $('#file-stickers')?.click());
+    $('#btn-manage-stickers')?.addEventListener('click', openStickerManager);
+    $('#me-avatar')?.addEventListener('click', () => {
+      state.uploadTarget = 'user';
+      $('#file-avatar')?.click();
+    });
     $('#file-stickers')?.addEventListener('change', async e => {
       const files = Array.from(e.target.files || []);
       e.target.value = '';
@@ -1823,7 +2060,8 @@
         } catch (_) {}
       }
       saveData();
-      alert(`已导入表情，当前共 ${state.stickers.length} 个`);
+      if (state.modalMode === 'sticker-manage') openStickerManager();
+      else alert(`已导入表情，当前共 ${state.stickers.length} 个`);
     });
     $('#moments-back')?.addEventListener('click', closeMomentsPage);
     $('#moments-refresh')?.addEventListener('click', () => {
