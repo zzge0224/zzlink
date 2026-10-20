@@ -606,15 +606,30 @@
 
   function readStatusHtml(m) {
     if (m.from !== 'user') return '';
-    if (m.read) return `<div class="msg-read">已读</div>`;
+    if (m.readStatus === 'noreply') return `<div class="msg-read noreply">已读不回</div>`;
+    if (m.read || m.readStatus === 'read') return `<div class="msg-read">已读</div>`;
     return `<div class="msg-read">未读</div>`;
   }
 
-  function markUserMsgsRead(contactId) {
+  /** asNoreply=true 时显示「已读不回」 */
+  function markUserMsgsRead(contactId, asNoreply) {
     const msgs = state.chats[contactId] || [];
     let changed = false;
     msgs.forEach(m => {
-      if (m.from === 'user' && !m.read) { m.read = true; changed = true; }
+      if (m.from !== 'user') return;
+      // 已是已读不回的不再改成普通已读
+      if (m.readStatus === 'noreply') return;
+      if (!m.read || m.readStatus !== 'read' || asNoreply) {
+        if (asNoreply) {
+          m.read = true;
+          m.readStatus = 'noreply';
+          changed = true;
+        } else if (!m.read || m.readStatus !== 'read') {
+          m.read = true;
+          m.readStatus = 'read';
+          changed = true;
+        }
+      }
     });
     if (changed) {
       saveData();
@@ -662,9 +677,9 @@
     messageList.appendChild(row);
     bindMsgRowEvents(row);
     messageList.scrollTop = messageList.scrollHeight;
-    // 对方回复后，将用户消息标为已读
+    // 对方回复时，把此前未读用户消息标为已读（非不回）
     if (msg.from === 'contact' && state.chatContactId) {
-      setTimeout(() => markUserMsgsRead(state.chatContactId), 400 + Math.random() * 800);
+      markUserMsgsRead(state.chatContactId, false);
     }
   }
   function showTyping() {
@@ -709,17 +724,37 @@
     clearPendingTimers();
     const s = contact.settings || DEFAULT_SETTINGS;
     const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
-    // 已读不回
-    if (!forceCount && Math.random() < (lc.readNoReplyChance || 0)) return;
-    // 回复概率
-    if (!forceCount && Math.random() > (lc.replyChance == null ? 1 : lc.replyChance)) return;
+    const minD = Math.max(0.5, s.minDelay || 1.5);
+    const maxD = Math.max(minD, s.maxDelay || 4);
+
+    // 先「已读」：在较短延迟后更新状态
+    const readDelay = randomDelay(Math.min(0.6, minD * 0.4), Math.min(2.5, minD * 0.9));
+    const willNoreply = !forceCount && Math.random() < (lc.readNoReplyChance || 0);
+
+    state.pendingTimers.push(setTimeout(() => {
+      // 即使不在当前聊天也要写入已读状态
+      markUserMsgsRead(contact.id, willNoreply);
+    }, readDelay * 1000));
+
+    // 已读不回：只标状态，不回复
+    if (willNoreply) return;
+
+    // 回复概率未命中：也算已读但不回
+    if (!forceCount && Math.random() > (lc.replyChance == null ? 1 : lc.replyChance)) {
+      // 已在上面标为普通已读；若希望与「不回」区分，可在此改为 noreply
+      state.pendingTimers.push(setTimeout(() => {
+        markUserMsgsRead(contact.id, true);
+      }, (readDelay + 0.3) * 1000));
+      return;
+    }
+
     const maxR = Math.min(3, Math.max(1, s.maxReplies || 2));
     const count = forceCount || (Math.floor(Math.random() * maxR) + 1);
     const pool = getContactCardPool(contact);
     const stickers = state.stickers || [];
-    let cum = 0;
+    let cum = readDelay;
     for (let i = 0; i < count; i++) {
-      const d = randomDelay(s.minDelay, s.maxDelay);
+      const d = randomDelay(minD, maxD);
       cum += d;
       const sendSticker = stickers.length && Math.random() < 0.22;
       state.pendingTimers.push(setTimeout(() => {
@@ -727,7 +762,22 @@
         showTyping();
       }, Math.max(0, (cum - d * 0.6) * 1000)));
       state.pendingTimers.push(setTimeout(() => {
-        if (state.chatContactId !== contact.id) return;
+        // 回复前确保已读（非不回）
+        markUserMsgsRead(contact.id, false);
+        if (state.chatContactId !== contact.id) {
+          // 不在当前页也写入消息
+          let msg;
+          if (sendSticker) {
+            const st = stickers[Math.floor(Math.random() * stickers.length)];
+            msg = { id: genId('m'), from: 'contact', type: 'sticker', stickerId: st.id, stickerData: st.data, time: Date.now() };
+          } else if (pool.length) {
+            msg = { id: genId('m'), from: 'contact', type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: Date.now() };
+          } else return;
+          if (!state.chats[contact.id]) state.chats[contact.id] = [];
+          state.chats[contact.id].push(msg);
+          saveData();
+          return;
+        }
         let msg;
         if (sendSticker) {
           const st = stickers[Math.floor(Math.random() * stickers.length)];
