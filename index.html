@@ -18,7 +18,6 @@
     </header>
 
     <main class="app-main">
-      <!-- 聊天 -->
       <section id="page-chat" class="page active">
         <div id="chat-list-view">
           <div id="chat-list" class="chat-list"></div>
@@ -49,7 +48,6 @@
         </div>
       </section>
 
-      <!-- 联系人 -->
       <section id="page-contacts" class="page">
         <div class="contacts-layout">
           <div class="contacts-list" id="contacts-list"></div>
@@ -59,26 +57,23 @@
         </div>
       </section>
 
-      <!-- 音乐 -->
       <section id="page-music" class="page">
         <div class="music-page">
           <div class="music-page-toolbar">
-            <button class="btn-primary" id="btn-import-song">导入歌曲</button>
-            <button class="btn-outline" id="btn-listen-together">一起听</button>
+            <button class="btn-primary" id="btn-import-song">＋ 导入歌曲</button>
           </div>
           <div id="song-list" class="song-list"></div>
           <div id="song-list-empty" class="empty-state">
             <div class="empty-icon">🎵</div>
             <p>还没有歌曲</p>
-            <p class="hint">点击「导入歌曲」添加直链或网易云 ID</p>
+            <p class="hint">导入直链音频（mp3/m4a 等），可填歌词 LRC</p>
           </div>
         </div>
       </section>
 
-      <!-- 我 -->
       <section id="page-me" class="page">
         <div class="me-content">
-          <div class="avatar-large" id="me-avatar" style="background:#3D9A62">昕</div>
+          <div class="avatar-large" style="background:#3D9A62">昕</div>
           <h2>昕</h2>
           <p class="subtitle">字笺 · 纸上心意</p>
           <div class="balance-card">
@@ -113,49 +108,45 @@
     </nav>
   </div>
 
-  <!-- 一起听全屏 -->
   <div id="listen-page" class="listen-page hidden">
-    <div class="listen-header">
-      <button id="listen-back" class="btn-back-listen">‹</button>
-      <div class="listen-header-info">
-        <div id="listen-with-name">一起听</div>
-        <div id="listen-mode-hint" class="listen-mode-hint"></div>
-      </div>
+    <div class="listen-top">
+      <button id="listen-back" class="listen-back">‹</button>
+      <div class="listen-with" id="listen-with-name">一起听</div>
+      <div class="listen-spacer"></div>
     </div>
-    <div class="listen-body">
-      <div class="listen-cover-wrap">
-        <div id="listen-cover" class="listen-cover rotating">🎵</div>
-      </div>
-      <div id="listen-title" class="listen-title">—</div>
-      <div id="listen-artist" class="listen-artist">—</div>
-      <div id="listen-lrc-wrap" class="listen-lrc-wrap">
-        <div id="listen-lrc" class="listen-lrc"><div class="lrc-line">暂无歌词</div></div>
-      </div>
-      <div id="listen-iframe-wrap" class="listen-iframe-wrap hidden">
-        <p class="iframe-tip">嵌入模式：无法同步歌词与对方操作</p>
-        <iframe id="listen-iframe" frameborder="no" border="0" width="100%" height="86"
-          allow="autoplay; encrypted-media" referrerpolicy="no-referrer-when-downgrade" scrolling="no"></iframe>
-      </div>
-      <div id="listen-controls" class="listen-controls">
-        <div class="progress-row">
-          <span id="listen-cur">0:00</span>
-          <input type="range" id="listen-progress" min="0" max="1000" value="0" />
-          <span id="listen-dur">0:00</span>
-        </div>
-        <div class="control-row">
-          <button id="btn-listen-play" class="btn-play">▶</button>
-        </div>
-        <button id="btn-manual-play" class="btn-manual-play hidden">点击继续播放</button>
-      </div>
+    <div class="listen-cover-wrap">
+      <div class="listen-cover-ring"><div id="listen-cover" class="listen-cover"></div></div>
+    </div>
+    <div class="listen-meta">
+      <div id="listen-title" class="listen-title">歌名</div>
+      <div id="listen-artist" class="listen-artist">歌手</div>
+    </div>
+    <div class="listen-lyrics-wrap"><div id="listen-lyrics" class="listen-lyrics"><div class="lyric-line">暂无歌词</div></div></div>
+    <div class="listen-progress-wrap">
+      <span id="listen-cur">0:00</span>
+      <input type="range" id="listen-seek" class="listen-seek" min="0" max="100" value="0" step="0.1" />
+      <span id="listen-dur">0:00</span>
+    </div>
+    <div class="listen-controls">
+      <button id="listen-play" class="listen-play-btn">▶</button>
     </div>
     <div id="listen-toast" class="listen-toast hidden"></div>
+    <audio id="listen-audio" preload="metadata"></audio>
+  </div>
+
+  <div id="pick-contact-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>选择一起听的联系人</h3>
+      <div id="pick-contact-list" class="pick-contact-list"></div>
+      <div class="modal-actions"><button class="btn-ghost" id="pick-contact-cancel">取消</button></div>
+    </div>
   </div>
 
   <div id="msg-action-menu" class="msg-action-menu hidden"><button data-action="quote">引用</button></div>
 
   <div id="modal-overlay" class="modal-overlay hidden">
-    <div class="modal">
-      <h3 id="modal-title">标题</h3>
+    <div class="modal modal-wide">
+      <h3 id="modal-title">导入歌曲</h3>
       <div id="modal-body"></div>
       <div class="modal-actions">
         <button class="btn-ghost" id="modal-cancel">取消</button>
@@ -166,7 +157,6 @@
 
   <input type="file" id="file-avatar" accept="image/*" class="hidden" />
   <input type="file" id="file-bg" accept="image/*" class="hidden" />
-  <audio id="audio-el" preload="metadata"></audio>
   <script src="app.js"></script>
 </body>
 </html>
