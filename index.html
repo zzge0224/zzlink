@@ -61,6 +61,7 @@
           <div class="contacts-side">
             <div class="toolbar-row" style="padding:8px 10px 4px">
               <button class="btn-xs" id="btn-add-contact" type="button">＋ 添加联系人</button>
+              <button class="btn-xs" id="btn-goto-group" type="button">群聊</button>
             </div>
             <div class="contacts-list" id="contacts-list"></div>
           </div>
@@ -86,11 +87,6 @@
             <button class="discover-item" id="btn-goto-memorial">
               <span class="discover-icon">📅</span>
               <span class="discover-label">纪念</span>
-              <span class="discover-arrow">›</span>
-            </button>
-            <button class="discover-item" id="btn-goto-group">
-              <span class="discover-icon">👥</span>
-              <span class="discover-label">群聊</span>
               <span class="discover-arrow">›</span>
             </button>
           </div>
@@ -255,6 +251,7 @@
     </div>
     <div class="moments-scroll">
       <div class="moments-cover" id="moments-cover">
+        <button type="button" id="moments-cover-btn" class="moments-cover-btn">更换封面</button>
         <div class="moments-cover-user">
           <span class="moments-cover-name" id="moments-cover-name">昕</span>
           <div class="moments-cover-avatar" id="moments-cover-avatar">昕</div>
@@ -276,6 +273,7 @@
     <div class="moments-top">
       <button id="group-back" class="listen-back">‹</button>
       <h2 id="group-title">群聊</h2>
+      <button id="group-settings" class="btn-xs hidden">设置</button>
       <button id="group-new" class="btn-xs">新建</button>
     </div>
     <div id="group-list" class="memorial-list"></div>

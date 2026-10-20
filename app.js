@@ -1873,11 +1873,35 @@
       if (ids.length < 1) { alert('至少选择一位联系人'); return; }
       if (!state.groups) state.groups = [];
       const g = { id: genId('g'), name, memberIds: ids, messages: [] };
+      ensureGroupShape(g);
       state.groups.push(g);
       saveData();
       closeModal();
       openGroupPage();
       enterGroup(g.id);
+      return;
+    }
+    if (state.modalMode === 'group-settings') {
+      const g = (state.groups || []).find(x => x.id === state.activeGroupId);
+      if (!g) { closeModal(); return; }
+      ensureGroupShape(g);
+      const num = (id, def) => {
+        const v = parseFloat($(id)?.value);
+        return isNaN(v) ? def : v;
+      };
+      g.name = ($('#gs-name')?.value || '').trim() || g.name;
+      let min = Math.max(0.5, Math.min(30, num('#gs-min', 1.5)));
+      let max = Math.max(min, Math.min(60, num('#gs-max', 4)));
+      g.settings = {
+        minDelay: min,
+        maxDelay: max,
+        maxReplies: Math.max(1, Math.min(5, parseInt($('#gs-count')?.value, 10) || 2))
+      };
+      g.listenConfig.replyChance = Math.max(0, Math.min(1, num('#gs-reply', 0.85)));
+      saveData();
+      $('#group-title').textContent = g.name;
+      closeModal();
+      alert('群聊设置已保存');
       return;
     }
   }
@@ -2273,42 +2297,38 @@
         bar?.classList.add('hidden');
         showMomentCommentBar(m.id);
       });
-      const delBtn = card.querySelector('[data-act="del"]');
-      if (delBtn) {
-        const doDel = e => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (!confirm('删除这条朋友圈？')) return;
-          state.moments = (state.moments || []).filter(x => x.id !== id);
-          state._momentsSeeded = true;
-          saveData();
-          renderMoments();
-        };
-        delBtn.addEventListener('click', doDel);
-        delBtn.addEventListener('touchend', doDel, { passive: false });
-      }
+      // 删除由全局委托处理，避免重复绑定
     });
   }
 
   function openMomentsSettings() {
-    state.modalMode = 'moments-settings';
-    modalTitle.textContent = '朋友圈设置';
-    const rows = (state.contacts || []).map(c => {
-      ensureContactShape(c);
-      const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
-      return `<div class="survey-editor-q">
-        <strong>${escapeHtml(c.name)}</strong>
-        <div class="form-row"><label>发动态概率 (0~1)</label>
-          <input type="number" data-cid="${c.id}" data-k="momentsChance" min="0" max="1" step="0.01" value="${lc.momentsChance != null ? lc.momentsChance : 0.15}"/>
-        </div>
-        <label style="font-size:13px;display:flex;align-items:center;gap:8px;margin-top:6px">
-          <input type="checkbox" data-cid="${c.id}" data-k="momentsSticker" ${lc.momentsSticker !== false ? 'checked' : ''}/>
-          发动态 / 评论时可带表情包
-        </label>
-      </div>`;
-    }).join('') || '<p style="color:var(--muted)">暂无联系人</p>';
-    modalBody.innerHTML = `<p style="font-size:12px;color:var(--muted);margin-bottom:8px">为每位联系人单独设置朋友圈行为。点确定保存。</p>${rows}`;
-    modalOverlay.classList.remove('hidden');
+    try {
+      if (!modalOverlay || !modalBody || !modalTitle) {
+        alert('弹层未就绪，请刷新页面');
+        return;
+      }
+      state.modalMode = 'moments-settings';
+      modalTitle.textContent = '朋友圈设置';
+      const rows = (state.contacts || []).map(c => {
+        ensureContactShape(c);
+        const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
+        return `<div class="survey-editor-q">
+          <strong>${escapeHtml(c.name)}</strong>
+          <div class="form-row"><label>发动态概率 (0~1)</label>
+            <input type="number" data-cid="${c.id}" data-k="momentsChance" min="0" max="1" step="0.01" value="${lc.momentsChance != null ? lc.momentsChance : 0.15}"/>
+          </div>
+          <label style="font-size:13px;display:flex;align-items:center;gap:8px;margin-top:6px">
+            <input type="checkbox" data-cid="${c.id}" data-k="momentsSticker" ${lc.momentsSticker !== false ? 'checked' : ''}/>
+            发动态 / 评论时可带表情包
+          </label>
+        </div>`;
+      }).join('') || '<p style="color:var(--muted)">暂无联系人</p>';
+      modalBody.innerHTML = `<p style="font-size:12px;color:var(--muted);margin-bottom:8px">为每位联系人单独设置。点「确定」保存。</p>${rows}`;
+      modalOverlay.classList.remove('hidden');
+    } catch (err) {
+      console.error(err);
+      alert('打开设置失败：' + (err && err.message));
+    }
   }
 
   function submitMomentComment(text, stickerData) {
@@ -2627,25 +2647,57 @@
     });
     $('#btn-add-contact')?.addEventListener('click', openAddContactModal);
     $('#moments-post')?.addEventListener('click', openPostMomentModal);
-    $('#moments-settings')?.addEventListener('click', openMomentsSettings);
-    $('#moments-cover')?.addEventListener('click', () => $('#file-moments-cover')?.click());
-    $('#btn-goto-group')?.addEventListener('click', openGroupPage);
-    $('#group-back')?.addEventListener('click', () => {
-      if (state.activeGroupId && !$('#group-list')?.classList.contains('hidden') === false) {
-        // if in chat view, back to list
+    // 事件委托：设置 / 封面 / 删除 / 群聊入口
+    document.addEventListener('click', e => {
+      const t = e.target;
+      if (!(t instanceof Element)) return;
+      if (t.closest('#moments-settings')) {
+        e.preventDefault();
+        openMomentsSettings();
+        return;
       }
-      if (state.activeGroupId && $('#group-chat-view') && !$('#group-chat-view').classList.contains('hidden')) {
+      if (t.closest('#moments-cover-btn') || (t.id === 'moments-cover')) {
+        e.preventDefault();
+        $('#file-moments-cover')?.click();
+        return;
+      }
+      const del = t.closest('.moment-del, [data-act="del"]');
+      if (del && del.closest('.moment-card')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = del.closest('.moment-card');
+        const mid = card?.dataset?.id;
+        if (!mid) return;
+        if (!confirm('删除这条朋友圈？')) return;
+        state.moments = (state.moments || []).filter(x => x.id !== mid);
+        state._momentsSeeded = true;
+        saveData();
+        renderMoments();
+        return;
+      }
+      if (t.closest('#btn-goto-group')) {
+        e.preventDefault();
+        openGroupPage();
+        return;
+      }
+    });
+    $('#group-back')?.addEventListener('click', () => {
+      const view = $('#group-chat-view');
+      if (state.activeGroupId && view && !view.classList.contains('hidden')) {
         state.activeGroupId = null;
-        $('#group-chat-view').classList.add('hidden');
-        $('#group-chat-view').style.display = 'none';
+        view.classList.add('hidden');
+        view.style.display = 'none';
         $('#group-list')?.classList.remove('hidden');
         $('#group-title').textContent = '群聊';
+        $('#group-settings')?.classList.add('hidden');
+        $('#group-new')?.classList.remove('hidden');
         renderGroupList();
         return;
       }
       closeGroupPage();
     });
     $('#group-new')?.addEventListener('click', openNewGroupModal);
+    $('#group-settings')?.addEventListener('click', openGroupSettings);
     $('#group-send')?.addEventListener('click', sendGroupMessage);
     $('#group-input')?.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); }
@@ -3273,11 +3325,51 @@
     const g = (state.groups || []).find(x => x.id === gid);
     if (!g) return;
     state.activeGroupId = gid;
+    ensureGroupShape(g);
     $('#group-list')?.classList.add('hidden');
     const view = $('#group-chat-view');
     if (view) { view.classList.remove('hidden'); view.style.display = 'flex'; }
     $('#group-title').textContent = g.name;
+    $('#group-settings')?.classList.remove('hidden');
+    $('#group-new')?.classList.add('hidden');
     renderGroupMessages();
+  }
+
+  function ensureGroupShape(g) {
+    if (!g.settings) {
+      g.settings = { minDelay: 1.5, maxDelay: 4, maxReplies: 2 };
+    }
+    if (!g.listenConfig) {
+      g.listenConfig = {
+        replyChance: 0.85,
+        readNoReplyChance: 0.05,
+        askChance: 0.08,
+        proactiveIntervalMin: 0
+      };
+    }
+    if (!Array.isArray(g.messages)) g.messages = [];
+    if (!Array.isArray(g.memberIds)) g.memberIds = [];
+    return g;
+  }
+
+  function openGroupSettings() {
+    const g = (state.groups || []).find(x => x.id === state.activeGroupId);
+    if (!g) { alert('请先进入群聊'); return; }
+    ensureGroupShape(g);
+    const s = g.settings;
+    const lc = g.listenConfig;
+    state.modalMode = 'group-settings';
+    modalTitle.textContent = '群聊设置 · ' + (g.name || '');
+    const memberNames = (g.memberIds || []).map(id => state.contacts.find(c => c.id === id)?.name || id).join('、');
+    modalBody.innerHTML = `
+      <div class="form-row"><label>群名称</label><input type="text" id="gs-name" value="${escapeHtml(g.name || '')}"/></div>
+      <p style="font-size:12px;color:var(--muted);margin:6px 0">成员：${escapeHtml(memberNames)}</p>
+      <div class="form-row"><label>回复最小延迟(秒)</label><input type="number" id="gs-min" step="0.5" value="${s.minDelay}"/></div>
+      <div class="form-row"><label>回复最大延迟(秒)</label><input type="number" id="gs-max" step="0.5" value="${s.maxDelay}"/></div>
+      <div class="form-row"><label>每次最多回复人数</label><input type="number" id="gs-count" min="1" max="5" value="${s.maxReplies}"/></div>
+      <div class="form-row"><label>成员回复概率</label><input type="number" id="gs-reply" step="0.01" min="0" max="1" value="${lc.replyChance}"/></div>
+      <p style="font-size:11px;color:var(--muted)">成员将从各自字卡库中随机回复</p>`;
+    modalOverlay.classList.remove('hidden');
   }
   function renderGroupMessages() {
     const box = $('#group-messages');
@@ -3297,16 +3389,22 @@
     const input = $('#group-input');
     const text = (input?.value || '').trim();
     if (!g || !text) return;
-    if (!g.messages) g.messages = [];
+    ensureGroupShape(g);
     g.messages.push({ id: genId('gm'), from: 'user', text, time: Date.now() });
     input.value = '';
     saveData();
     renderGroupMessages();
-    // 成员随机用字卡回复
     const members = (g.memberIds || []).map(id => state.contacts.find(c => c.id === id)).filter(Boolean);
-    members.forEach(c => {
-      if (Math.random() > 0.55) return;
-      const delay = randomDelay(1, 4);
+    const s = g.settings || { minDelay: 1.5, maxDelay: 4, maxReplies: 2 };
+    const replyChance = g.listenConfig?.replyChance != null ? g.listenConfig.replyChance : 0.85;
+    const maxN = Math.min(members.length, s.maxReplies || 2);
+    const shuffled = members.slice().sort(() => Math.random() - 0.5);
+    let replied = 0;
+    shuffled.forEach(c => {
+      if (replied >= maxN) return;
+      if (Math.random() > replyChance) return;
+      replied++;
+      const delay = randomDelay(s.minDelay || 1.5, s.maxDelay || 4);
       setTimeout(() => {
         const pool = getContactCardPool(c);
         if (!pool.length) return;

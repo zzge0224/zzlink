@@ -256,7 +256,7 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 .tab-icon { font-size:20px; line-height:1; }
 .tab-label { font-size:11px; }
 
-.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:500; padding:24px; }
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:900; padding:24px; }
 .modal-overlay.hidden { display:none; }
 .modal { background:var(--chrome); border-radius:16px; padding:20px; width:100%; max-width:340px; border:1px solid var(--border); max-height:85vh; overflow-y:auto; }
 .modal-wide { max-width:380px; }
@@ -401,7 +401,7 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 
 /* 朋友圈 */
 .moments-page {
-  position:fixed; inset:0; z-index:180; background:var(--canvas);
+  position:fixed; inset:0; z-index:220; background:var(--canvas);
   display:flex; flex-direction:column; max-width:480px; margin:0 auto; left:0; right:0;
 }
 .moments-page.hidden { display:none; }
@@ -558,10 +558,49 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 /* 朋友圈封面 + 滚动 */
 .moments-page { background:var(--canvas); }
 .moments-top.transparent {
-  position:absolute; top:0; left:0; right:0; z-index:5;
-  background:transparent; border:none;
+  position:absolute; top:0; left:0; right:0; z-index:30;
+  background:linear-gradient(180deg,rgba(0,0,0,.45),transparent);
+  border:none;
   max-width:480px; margin:0 auto;
 }
+.moments-top .btn-xs, .moments-top .listen-back {
+  position: relative; z-index: 31;
+  pointer-events: auto;
+  background: rgba(255,255,255,.92) !important;
+  color: #222 !important;
+  border: none;
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.moments-top .listen-back {
+  background: rgba(255,255,255,.92) !important;
+  color: #222 !important;
+  font-size: 22px;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.moments-cover-btn {
+  position: absolute; left: 12px; bottom: 12px; z-index: 4;
+  border: none; border-radius: 12px; padding: 6px 12px;
+  background: rgba(0,0,0,.5); color: #fff; font-size: 12px; cursor: pointer;
+}
+.moments-cover::after { display: none !important; }
+.moment-del {
+  background: rgba(180,50,50,.12) !important;
+  color: #c45c5c !important;
+  border: 1px solid rgba(180,50,50,.35) !important;
+  border-radius: 8px !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  pointer-events: auto !important;
+  z-index: 5 !important;
+  position: relative !important;
+  cursor: pointer !important;
+}
+
 .moments-scroll { flex:1; overflow-y:auto; }
 .moments-cover {
   height:220px; background:linear-gradient(160deg,#2a2a32,#1a1a22);
