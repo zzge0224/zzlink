@@ -608,29 +608,27 @@
     if (m.from !== 'user') return '';
     if (m.readStatus === 'noreply') return `<div class="msg-read noreply">已读不回</div>`;
     if (m.read || m.readStatus === 'read') return `<div class="msg-read">已读</div>`;
-    return `<div class="msg-read">未读</div>`;
+    return `<div class="msg-read unread">未读</div>`;
   }
 
-  /** asNoreply=true 时显示「已读不回」 */
+  /**
+   * 只处理「最近一段」尚未有已读状态的用户消息：
+   * 从末尾往前，直到碰到联系人消息或已有 readStatus 的用户消息为止。
+   * asNoreply=true → 已读不回；false → 已读
+   */
   function markUserMsgsRead(contactId, asNoreply) {
     const msgs = state.chats[contactId] || [];
     let changed = false;
-    msgs.forEach(m => {
-      if (m.from !== 'user') return;
-      // 已是已读不回的不再改成普通已读
-      if (m.readStatus === 'noreply') return;
-      if (!m.read || m.readStatus !== 'read' || asNoreply) {
-        if (asNoreply) {
-          m.read = true;
-          m.readStatus = 'noreply';
-          changed = true;
-        } else if (!m.read || m.readStatus !== 'read') {
-          m.read = true;
-          m.readStatus = 'read';
-          changed = true;
-        }
-      }
-    });
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const m = msgs[i];
+      if (m.from === 'contact') break;
+      if (m.from !== 'user') continue;
+      // 已有明确状态则跳过（保留历史）
+      if (m.readStatus === 'read' || m.readStatus === 'noreply') continue;
+      m.read = true;
+      m.readStatus = asNoreply ? 'noreply' : 'read';
+      changed = true;
+    }
     if (changed) {
       saveData();
       if (state.chatContactId === contactId) renderMessages();
@@ -727,26 +725,25 @@
     const minD = Math.max(0.5, s.minDelay || 1.5);
     const maxD = Math.max(minD, s.maxDelay || 4);
 
-    // 先「已读」：在较短延迟后更新状态
-    const readDelay = randomDelay(Math.min(0.6, minD * 0.4), Math.min(2.5, minD * 0.9));
-    const willNoreply = !forceCount && Math.random() < (lc.readNoReplyChance || 0);
+    // 已读延迟（先变已读，再决定是否回复）
+    const readDelay = randomDelay(
+      Math.min(0.5, minD * 0.35),
+      Math.min(2.2, Math.max(0.8, minD * 0.85))
+    );
 
+    // 已读不回：按设置概率
+    const willNoreply = !forceCount && Math.random() < (Number(lc.readNoReplyChance) || 0);
+    // 回复概率（在未触发已读不回时）
+    const willSkipReply = !forceCount && !willNoreply &&
+      Math.random() > (lc.replyChance == null ? 1 : Number(lc.replyChance));
+
+    // 统一先在 readDelay 后写入已读状态
     state.pendingTimers.push(setTimeout(() => {
-      // 即使不在当前聊天也要写入已读状态
-      markUserMsgsRead(contact.id, willNoreply);
+      markUserMsgsRead(contact.id, willNoreply || willSkipReply);
     }, readDelay * 1000));
 
-    // 已读不回：只标状态，不回复
-    if (willNoreply) return;
-
-    // 回复概率未命中：也算已读但不回
-    if (!forceCount && Math.random() > (lc.replyChance == null ? 1 : lc.replyChance)) {
-      // 已在上面标为普通已读；若希望与「不回」区分，可在此改为 noreply
-      state.pendingTimers.push(setTimeout(() => {
-        markUserMsgsRead(contact.id, true);
-      }, (readDelay + 0.3) * 1000));
-      return;
-    }
+    // 已读不回 或 不回复 → 结束
+    if (willNoreply || willSkipReply) return;
 
     const maxR = Math.min(3, Math.max(1, s.maxReplies || 2));
     const count = forceCount || (Math.floor(Math.random() * maxR) + 1);
