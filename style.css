@@ -26,6 +26,43 @@
   --bubble-user:#7B5EA7; --bubble-user-text:#fff;
   --bubble-contact:#F0EBF8; --bubble-contact-text:#1E1A28; --msg-list-bg:#1A1625;
 }
+
+[data-theme="rose"] {
+  --canvas:#1C1216; --chrome:#2A1A20; --paper:#FCE8EE; --ink:#2A151C;
+  --accent:#E85A7A; --accent-soft:rgba(232,90,122,.2); --seal:#C73A5A;
+  --muted:#A88892; --border:#3D2830; --gold:#E8B4C0;
+  --bubble-user:#E85A7A; --bubble-user-text:#fff;
+  --bubble-contact:#FCE8EE; --bubble-contact-text:#2A151C; --msg-list-bg:#1C1216;
+}
+[data-theme="ocean"] {
+  --canvas:#0E1A22; --chrome:#152530; --paper:#E4F2F8; --ink:#0E1A22;
+  --accent:#3D9EBF; --accent-soft:rgba(61,158,191,.2); --seal:#2A7A9A;
+  --muted:#7A9AAA; --border:#1E3440; --gold:#7BC4D8;
+  --bubble-user:#3D9EBF; --bubble-user-text:#fff;
+  --bubble-contact:#E4F2F8; --bubble-contact-text:#0E1A22; --msg-list-bg:#0E1A22;
+}
+[data-theme="ink"] {
+  --canvas:#0A0A0A; --chrome:#161616; --paper:#F0F0F0; --ink:#0A0A0A;
+  --accent:#E8E8E8; --accent-soft:rgba(255,255,255,.12); --seal:#888;
+  --muted:#888; --border:#2A2A2A; --gold:#CCC;
+  --bubble-user:#E8E8E8; --bubble-user-text:#111;
+  --bubble-contact:#2A2A2A; --bubble-contact-text:#F0F0F0; --msg-list-bg:#0A0A0A;
+}
+[data-theme="amber"] {
+  --canvas:#1A140C; --chrome:#261E12; --paper:#F8F0E0; --ink:#1A140C;
+  --accent:#D4923A; --accent-soft:rgba(212,146,58,.2); --seal:#B86A20;
+  --muted:#A09070; --border:#3A3020; --gold:#E8C070;
+  --bubble-user:#D4923A; --bubble-user-text:#1A140C;
+  --bubble-contact:#F8F0E0; --bubble-contact-text:#1A140C; --msg-list-bg:#1A140C;
+}
+[data-theme="mint"] {
+  --canvas:#0F1A18; --chrome:#162420; --paper:#E6F5F0; --ink:#0F1A18;
+  --accent:#3DBB8A; --accent-soft:rgba(61,187,138,.2); --seal:#2A9070;
+  --muted:#7AAA98; --border:#1E3830; --gold:#7AD4B0;
+  --bubble-user:#3DBB8A; --bubble-user-text:#fff;
+  --bubble-contact:#E6F5F0; --bubble-contact-text:#0F1A18; --msg-list-bg:#0F1A18;
+}
+
 * { box-sizing:border-box; margin:0; padding:0; }
 html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:var(--canvas); color:var(--paper); -webkit-font-smoothing:antialiased; transition:background-color .35s,color .35s; }
 #app { display:flex; flex-direction:column; height:100%; max-width:480px; margin:0 auto; background:var(--canvas); position:relative; overflow:hidden; transition:background-color .35s; }
@@ -596,3 +633,29 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 .moment-del {
   background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; margin-left:8px;
 }
+
+.rose-preview { background:linear-gradient(90deg,#1C1216 40%,#E85A7A 40%,#E85A7A 70%,#FCE8EE 70%); }
+.ocean-preview { background:linear-gradient(90deg,#0E1A22 40%,#3D9EBF 40%,#3D9EBF 70%,#E4F2F8 70%); }
+.ink-preview { background:linear-gradient(90deg,#0A0A0A 40%,#E8E8E8 40%,#E8E8E8 70%,#2A2A2A 70%); }
+.amber-preview { background:linear-gradient(90deg,#1A140C 40%,#D4923A 40%,#D4923A 70%,#F8F0E0 70%); }
+.mint-preview { background:linear-gradient(90deg,#0F1A18 40%,#3DBB8A 40%,#3DBB8A 70%,#E6F5F0 70%); }
+.dark-preview { background:linear-gradient(90deg,#0D0D0D 40%,#5B9BD5 40%,#5B9BD5 70%,#2A2A2A 70%); }
+.cream-preview { background:linear-gradient(90deg,#F5F0E6 40%,#C17B4A 40%,#C17B4A 70%,#FFF 70%); }
+.lavender-preview { background:linear-gradient(90deg,#1A1625 40%,#9B7EBD 40%,#9B7EBD 70%,#F0EBF8 70%); }
+
+/* 纪念 */
+.memorial-list { padding:12px 16px; }
+.memorial-card {
+  background:var(--chrome); border:1px solid var(--border); border-radius:12px;
+  padding:14px; margin-bottom:10px;
+}
+.memorial-title { font-size:15px; font-weight:500; color:var(--paper); }
+.memorial-meta { font-size:12px; color:var(--muted); margin-top:4px; }
+.memorial-days { font-size:22px; color:var(--accent); font-weight:600; margin-top:8px; }
+.memorial-actions { display:flex; gap:8px; margin-top:10px; }
+.chat-pin-memorial {
+  font-size:11px; color:var(--accent); text-align:center;
+  padding:4px 10px; background:var(--accent-soft); border-radius:10px;
+  margin:0 12px 6px; flex-shrink:0;
+}
+.chat-pin-memorial.hidden { display:none; }

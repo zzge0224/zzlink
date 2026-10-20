@@ -30,6 +30,7 @@
           </div>
         </div>
         <div id="chat-detail-view" class="hidden">
+          <div id="chat-pin-memorial" class="chat-pin-memorial hidden"></div>
           <div id="message-list" class="message-list"></div>
           <div id="quote-bar" class="quote-bar hidden">
             <div class="quote-bar-content">
@@ -75,6 +76,18 @@
               <span class="discover-label">音乐</span>
               <span class="discover-arrow">›</span>
             </button>
+            <button class="discover-item" id="btn-goto-memorial">
+              <span class="discover-icon">📅</span>
+              <span class="discover-label">纪念</span>
+              <span class="discover-arrow">›</span>
+            </button>
+          </div>
+          <div id="memorial-subpage" class="music-subpage hidden">
+            <div class="music-page-toolbar">
+              <button class="btn-xs" id="btn-memorial-back">‹ 返回</button>
+              <button class="btn-primary" id="btn-add-memorial">＋ 添加纪念</button>
+            </div>
+            <div id="memorial-list" class="memorial-list"></div>
           </div>
           <div id="music-subpage" class="music-subpage hidden">
             <div class="music-page-toolbar">
@@ -123,6 +136,11 @@
               <button class="theme-card" data-theme="dark"><div class="theme-preview dark-preview"></div><span>暗夜黑</span></button>
               <button class="theme-card" data-theme="cream"><div class="theme-preview cream-preview"></div><span>奶油白</span></button>
               <button class="theme-card" data-theme="lavender"><div class="theme-preview lavender-preview"></div><span>淡紫</span></button>
+              <button class="theme-card" data-theme="rose"><div class="theme-preview rose-preview"></div><span>玫瑰粉</span></button>
+              <button class="theme-card" data-theme="ocean"><div class="theme-preview ocean-preview"></div><span>海洋蓝</span></button>
+              <button class="theme-card" data-theme="ink"><div class="theme-preview ink-preview"></div><span>水墨黑</span></button>
+              <button class="theme-card" data-theme="amber"><div class="theme-preview amber-preview"></div><span>琥珀金</span></button>
+              <button class="theme-card" data-theme="mint"><div class="theme-preview mint-preview"></div><span>薄荷青</span></button>
             </div>
           </div>
           <div class="stats">

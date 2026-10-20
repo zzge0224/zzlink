@@ -21,7 +21,7 @@
     // 每隔多少分钟主动给用户发一条消息；0 表示关闭
     proactiveIntervalMin: 30
   };
-  const THEMES = ['classic', 'dark', 'cream', 'lavender'];
+  const THEMES = ['classic', 'dark', 'cream', 'lavender', 'rose', 'ocean', 'ink', 'amber', 'mint'];
 
   const SAMPLE_LRC = `[00:00.00]示例歌词第一行
 [00:05.00]这是第二行歌词
@@ -65,7 +65,7 @@
   const DEFAULT_STATUSES = ['在线', '忙碌', '睡觉', '听歌中'];
 
   let state = {
-    contacts: [], songs: [], chats: {}, stickers: [], moments: [],
+    contacts: [], songs: [], chats: {}, stickers: [], moments: [], memorials: [],
     userBalance: 888, theme: 'classic', userAvatar: null, userName: '昕',
     currentContactId: null, chatContactId: null,
     editingCardIndex: null, editingCardType: 'normal', editingGroup: '默认', modalMode: null,
@@ -118,6 +118,7 @@
       chats: p.chats || {},
       stickers: Array.isArray(p.stickers) ? p.stickers : [],
       moments: Array.isArray(p.moments) ? p.moments : [],
+      memorials: Array.isArray(p.memorials) ? p.memorials : [],
       userBalance: typeof p.userBalance === 'number' ? p.userBalance : 888,
       theme: THEMES.includes(p.theme) ? p.theme : 'classic',
       playMode: p.playMode || 'order',
@@ -181,6 +182,7 @@
       chats,
       stickers: state.stickers || [],
       moments: (state.moments || []).slice(-100),
+      memorials: state.memorials || [],
       userBalance: state.userBalance,
       theme: state.theme,
       playMode: state.playMode || 'order',
@@ -188,7 +190,7 @@
       userName: state.userName || '昕',
       lastProactiveAt: state.lastProactiveAt || {},
       momentsCover: state.momentsCover || null,
-      _v: 10
+      _v: 11
     };
   }
 
@@ -379,7 +381,8 @@
     hideMsgMenu();
     // 互动页子视图重置
     $('#music-subpage')?.classList.add('hidden');
-    $('.discover-list') && document.querySelector('.discover-list')?.classList.remove('hidden');
+    $('#memorial-subpage')?.classList.add('hidden');
+    document.querySelector('.discover-list')?.classList.remove('hidden');
     if (name === 'chat') {
       if (state.chatContactId) enterChat(state.chatContactId);
       else { pageTitle.textContent = '聊天'; showChatListView(); renderChatList(); }
@@ -465,10 +468,13 @@
     if (!state.chats[id]) state.chats[id] = [];
     renderMessages(); msgInput.value = ''; hideAttachPanel(); hideStickerPanel(); state.quotingMsg = null; updateQuoteBar();
     $('#btn-chat-more')?.classList.remove('hidden');
+    updateChatPinMemorial(id);
   }
   function leaveChat() {
     clearPendingTimers(); state.chatContactId = null; state.quotingMsg = null;
     $('#btn-chat-more')?.classList.add('hidden');
+    const pin = $('#chat-pin-memorial');
+    if (pin) { pin.classList.add('hidden'); pin.textContent = ''; }
     showChatListView(); renderChatList();
   }
 
@@ -832,7 +838,6 @@
       const msg = { id: genId('m'), from: 'user', type: 'image', imageData, time: Date.now(), read: false };
       pushMsg(msg); appendMessage(msg); hideAttachPanel(); scheduleReplies(c);
     } catch (_) { alert('图片发送失败'); }
-  }
   }
   function hideAttachPanel() { attachPanel.classList.add('hidden'); btnAttach.classList.remove('active'); }
   function openMoneyModal(kind) {
@@ -1605,6 +1610,24 @@
       renderMoments();
       return;
     }
+    if (state.modalMode === 'add-memorial') {
+      const contactId = $('#mem-contact')?.value;
+      const title = ($('#mem-title')?.value || '').trim() || '纪念';
+      const date = $('#mem-date')?.value;
+      const type = $('#mem-type')?.value || 'anniversary';
+      const pinInChat = !!$('#mem-pin')?.checked;
+      if (!contactId || !date) { alert('请选择联系人和日期'); return; }
+      if (!state.memorials) state.memorials = [];
+      if (pinInChat) {
+        state.memorials.forEach(x => { if (x.contactId === contactId) x.pinInChat = false; });
+      }
+      state.memorials.push({ id: genId('mem'), contactId, title, date, type, pinInChat });
+      saveData();
+      closeModal();
+      renderMemorialList();
+      if (state.chatContactId === contactId) updateChatPinMemorial(contactId);
+      return;
+    }
   }
 
   function updateStats() {
@@ -1704,6 +1727,102 @@
         else renderChatList();
       });
     }, 60000);
+  }
+
+  function daysBetween(dateStr) {
+    // dateStr YYYY-MM-DD，返回距今天数（正=已过，负=未到）
+    try {
+      const t = new Date(dateStr + 'T00:00:00');
+      const n = new Date();
+      n.setHours(0, 0, 0, 0);
+      return Math.round((n - t) / 86400000);
+    } catch (_) { return 0; }
+  }
+
+  function memorialLabel(m) {
+    const d = daysBetween(m.date);
+    if (m.type === 'countdown') {
+      if (d > 0) return `已过 ${d} 天`;
+      if (d === 0) return '就是今天';
+      return `还有 ${-d} 天`;
+    }
+    // anniversary：已过天数
+    if (d < 0) return `还有 ${-d} 天到来`;
+    if (d === 0) return '今天！';
+    return `已 ${d} 天`;
+  }
+
+  function renderMemorialList() {
+    const list = $('#memorial-list');
+    if (!list) return;
+    const arr = state.memorials || [];
+    if (!arr.length) {
+      list.innerHTML = '<div class="empty-state small"><p>还没有纪念</p><p class="hint">记录纪念日或倒数日</p></div>';
+      return;
+    }
+    list.innerHTML = arr.map(m => {
+      const c = state.contacts.find(x => x.id === m.contactId);
+      const name = c ? c.name : '未知';
+      return `<div class="memorial-card" data-id="${m.id}">
+        <div class="memorial-title">${escapeHtml(m.title || '纪念')}</div>
+        <div class="memorial-meta">${escapeHtml(name)} · ${m.date} · ${m.type === 'countdown' ? '倒数日' : '纪念日'}${m.pinInChat ? ' · 已置顶' : ''}</div>
+        <div class="memorial-days">${memorialLabel(m)}</div>
+        <div class="memorial-actions">
+          <button class="btn-xs" data-act="pin">${m.pinInChat ? '取消置顶' : '聊天置顶'}</button>
+          <button class="btn-xs" data-act="del">删除</button>
+        </div>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('.memorial-card').forEach(card => {
+      const id = card.dataset.id;
+      const m = (state.memorials || []).find(x => x.id === id);
+      if (!m) return;
+      card.querySelector('[data-act="pin"]')?.addEventListener('click', () => {
+        m.pinInChat = !m.pinInChat;
+        // 同一联系人只保留一个置顶
+        if (m.pinInChat) {
+          (state.memorials || []).forEach(x => {
+            if (x.id !== m.id && x.contactId === m.contactId) x.pinInChat = false;
+          });
+        }
+        saveData();
+        renderMemorialList();
+        if (state.chatContactId === m.contactId) updateChatPinMemorial(m.contactId);
+      });
+      card.querySelector('[data-act="del"]')?.addEventListener('click', () => {
+        if (!confirm('删除这条纪念？')) return;
+        state.memorials = (state.memorials || []).filter(x => x.id !== id);
+        saveData();
+        renderMemorialList();
+        if (state.chatContactId) updateChatPinMemorial(state.chatContactId);
+      });
+    });
+  }
+
+  function openAddMemorialModal() {
+    if (!(state.contacts || []).length) { alert('请先添加联系人'); return; }
+    state.modalMode = 'add-memorial';
+    modalTitle.textContent = '添加纪念';
+    const opts = state.contacts.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    const today = new Date().toISOString().slice(0, 10);
+    modalBody.innerHTML = `
+      <div class="form-row"><label>联系人</label><select id="mem-contact">${opts}</select></div>
+      <div class="form-row"><label>标题</label><input type="text" id="mem-title" placeholder="如：认识纪念日"/></div>
+      <div class="form-row"><label>日期</label><input type="date" id="mem-date" value="${today}"/></div>
+      <div class="form-row"><label>类型</label>
+        <select id="mem-type"><option value="anniversary">纪念日（已过天数）</option><option value="countdown">倒数日</option></select>
+      </div>
+      <div class="form-row"><label><input type="checkbox" id="mem-pin"/> 在聊天页置顶显示</label></div>`;
+    modalOverlay.classList.remove('hidden');
+  }
+
+  function updateChatPinMemorial(contactId) {
+    const el = $('#chat-pin-memorial');
+    if (!el) return;
+    const m = (state.memorials || []).find(x => x.contactId === contactId && x.pinInChat);
+    if (!m) { el.classList.add('hidden'); el.textContent = ''; return; }
+    el.textContent = `${m.title || '纪念'} · ${memorialLabel(m)}`;
+    el.classList.remove('hidden');
   }
 
   function openMomentsPage() {
@@ -2101,6 +2220,7 @@
     const data = await loadDataAsync();
     state.contacts = data.contacts; state.songs = data.songs; state.chats = data.chats;
     state.stickers = data.stickers || []; state.moments = data.moments || [];
+    state.memorials = data.memorials || [];
     state.userBalance = data.userBalance; state.theme = data.theme;
     state.playMode = data.playMode || 'order';
     state.userAvatar = data.userAvatar || null;
@@ -2244,14 +2364,29 @@
     $('#btn-goto-music')?.addEventListener('click', () => {
       document.querySelector('.discover-list')?.classList.add('hidden');
       $('#music-subpage')?.classList.remove('hidden');
+      $('#memorial-subpage')?.classList.add('hidden');
       pageTitle.textContent = '音乐';
       renderSongList();
     });
     $('#btn-music-back')?.addEventListener('click', () => {
       $('#music-subpage')?.classList.add('hidden');
+      $('#memorial-subpage')?.classList.add('hidden');
       document.querySelector('.discover-list')?.classList.remove('hidden');
       pageTitle.textContent = '互动';
     });
+    $('#btn-goto-memorial')?.addEventListener('click', () => {
+      document.querySelector('.discover-list')?.classList.add('hidden');
+      $('#music-subpage')?.classList.add('hidden');
+      $('#memorial-subpage')?.classList.remove('hidden');
+      pageTitle.textContent = '纪念';
+      renderMemorialList();
+    });
+    $('#btn-memorial-back')?.addEventListener('click', () => {
+      $('#memorial-subpage')?.classList.add('hidden');
+      document.querySelector('.discover-list')?.classList.remove('hidden');
+      pageTitle.textContent = '互动';
+    });
+    $('#btn-add-memorial')?.addEventListener('click', openAddMemorialModal);
     $('#btn-chat-more')?.addEventListener('click', openChatSettings);
     $('#chat-settings-back')?.addEventListener('click', closeChatSettings);
 
