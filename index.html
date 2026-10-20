@@ -39,6 +39,7 @@
             <button id="quote-bar-close" class="quote-bar-close">✕</button>
           </div>
           <div id="attach-panel" class="attach-panel hidden">
+            <button class="attach-btn" data-action="photo"><span class="attach-icon">🖼️</span><span>照片</span></button>
             <button class="attach-btn" data-action="transfer"><span class="attach-icon">💸</span><span>转账</span></button>
             <button class="attach-btn" data-action="redpacket"><span class="attach-icon">🧧</span><span>红包</span></button>
           </div>
@@ -213,6 +214,7 @@
     <div class="moments-top transparent">
       <button id="moments-back" class="listen-back">‹</button>
       <h2>朋友圈</h2>
+      <button id="moments-post" class="btn-xs">发表</button>
       <button id="moments-refresh" class="btn-xs">刷新</button>
     </div>
     <div class="moments-scroll">
@@ -244,6 +246,8 @@
 
   <input type="file" id="file-backup" accept="application/json,.json" class="hidden" />
   <input type="file" id="file-cards-txt" accept=".txt,text/plain" class="hidden" />
+  <input type="file" id="file-chat-photo" accept="image/*" class="hidden" />
+  <input type="file" id="file-moment-photo" accept="image/*" class="hidden" />
   <input type="file" id="file-stickers" accept="image/*" multiple class="hidden" />
 
   

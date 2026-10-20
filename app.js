@@ -406,6 +406,7 @@
     if (msg.type === 'transfer') return `[转账] ${msg.amount} 星币`;
     if (msg.type === 'redpacket') return `[红包] ${msg.note || '恭喜发财'}`;
     if (msg.type === 'sticker') return '[表情]';
+    if (msg.type === 'image') return '[图片]';
     return (msg.from === 'user' ? '我: ' : '') + (msg.text || '');
   }
   function renderChatList() {
@@ -550,6 +551,9 @@
       const src = m.stickerData || (state.stickers.find(s => s.id === m.stickerId) || {}).data || '';
       return `<div class="msg-bubble msg-sticker" style="background:transparent;box-shadow:none;padding:4px">${src ? `<img src="${src}" alt="表情"/>` : '[表情]'}</div>`;
     }
+    if (m.type === 'image') {
+      return `<div class="msg-bubble msg-photo" style="padding:4px;background:transparent;box-shadow:none"><img src="${m.imageData || ''}" alt="图片"/></div>`;
+    }
     if (m.type === 'transfer') {
       const opened = m.opened ? ' opened' : '';
       const label = m.opened ? '已收款' : (m.from === 'user' ? '转账给对方' : '点击收款');
@@ -600,64 +604,68 @@
     return `<div class="msg-avatar msg-avatar-contact" style="background:${c.avatarColor}">${c.name.charAt(0)}</div>`;
   }
 
-  function renderMessages() {
-    const msgs = state.chats[state.chatContactId] || [];
-    messageList.innerHTML = msgs.map(m => {
-      if (m.type === 'system' || m.type === 'poke') {
-        return `<div class="msg-row system" data-id="${m.id}">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div></div>`;
-      }
-      const cls = m.from === 'user' ? 'user' : 'contact';
-      const av = msgAvatarHtml(m.from);
-      const body = `<div class="msg-col">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div></div>`;
-      return `<div class="msg-row ${cls}" data-id="${m.id}">${cls === 'contact' ? av + body : body + av}</div>`;
-    }).join('');
-    messageList.querySelectorAll('.msg-row:not(.system)').forEach(row => {
-      bindLongPress(row);
-      bindMoneyOpen(row);
+  function readStatusHtml(m) {
+    if (m.from !== 'user') return '';
+    if (m.read) return `<div class="msg-read">已读</div>`;
+    return `<div class="msg-read">未读</div>`;
+  }
+
+  function markUserMsgsRead(contactId) {
+    const msgs = state.chats[contactId] || [];
+    let changed = false;
+    msgs.forEach(m => {
+      if (m.from === 'user' && !m.read) { m.read = true; changed = true; }
     });
-    messageList.querySelectorAll('.msg-avatar-contact').forEach(av => {
-      av.addEventListener('dblclick', e => { e.stopPropagation(); doPoke(); });
-      // 移动端双击
+    if (changed) {
+      saveData();
+      if (state.chatContactId === contactId) renderMessages();
+    }
+  }
+
+  function buildMsgRowHtml(m) {
+    if (m.type === 'system' || m.type === 'poke') {
+      return `<div class="msg-row system" data-id="${m.id}">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div></div>`;
+    }
+    const cls = m.from === 'user' ? 'user' : 'contact';
+    const av = msgAvatarHtml(m.from);
+    const body = `<div class="msg-col">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div>${readStatusHtml(m)}</div>`;
+    return `<div class="msg-row ${cls}" data-id="${m.id}">${cls === 'contact' ? av + body : body + av}</div>`;
+  }
+
+  function bindMsgRowEvents(row) {
+    if (row.classList.contains('system')) return;
+    bindLongPress(row);
+    bindMoneyOpen(row);
+    const avEl = row.querySelector('.msg-avatar-contact');
+    if (avEl) {
+      avEl.addEventListener('dblclick', e => { e.stopPropagation(); doPoke(); });
       let last = 0;
-      av.addEventListener('click', e => {
+      avEl.addEventListener('click', e => {
         e.stopPropagation();
         const now = Date.now();
         if (now - last < 350) { doPoke(); last = 0; } else last = now;
       });
-    });
+    }
+  }
+
+  function renderMessages() {
+    const msgs = state.chats[state.chatContactId] || [];
+    messageList.innerHTML = msgs.map(buildMsgRowHtml).join('');
+    messageList.querySelectorAll('.msg-row').forEach(bindMsgRowEvents);
     requestAnimationFrame(() => { messageList.scrollTop = messageList.scrollHeight; });
   }
   function appendMessage(msg) {
     const typing = messageList.querySelector('.typing-row'); if (typing) typing.remove();
-    if (msg.type === 'system' || msg.type === 'poke') {
-      const row = document.createElement('div');
-      row.className = 'msg-row system'; row.dataset.id = msg.id;
-      row.innerHTML = `${renderMsgBubble(msg)}<div class="msg-time">${formatTime(msg.time)}</div>`;
-      messageList.appendChild(row);
-      messageList.scrollTop = messageList.scrollHeight;
-      return;
-    }
-    const cls = msg.from === 'user' ? 'user' : 'contact';
-    const av = msgAvatarHtml(msg.from);
-    const body = `<div class="msg-col">${renderMsgBubble(msg)}<div class="msg-time">${formatTime(msg.time)}</div></div>`;
-    const row = document.createElement('div');
-    row.className = `msg-row ${cls}`; row.dataset.id = msg.id;
-    row.innerHTML = cls === 'contact' ? av + body : body + av;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = buildMsgRowHtml(msg);
+    const row = wrap.firstElementChild;
     messageList.appendChild(row);
-    bindLongPress(row); bindMoneyOpen(row);
-    if (cls === 'contact') {
-      const avEl = row.querySelector('.msg-avatar-contact');
-      if (avEl) {
-        avEl.addEventListener('dblclick', e => { e.stopPropagation(); doPoke(); });
-        let last = 0;
-        avEl.addEventListener('click', e => {
-          e.stopPropagation();
-          const now = Date.now();
-          if (now - last < 350) { doPoke(); last = 0; } else last = now;
-        });
-      }
-    }
+    bindMsgRowEvents(row);
     messageList.scrollTop = messageList.scrollHeight;
+    // 对方回复后，将用户消息标为已读
+    if (msg.from === 'contact' && state.chatContactId) {
+      setTimeout(() => markUserMsgsRead(state.chatContactId), 400 + Math.random() * 800);
+    }
   }
   function showTyping() {
     if (messageList.querySelector('.typing-row')) return;
@@ -764,9 +772,20 @@
   function sendMessage() {
     const text = msgInput.value.trim(); if (!text || !state.chatContactId) return;
     const c = state.contacts.find(x => x.id === state.chatContactId); if (!c) return;
-    const msg = { id:genId('m'), from:'user', type: state.quotingMsg?'quote':'text', text, time:Date.now() };
+    const msg = { id:genId('m'), from:'user', type: state.quotingMsg?'quote':'text', text, time:Date.now(), read:false };
     if (state.quotingMsg) msg.quote = { id:state.quotingMsg.id, from:state.quotingMsg.from, text:state.quotingMsg.text||getPreviewText(state.quotingMsg), type:state.quotingMsg.type };
-    pushMsg(msg); appendMessage(msg); msgInput.value=''; state.quotingMsg=null; updateQuoteBar(); hideAttachPanel(); scheduleReplies(c);
+    pushMsg(msg); appendMessage(msg); msgInput.value=''; state.quotingMsg=null; updateQuoteBar(); hideAttachPanel(); hideStickerPanel(); scheduleReplies(c);
+  }
+
+  async function sendChatPhoto(file) {
+    if (!file || !state.chatContactId) return;
+    const c = state.contacts.find(x => x.id === state.chatContactId); if (!c) return;
+    try {
+      const imageData = await compressImage(file, 720, 0.72);
+      const msg = { id: genId('m'), from: 'user', type: 'image', imageData, time: Date.now(), read: false };
+      pushMsg(msg); appendMessage(msg); hideAttachPanel(); scheduleReplies(c);
+    } catch (_) { alert('图片发送失败'); }
+  }
   }
   function hideAttachPanel() { attachPanel.classList.add('hidden'); btnAttach.classList.remove('active'); }
   function openMoneyModal(kind) {
@@ -783,10 +802,40 @@
       const item = document.createElement('div');
       item.className = 'contact-item' + (c.id === state.currentContactId ? ' active' : '');
       item.innerHTML = `${renderAvatarEl(c)}<div class="contact-name">${escapeHtml(c.name)}</div>
-        <div class="contact-status">${escapeHtml(c.currentStatus || '')}</div>`;
-      item.addEventListener('click', () => { state.currentContactId = c.id; state.activeCardGroup = '默认'; renderContactsList(); renderCardsPanel(); });
+        <div class="contact-status">${escapeHtml(c.currentStatus || '')}</div>
+        <button class="contact-del" data-id="${c.id}" title="删除">✕</button>`;
+      item.addEventListener('click', e => {
+        if (e.target.closest('.contact-del')) return;
+        state.currentContactId = c.id; state.activeCardGroup = '默认';
+        renderContactsList(); renderCardsPanel();
+      });
+      item.querySelector('.contact-del')?.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!confirm(`删除联系人「${c.name}」？聊天记录与其朋友圈也会移除。`)) return;
+        state.contacts = state.contacts.filter(x => x.id !== c.id);
+        delete state.chats[c.id];
+        state.moments = (state.moments || []).filter(m => m.contactId !== c.id);
+        if (state.currentContactId === c.id) state.currentContactId = state.contacts[0]?.id || null;
+        if (state.chatContactId === c.id) leaveChat();
+        saveData();
+        renderContactsList(); renderCardsPanel(); renderChatList(); updateStats();
+      });
+      // 长按显示删除
+      let t = null;
+      item.addEventListener('touchstart', () => { t = setTimeout(() => item.classList.add('show-del'), 500); }, { passive: true });
+      item.addEventListener('touchend', () => clearTimeout(t));
       contactsList.appendChild(item);
     });
+  }
+
+  function openAddContactModal() {
+    state.modalMode = 'add-contact';
+    modalTitle.textContent = '添加联系人';
+    modalBody.innerHTML = `
+      <div class="form-row"><label>名称</label><input type="text" id="new-c-name" placeholder="联系人昵称"/></div>
+      <div class="form-row"><label>头像色</label><input type="color" id="new-c-color" value="#3D9A62"/></div>`;
+    modalOverlay.classList.remove('hidden');
+    $('#new-c-name')?.focus();
   }
 
   function renderCardsPanel() {
@@ -886,8 +935,10 @@
   }
 
   function openStatusModal() {
-    const c = state.contacts.find(x => x.id === state.currentContactId);
+    const cid = state.currentContactId || state.chatContactId;
+    const c = state.contacts.find(x => x.id === cid);
     if (!c) return;
+    state.currentContactId = c.id;
     state.modalMode = 'status';
     modalTitle.textContent = '状态列表（每行一个）';
     modalBody.innerHTML = `<textarea id="modal-input" rows="5">${escapeHtml((c.statuses || DEFAULT_STATUSES).join('\n'))}</textarea>`;
@@ -1457,11 +1508,54 @@
     }
     if (state.modalMode === 'status') {
       const lines = ($('#modal-input')?.value || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      const c = state.contacts.find(x => x.id === state.currentContactId);
+      const cid = state.currentContactId || state.chatContactId;
+      const c = state.contacts.find(x => x.id === cid);
       if (!c) return;
       c.statuses = lines.length ? lines : DEFAULT_STATUSES.slice();
       if (!c.statuses.includes(c.currentStatus)) c.currentStatus = c.statuses[0];
-      saveData(); renderCardsPanel(); renderContactsList(); closeModal();
+      saveData();
+      renderCardsPanel(); renderContactsList();
+      if (state.chatContactId === c.id) {
+        const st = c.currentStatus ? ` · ${c.currentStatus}` : '';
+        pageTitle.innerHTML = `${escapeHtml(c.name)}<span class="header-status">${escapeHtml(st)}</span>`;
+      }
+      closeModal();
+      return;
+    }
+    if (state.modalMode === 'add-contact') {
+      const name = ($('#new-c-name')?.value || '').trim();
+      if (!name) { alert('请输入名称'); return; }
+      const color = $('#new-c-color')?.value || '#3D9A62';
+      const c = ensureContactShape({
+        id: genId('c'), name, avatarColor: color, avatarImg: null,
+        chatBgColor: null, chatBgImg: null,
+        cards: ['你好，很高兴认识你。'], interactionCards: [...DEFAULT_INTERACTION],
+        settings: { ...DEFAULT_SETTINGS }, favorites: [], listenConfig: { ...DEFAULT_LISTEN },
+        cardGroups: { '默认': ['你好，很高兴认识你。'] },
+        statuses: [...DEFAULT_STATUSES], currentStatus: '在线'
+      });
+      state.contacts.push(c);
+      state.chats[c.id] = [];
+      state.currentContactId = c.id;
+      saveData();
+      renderContactsList(); renderCardsPanel(); renderChatList(); updateStats();
+      closeModal();
+      return;
+    }
+    if (state.modalMode === 'post-moment') {
+      const text = ($('#moment-text')?.value || '').trim();
+      if (!text && !state._momentDraftImage) { alert('写点内容或选一张图'); return; }
+      const m = {
+        id: genId('mo'), contactId: 'me', text,
+        imageData: state._momentDraftImage || null,
+        stickerData: null, time: Date.now(), likes: [], comments: []
+      };
+      if (!state.moments) state.moments = [];
+      state.moments.unshift(m);
+      state._momentDraftImage = null;
+      saveData();
+      closeModal();
+      renderMoments();
       return;
     }
   }
@@ -1628,10 +1722,24 @@
       stickerId = st.id; stickerData = st.data;
     }
     return {
-      id: genId('mo'), contactId: c.id, text, stickerId, stickerData,
+      id: genId('mo'), contactId: c.id, text, stickerId, stickerData, imageData: null,
       time: Date.now() - Math.floor(Math.random() * 86400000 * 3),
       likes: [], comments: []
     };
+  }
+
+  function openPostMomentModal() {
+    state.modalMode = 'post-moment';
+    state._momentDraftImage = null;
+    modalTitle.textContent = '发表朋友圈';
+    modalBody.innerHTML = `
+      <textarea id="moment-text" rows="4" placeholder="这一刻的想法..."></textarea>
+      <div class="toolbar-row" style="margin-top:8px">
+        <button class="btn-xs" type="button" id="moment-pick-photo">＋ 照片</button>
+        <span id="moment-photo-preview" style="font-size:12px;color:var(--muted)"></span>
+      </div>`;
+    modalOverlay.classList.remove('hidden');
+    $('#moment-pick-photo')?.addEventListener('click', () => $('#file-moment-photo')?.click());
   }
 
   function replyToMomentLater(m) {
@@ -1664,8 +1772,14 @@
     }
     const sorted = state.moments.slice().sort((a, b) => b.time - a.time);
     list.innerHTML = sorted.map(m => {
-      const c = state.contacts.find(x => x.id === m.contactId);
-      const name = c ? c.name : '未知';
+      const isMe = m.contactId === 'me';
+      const c = isMe ? null : state.contacts.find(x => x.id === m.contactId);
+      const name = isMe ? (state.userName || '昕') : (c ? c.name : '未知');
+      const avHtml = isMe
+        ? (state.userAvatar
+          ? `<div class="avatar" style="background-image:url(${state.userAvatar})"></div>`
+          : `<div class="avatar" style="background:var(--accent)">${(state.userName || '昕').charAt(0)}</div>`)
+        : (c ? renderAvatarEl(c) : '<div class="avatar" style="background:#666">?</div>');
       const liked = (m.likes || []).includes('me');
       const ago = (() => {
         const d = Date.now() - m.time;
@@ -1676,13 +1790,15 @@
       })();
       return `<div class="moment-card wx" data-id="${m.id}">
         <div class="moment-head">
-          ${c ? renderAvatarEl(c) : '<div class="avatar" style="background:#666">?</div>'}
+          ${avHtml}
           <div class="moment-meta">
             <div class="moment-name">${escapeHtml(name)}</div>
             <div class="moment-text">${escapeHtml(m.text || '')}</div>
+            ${m.imageData ? `<div class="moment-photo"><img src="${m.imageData}"/></div>` : ''}
             ${m.stickerData ? `<div class="moment-sticker"><img src="${m.stickerData}"/></div>` : ''}
             <div class="moment-foot">
               <span class="moment-time">${ago}</span>
+              ${m.contactId === 'me' || true ? `<button class="moment-del" data-act="del" type="button">删除</button>` : ''}
               <button class="moment-more" data-act="menu" type="button">···</button>
             </div>
             <div class="moment-action-bar hidden" data-bar>
@@ -1722,6 +1838,13 @@
         e.stopPropagation();
         bar?.classList.add('hidden');
         showMomentCommentBar(m.id);
+      });
+      card.querySelector('[data-act="del"]')?.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!confirm('删除这条朋友圈？')) return;
+        state.moments = (state.moments || []).filter(x => x.id !== m.id);
+        saveData();
+        renderMoments();
       });
     });
   }
@@ -2004,7 +2127,29 @@
       if (attachPanel.classList.contains('hidden')) { attachPanel.classList.remove('hidden'); btnAttach.classList.add('active'); }
       else hideAttachPanel();
     });
-    attachPanel.querySelectorAll('.attach-btn').forEach(b => b.addEventListener('click', () => openMoneyModal(b.dataset.action)));
+    attachPanel.querySelectorAll('.attach-btn').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.action === 'photo') {
+        $('#file-chat-photo')?.click();
+        hideAttachPanel();
+        return;
+      }
+      openMoneyModal(b.dataset.action);
+    }));
+    $('#file-chat-photo')?.addEventListener('change', e => {
+      const f = e.target.files?.[0]; e.target.value = '';
+      if (f) sendChatPhoto(f);
+    });
+    $('#file-moment-photo')?.addEventListener('change', async e => {
+      const f = e.target.files?.[0]; e.target.value = '';
+      if (!f) return;
+      try {
+        state._momentDraftImage = await compressImage(f, 900, 0.72);
+        const prev = $('#moment-photo-preview');
+        if (prev) prev.textContent = '已选 1 张图';
+      } catch (_) { alert('图片失败'); }
+    });
+    $('#btn-add-contact')?.addEventListener('click', openAddContactModal);
+    $('#moments-post')?.addEventListener('click', openPostMomentModal);
     $('#quote-bar-close').addEventListener('click', () => { state.quotingMsg=null; updateQuoteBar(); });
     msgActionMenu.querySelector('[data-action="quote"]').addEventListener('click', () => {
       if (state.longPressMsg) { state.quotingMsg=state.longPressMsg; updateQuoteBar(); hideMsgMenu(); msgInput.focus(); }
