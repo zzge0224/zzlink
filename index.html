@@ -40,8 +40,10 @@
             <button class="attach-btn" data-action="transfer"><span class="attach-icon">💸</span><span>转账</span></button>
             <button class="attach-btn" data-action="redpacket"><span class="attach-icon">🧧</span><span>红包</span></button>
           </div>
+          <div id="sticker-panel" class="sticker-panel hidden"></div>
           <div class="composer">
             <button id="btn-attach" class="btn-attach">+</button>
+            <button id="btn-sticker" class="btn-attach" title="表情">☺</button>
             <textarea id="msg-input" placeholder="说点什么..." rows="1"></textarea>
             <button id="btn-send" class="btn-send">发送</button>
           </div>
@@ -94,6 +96,11 @@
             <div class="stat-item"><span class="stat-num" id="stat-contacts">0</span><span class="stat-label">联系人</span></div>
             <div class="stat-item"><span class="stat-num" id="stat-cards">0</span><span class="stat-label">字卡</span></div>
             <div class="stat-item"><span class="stat-num" id="stat-songs">0</span><span class="stat-label">歌曲</span></div>
+          </div>
+          <div class="toolbar-row" style="justify-content:center;margin-bottom:16px">
+            <button class="btn-xs" id="btn-export-data">导出备份 JSON</button>
+            <button class="btn-xs" id="btn-import-data">导入备份 JSON</button>
+            <button class="btn-xs" id="btn-manage-stickers">管理表情包</button>
           </div>
           <button class="btn-outline" id="btn-reset-data">重置示例数据</button>
         </div>
@@ -173,6 +180,31 @@
 
   <input type="file" id="file-avatar" accept="image/*" class="hidden" />
   <input type="file" id="file-bg" accept="image/*" class="hidden" />
+  
+  <!-- 朋友圈 -->
+  <div id="moments-page" class="moments-page hidden">
+    <div class="moments-top">
+      <button id="moments-back" class="listen-back">‹</button>
+      <h2>朋友圈</h2>
+      <button id="moments-refresh" class="btn-xs">刷新</button>
+    </div>
+    <div id="moments-list" class="moments-list"></div>
+  </div>
+
+  <!-- 红包打开 -->
+  <div id="rp-open-overlay" class="rp-open-overlay hidden">
+    <div class="rp-open-card">
+      <div>红包</div>
+      <div class="rp-open-amount" id="rp-open-amount">0</div>
+      <div class="rp-open-note" id="rp-open-note"></div>
+      <button class="rp-open-close" id="rp-open-close">收下</button>
+    </div>
+  </div>
+
+  <input type="file" id="file-backup" accept="application/json,.json" class="hidden" />
+  <input type="file" id="file-cards-txt" accept=".txt,text/plain" class="hidden" />
+  <input type="file" id="file-stickers" accept="image/*" multiple class="hidden" />
+
   <script src="app.js"></script>
 </body>
 </html>

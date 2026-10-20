@@ -259,3 +259,122 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 ::-webkit-scrollbar { width:4px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+/* ===== 字体与气泡缩小 ===== */
+.msg-bubble { font-size:13px !important; padding:8px 12px !important; line-height:1.5 !important; }
+.msg-time { font-size:10px !important; }
+.chat-item-name { font-size:14px !important; }
+.chat-item-preview { font-size:12px !important; }
+#msg-input { font-size:14px !important; padding:8px 14px !important; }
+.btn-send { font-size:14px !important; height:36px !important; padding:8px 14px !important; }
+
+/* ===== 可拖动小悬浮窗 ===== */
+.float-player {
+  position:fixed !important;
+  left:auto !important;
+  right:12px !important;
+  bottom:calc(72px + env(safe-area-inset-bottom)) !important;
+  transform:none !important;
+  width:auto !important;
+  max-width:220px !important;
+  min-width:160px !important;
+  padding:6px 8px !important;
+  border-radius:20px !important;
+  gap:6px !important;
+  cursor:grab;
+  touch-action:none;
+  user-select:none;
+}
+.float-player:active { cursor:grabbing; }
+.float-cover { width:28px !important; height:28px !important; border-radius:50% !important; font-size:12px !important; }
+.float-title { font-size:11px !important; }
+.float-artist { font-size:10px !important; }
+.float-btn { width:26px !important; height:26px !important; font-size:10px !important; }
+.float-player .float-artist { display:none; }
+
+/* 状态点 */
+.status-dot {
+  display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:var(--accent); margin-right:4px; vertical-align:middle;
+}
+.status-text { font-size:11px; color:var(--muted); }
+.contact-status { font-size:10px; color:var(--accent); margin-top:2px; text-align:center; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.header-status { font-size:11px; color:var(--muted); font-weight:400; margin-left:4px; }
+
+/* 表情消息 */
+.msg-sticker img { max-width:100px; max-height:100px; border-radius:8px; display:block; }
+.sticker-panel {
+  display:flex; flex-wrap:wrap; gap:8px; padding:10px 12px;
+  background:var(--chrome); border-top:1px solid var(--border);
+  max-height:140px; overflow-y:auto;
+}
+.sticker-panel.hidden { display:none; }
+.sticker-item {
+  width:52px; height:52px; border-radius:8px; overflow:hidden;
+  border:1px solid var(--border); background:var(--canvas); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.sticker-item img { width:100%; height:100%; object-fit:cover; }
+
+/* 字卡分组 */
+.group-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.group-tab {
+  font-size:12px; padding:4px 10px; border-radius:12px;
+  border:1px solid var(--border); background:var(--chrome); color:var(--muted); cursor:pointer;
+}
+.group-tab.active { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+
+/* 朋友圈 */
+.moments-page {
+  position:fixed; inset:0; z-index:180; background:var(--canvas);
+  display:flex; flex-direction:column; max-width:480px; margin:0 auto; left:0; right:0;
+}
+.moments-page.hidden { display:none; }
+.moments-top {
+  display:flex; align-items:center; padding:12px 16px;
+  border-bottom:1px solid var(--border); background:var(--chrome);
+}
+.moments-top h2 { flex:1; text-align:center; font-size:16px; color:var(--paper); }
+.moments-list { flex:1; overflow-y:auto; padding:12px 16px; }
+.moment-card {
+  background:var(--chrome); border-radius:12px; padding:12px; margin-bottom:12px;
+  border:1px solid var(--border);
+}
+.moment-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.moment-name { font-size:14px; font-weight:500; color:var(--paper); }
+.moment-time { font-size:11px; color:var(--muted); margin-left:auto; }
+.moment-text { font-size:13px; color:var(--paper); line-height:1.5; margin-bottom:8px; white-space:pre-wrap; }
+.moment-sticker img { max-width:120px; border-radius:8px; margin-bottom:8px; }
+.moment-actions { display:flex; gap:12px; font-size:12px; color:var(--muted); }
+.moment-actions button { background:none; border:none; color:var(--muted); cursor:pointer; font-size:12px; }
+.moment-likes { font-size:12px; color:var(--accent); margin-top:6px; }
+.moment-comments { margin-top:8px; font-size:12px; color:var(--paper); }
+.moment-comment { padding:4px 0; border-top:1px solid var(--border); }
+.moment-comment .who { color:var(--accent); margin-right:4px; }
+
+/* 红包拆开层 */
+.rp-open-overlay {
+  position:fixed; inset:0; z-index:300; background:rgba(0,0,0,.55);
+  display:flex; align-items:center; justify-content:center;
+}
+.rp-open-overlay.hidden { display:none; }
+.rp-open-card {
+  width:220px; background:linear-gradient(160deg,#e85d4c,#b8302a);
+  border-radius:16px; padding:28px 20px; text-align:center; color:#fff;
+  box-shadow:0 12px 40px rgba(0,0,0,.4);
+  animation:rp-pop .35s ease;
+}
+@keyframes rp-pop {
+  from { transform:scale(.6); opacity:0; }
+  to { transform:scale(1); opacity:1; }
+}
+.rp-open-amount { font-size:36px; font-weight:700; margin:12px 0; }
+.rp-open-note { font-size:13px; opacity:.9; }
+.rp-open-close { margin-top:16px; background:rgba(255,255,255,.2); border:none; color:#fff; padding:8px 20px; border-radius:16px; cursor:pointer; }
+
+.msg-transfer.opened, .msg-redpacket.opened { opacity:.75; }
+.toolbar-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.btn-xs {
+  font-size:11px; padding:4px 8px; border-radius:10px;
+  border:1px solid var(--border); background:var(--chrome); color:var(--muted); cursor:pointer;
+}

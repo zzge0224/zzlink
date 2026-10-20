@@ -52,39 +52,55 @@
     }
   ];
 
+  const DEFAULT_STATUSES = ['在线', '忙碌', '睡觉', '听歌中'];
+
   let state = {
-    contacts: [], songs: [], chats: {}, userBalance: 888, theme: 'classic',
+    contacts: [], songs: [], chats: {}, stickers: [], moments: [],
+    userBalance: 888, theme: 'classic',
     currentContactId: null, chatContactId: null,
-    editingCardIndex: null, editingCardType: 'normal', modalMode: null,
+    editingCardIndex: null, editingCardType: 'normal', editingGroup: '默认', modalMode: null,
     pendingTimers: [], quotingMsg: null, longPressMsg: null,
-    playMode: 'order', // order | random | loop | one
-    // 一起听
+    playMode: 'order',
     listenSongId: null, listenContactId: null, listenInterval: null,
     listenLyrics: [], listenLyricIdx: -1, pendingSong: null,
-    listenQueue: [], listenIndex: 0, floatVisible: false
+    listenQueue: [], listenIndex: 0, floatVisible: false,
+    statusTimer: null, activeCardGroup: '默认'
   };
+
+  function ensureContactShape(c) {
+    if (!c.settings) c.settings = { ...DEFAULT_SETTINGS };
+    if (!c.interactionCards) c.interactionCards = [...DEFAULT_INTERACTION];
+    if (!c.favorites) c.favorites = [];
+    if (!c.listenConfig) c.listenConfig = { ...DEFAULT_LISTEN };
+    if (c.avatarImg === undefined) c.avatarImg = null;
+    if (c.chatBgImg === undefined) c.chatBgImg = null;
+    if (c.chatBgColor === undefined) c.chatBgColor = null;
+    // 字卡分组：旧版 cards[] 迁移到 cardGroups
+    if (!c.cardGroups || typeof c.cardGroups !== 'object') {
+      c.cardGroups = { '默认': Array.isArray(c.cards) ? c.cards.slice() : [] };
+    }
+    if (!Array.isArray(c.cards)) c.cards = Object.values(c.cardGroups).flat();
+    if (!Array.isArray(c.statuses) || !c.statuses.length) c.statuses = DEFAULT_STATUSES.slice();
+    if (!c.currentStatus) c.currentStatus = c.statuses[0];
+    return c;
+  }
 
   function normalizeLoaded(p) {
     if (!p || !Array.isArray(p.contacts) || !p.contacts.length) {
       return {
-        contacts: JSON.parse(JSON.stringify(DEFAULT_CONTACTS)),
+        contacts: JSON.parse(JSON.stringify(DEFAULT_CONTACTS)).map(ensureContactShape),
         songs: JSON.parse(JSON.stringify(DEFAULT_SONGS)),
-        chats: {}, userBalance: 888, theme: 'classic', playMode: 'order'
+        chats: {}, stickers: [], moments: [],
+        userBalance: 888, theme: 'classic', playMode: 'order'
       };
     }
-    p.contacts.forEach(c => {
-      if (!c.settings) c.settings = { ...DEFAULT_SETTINGS };
-      if (!c.interactionCards) c.interactionCards = [...DEFAULT_INTERACTION];
-      if (!c.favorites) c.favorites = [];
-      if (!c.listenConfig) c.listenConfig = { ...DEFAULT_LISTEN };
-      if (c.avatarImg === undefined) c.avatarImg = null;
-      if (c.chatBgImg === undefined) c.chatBgImg = null;
-      if (c.chatBgColor === undefined) c.chatBgColor = null;
-    });
+    p.contacts.forEach(ensureContactShape);
     return {
       contacts: p.contacts,
       songs: Array.isArray(p.songs) ? p.songs : JSON.parse(JSON.stringify(DEFAULT_SONGS)),
       chats: p.chats || {},
+      stickers: Array.isArray(p.stickers) ? p.stickers : [],
+      moments: Array.isArray(p.moments) ? p.moments : [],
       userBalance: typeof p.userBalance === 'number' ? p.userBalance : 888,
       theme: THEMES.includes(p.theme) ? p.theme : 'classic',
       playMode: p.playMode || 'order'
@@ -134,14 +150,20 @@
       const arr = state.chats[cid] || [];
       chats[cid] = arr.length > 500 ? arr.slice(-500) : arr;
     });
+    // 同步 cards 扁平数组方便旧逻辑
+    (state.contacts || []).forEach(c => {
+      if (c.cardGroups) c.cards = Object.values(c.cardGroups).flat();
+    });
     return {
       contacts: state.contacts,
       songs,
       chats,
+      stickers: state.stickers || [],
+      moments: (state.moments || []).slice(-100),
       userBalance: state.userBalance,
       theme: state.theme,
       playMode: state.playMode || 'order',
-      _v: 7
+      _v: 8
     };
   }
 
@@ -352,6 +374,7 @@
     if (msg.type === 'system' || msg.type === 'poke') return msg.text;
     if (msg.type === 'transfer') return `[转账] ${msg.amount} 星币`;
     if (msg.type === 'redpacket') return `[红包] ${msg.note || '恭喜发财'}`;
+    if (msg.type === 'sticker') return '[表情]';
     return (msg.from === 'user' ? '我: ' : '') + (msg.text || '');
   }
   function renderChatList() {
@@ -399,13 +422,15 @@
     const c = state.contacts.find(x => x.id === id); if (!c) return;
     state.chatContactId = id;
     chatListView.classList.add('hidden'); chatDetailView.classList.remove('hidden');
-    btnBack.classList.remove('hidden'); pageTitle.textContent = c.name;
+    btnBack.classList.remove('hidden');
+    const st = c.currentStatus ? ` · ${c.currentStatus}` : '';
+    pageTitle.innerHTML = `${escapeHtml(c.name)}<span class="header-status">${escapeHtml(st)}</span>`;
     headerAvatar.classList.remove('hidden');
     if (c.avatarImg) { headerAvatar.style.backgroundImage = `url(${c.avatarImg})`; headerAvatar.textContent = ''; }
     else { headerAvatar.style.backgroundImage = ''; headerAvatar.style.background = c.avatarColor; headerAvatar.textContent = c.name.charAt(0); }
     applyContactChatBg(id);
     if (!state.chats[id]) state.chats[id] = [];
-    renderMessages(); msgInput.value = ''; hideAttachPanel(); state.quotingMsg = null; updateQuoteBar();
+    renderMessages(); msgInput.value = ''; hideAttachPanel(); hideStickerPanel(); state.quotingMsg = null; updateQuoteBar();
   }
   function leaveChat() {
     clearPendingTimers(); state.chatContactId = null; state.quotingMsg = null;
@@ -413,8 +438,20 @@
   }
   function renderMsgBubble(m) {
     if (m.type === 'system' || m.type === 'poke') return `<div class="msg-system">${escapeHtml(m.text)}</div>`;
-    if (m.type === 'transfer') return `<div class="msg-bubble msg-transfer"><div class="tf-label">${m.from==='user'?'转账给对方':'收到转账'}</div><div class="tf-amount">${m.amount}<span class="tf-unit"> 星币</span></div>${m.note?`<div class="tf-note">${escapeHtml(m.note)}</div>`:''}</div>`;
-    if (m.type === 'redpacket') return `<div class="msg-bubble msg-redpacket"><div class="rp-icon">🧧</div><div class="rp-body"><div class="rp-title">${escapeHtml(m.note||'恭喜发财')}</div><div class="rp-amount">${m.amount} 星币</div></div></div>`;
+    if (m.type === 'sticker') {
+      const src = m.stickerData || (state.stickers.find(s => s.id === m.stickerId) || {}).data || '';
+      return `<div class="msg-bubble msg-sticker" style="background:transparent;box-shadow:none;padding:4px">${src ? `<img src="${src}" alt="表情"/>` : '[表情]'}</div>`;
+    }
+    if (m.type === 'transfer') {
+      const opened = m.opened ? ' opened' : '';
+      const label = m.opened ? '已收款' : (m.from === 'user' ? '转账给对方' : '点击收款');
+      return `<div class="msg-bubble msg-transfer${opened}" data-money-id="${m.id}"><div class="tf-label">${label}</div><div class="tf-amount">${m.amount}<span class="tf-unit"> 星币</span></div>${m.note?`<div class="tf-note">${escapeHtml(m.note)}</div>`:''}</div>`;
+    }
+    if (m.type === 'redpacket') {
+      const opened = m.opened ? ' opened' : '';
+      const title = m.opened ? '已领取' : (m.note || '恭喜发财');
+      return `<div class="msg-bubble msg-redpacket${opened}" data-money-id="${m.id}"><div class="rp-icon">🧧</div><div class="rp-body"><div class="rp-title">${escapeHtml(title)}</div><div class="rp-amount">${m.opened ? m.amount + ' 星币' : '点击拆开'}</div></div></div>`;
+    }
     let q = '';
     if (m.quote) {
       const qf = m.quote.from === 'user' ? '我' : (state.contacts.find(c=>c.id===state.chatContactId)?.name||'对方');
@@ -422,23 +459,48 @@
     }
     return `<div class="msg-bubble">${q}${escapeHtml(m.text||'')}</div>`;
   }
+  function bindMoneyOpen(row) {
+    const el = row.querySelector('[data-money-id]');
+    if (!el) return;
+    el.addEventListener('click', () => {
+      const id = el.getAttribute('data-money-id');
+      const msgs = state.chats[state.chatContactId] || [];
+      const m = msgs.find(x => x.id === id);
+      if (!m || m.opened) return;
+      m.opened = true;
+      saveData();
+      if (m.type === 'redpacket') {
+        const overlay = $('#rp-open-overlay');
+        $('#rp-open-amount').textContent = m.amount;
+        $('#rp-open-note').textContent = m.note || '恭喜发财';
+        overlay?.classList.remove('hidden');
+      }
+      // 刷新该气泡
+      row.innerHTML = `${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div>`;
+      bindMoneyOpen(row);
+      if (m.type !== 'redpacket') showListenToast && showListenToast('已收款');
+    });
+  }
   function renderMessages() {
     const msgs = state.chats[state.chatContactId] || [];
     messageList.innerHTML = msgs.map(m => {
-      let cls = m.from; if (m.type==='system'||m.type==='poke') cls='system';
+      let cls = m.from; if (m.type === 'system' || m.type === 'poke') cls = 'system';
       return `<div class="msg-row ${cls}" data-id="${m.id}">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div></div>`;
     }).join('');
-    messageList.querySelectorAll('.msg-row:not(.system)').forEach(bindLongPress);
+    messageList.querySelectorAll('.msg-row:not(.system)').forEach(row => {
+      bindLongPress(row);
+      bindMoneyOpen(row);
+    });
     requestAnimationFrame(() => { messageList.scrollTop = messageList.scrollHeight; });
   }
   function appendMessage(msg) {
     const typing = messageList.querySelector('.typing-row'); if (typing) typing.remove();
-    let cls = msg.from; if (msg.type==='system'||msg.type==='poke') cls='system';
+    let cls = msg.from; if (msg.type === 'system' || msg.type === 'poke') cls = 'system';
     const row = document.createElement('div');
     row.className = `msg-row ${cls}`; row.dataset.id = msg.id;
     row.innerHTML = `${renderMsgBubble(msg)}<div class="msg-time">${formatTime(msg.time)}</div>`;
     messageList.appendChild(row);
-    if (cls !== 'system') bindLongPress(row);
+    if (cls !== 'system') { bindLongPress(row); bindMoneyOpen(row); }
     messageList.scrollTop = messageList.scrollHeight;
   }
   function showTyping() {
@@ -471,24 +533,44 @@
     state.chats[state.chatContactId].push(msg); saveData();
   }
   function clearPendingTimers() { state.pendingTimers.forEach(clearTimeout); state.pendingTimers = []; }
+  function getContactCardPool(contact) {
+    if (contact.cardGroups) {
+      const all = Object.values(contact.cardGroups).flat().filter(Boolean);
+      if (all.length) return all;
+    }
+    return contact.cards || [];
+  }
+
   function scheduleReplies(contact, forceCount) {
     clearPendingTimers();
     const s = contact.settings || DEFAULT_SETTINGS;
-    const maxR = Math.min(3, Math.max(1, s.maxReplies||2));
-    const count = forceCount || (Math.floor(Math.random()*maxR)+1);
-    if (!contact.cards?.length) return;
-    const selected = [];
-    for (let i=0;i<count;i++) selected.push(contact.cards[Math.floor(Math.random()*contact.cards.length)]);
+    const maxR = Math.min(3, Math.max(1, s.maxReplies || 2));
+    const count = forceCount || (Math.floor(Math.random() * maxR) + 1);
+    const pool = getContactCardPool(contact);
+    const stickers = state.stickers || [];
     let cum = 0;
-    selected.forEach(text => {
-      const d = randomDelay(s.minDelay, s.maxDelay); cum += d;
-      state.pendingTimers.push(setTimeout(() => { if (state.chatContactId!==contact.id) return; showTyping(); }, Math.max(0,(cum-d*0.6)*1000)));
+    for (let i = 0; i < count; i++) {
+      const d = randomDelay(s.minDelay, s.maxDelay);
+      cum += d;
+      const sendSticker = stickers.length && Math.random() < 0.22;
       state.pendingTimers.push(setTimeout(() => {
-        if (state.chatContactId!==contact.id) return;
-        const msg = { id:genId('m'), from:'contact', type:'text', text, time:Date.now() };
-        pushMsg(msg); appendMessage(msg);
-      }, cum*1000));
-    });
+        if (state.chatContactId !== contact.id) return;
+        showTyping();
+      }, Math.max(0, (cum - d * 0.6) * 1000)));
+      state.pendingTimers.push(setTimeout(() => {
+        if (state.chatContactId !== contact.id) return;
+        let msg;
+        if (sendSticker) {
+          const st = stickers[Math.floor(Math.random() * stickers.length)];
+          msg = { id: genId('m'), from: 'contact', type: 'sticker', stickerId: st.id, stickerData: st.data, time: Date.now() };
+        } else if (pool.length) {
+          const text = pool[Math.floor(Math.random() * pool.length)];
+          msg = { id: genId('m'), from: 'contact', type: 'text', text, time: Date.now() };
+        } else return;
+        pushMsg(msg);
+        appendMessage(msg);
+      }, cum * 1000));
+    }
   }
   function doPoke() {
     const c = state.contacts.find(x => x.id === state.chatContactId); if (!c) return;
@@ -524,54 +606,123 @@
     contactsList.innerHTML = '';
     state.contacts.forEach(c => {
       const item = document.createElement('div');
-      item.className = 'contact-item' + (c.id===state.currentContactId?' active':'');
-      item.innerHTML = `${renderAvatarEl(c)}<div class="contact-name">${escapeHtml(c.name)}</div>`;
-      item.addEventListener('click', () => { state.currentContactId=c.id; renderContactsList(); renderCardsPanel(); });
+      item.className = 'contact-item' + (c.id === state.currentContactId ? ' active' : '');
+      item.innerHTML = `${renderAvatarEl(c)}<div class="contact-name">${escapeHtml(c.name)}</div>
+        <div class="contact-status">${escapeHtml(c.currentStatus || '')}</div>`;
+      item.addEventListener('click', () => { state.currentContactId = c.id; state.activeCardGroup = '默认'; renderContactsList(); renderCardsPanel(); });
       contactsList.appendChild(item);
     });
   }
+
   function renderCardsPanel() {
     const c = state.contacts.find(x => x.id === state.currentContactId);
     if (!c) { cardsPanel.innerHTML = `<div class="empty-state small"><p>选择一位联系人查看字卡库</p></div>`; return; }
+    ensureContactShape(c);
     const s = c.settings || DEFAULT_SETTINGS;
-    const mk = (text, idx, type) => `<div class="card-item ${type==='interaction'?'interaction':''}"><div class="card-text">${escapeHtml(text)}</div>
+    const groups = Object.keys(c.cardGroups);
+    if (!groups.includes(state.activeCardGroup)) state.activeCardGroup = groups[0] || '默认';
+    const gName = state.activeCardGroup;
+    const list = c.cardGroups[gName] || [];
+    const mk = (text, idx, type) => `<div class="card-item ${type === 'interaction' ? 'interaction' : ''}"><div class="card-text">${escapeHtml(text)}</div>
       <div class="card-actions"><button class="card-btn edit" data-i="${idx}" data-t="${type}">✎</button><button class="card-btn delete" data-i="${idx}" data-t="${type}">✕</button></div></div>`;
-    const favSongs = (c.favorites||[]).map(fid => state.songs.find(s => s.id===fid)).filter(Boolean);
+    const favSongs = (c.favorites || []).map(fid => state.songs.find(s => s.id === fid)).filter(Boolean);
     cardsPanel.innerHTML = `
-      <div class="cards-header"><h2>${escapeHtml(c.name)}</h2><button class="btn-settings" id="btn-settings">设置</button></div>
-      <div class="settings-summary">回复延迟 <strong>${s.minDelay}~${s.maxDelay}s</strong> · 每次最多 <strong>${s.maxReplies}</strong> 条</div>
+      <div class="cards-header"><h2>${escapeHtml(c.name)}</h2>
+        <button class="btn-xs" id="btn-moments">朋友圈</button>
+        <button class="btn-settings" id="btn-settings">设置</button>
+      </div>
+      <div class="settings-summary">状态 <strong>${escapeHtml(c.currentStatus || '')}</strong> · 延迟 <strong>${s.minDelay}~${s.maxDelay}s</strong></div>
       <div class="contact-custom-bar">
         <button class="btn-custom" id="btn-set-avatar">头像</button>
         <button class="btn-custom" id="btn-set-bg">背景</button>
+        <button class="btn-custom" id="btn-edit-status">状态</button>
       </div>
-      <div class="section-title">普通字卡 <button class="btn-add" id="btn-add-card" style="margin-left:8px">+</button></div>
-      <div class="card-list">${(c.cards||[]).map((t,i)=>mk(t,i,'normal')).join('')||'<div class="empty-state small"><p>暂无</p></div>'}</div>
+      <div class="section-title">字卡分组</div>
+      <div class="group-tabs" id="group-tabs">
+        ${groups.map(g => `<button class="group-tab ${g === gName ? 'active' : ''}" data-g="${escapeHtml(g)}">${escapeHtml(g)}</button>`).join('')}
+        <button class="group-tab" id="btn-add-group">+组</button>
+      </div>
+      <div class="toolbar-row">
+        <button class="btn-xs" id="btn-add-card">+ 字卡</button>
+        <button class="btn-xs" id="btn-batch-cards">批量导入</button>
+        <button class="btn-xs" id="btn-file-cards">文件导入</button>
+      </div>
+      <div class="card-list">${list.map((t, i) => mk(t, i, 'normal')).join('') || '<div class="empty-state small"><p>暂无字卡</p></div>'}</div>
       <div class="section-title">互动字卡 <button class="btn-add" id="btn-add-inter" style="margin-left:8px">+</button></div>
-      <div class="card-list">${(c.interactionCards||[]).map((t,i)=>mk(t,i,'interaction')).join('')||'<div class="empty-state small"><p>暂无</p></div>'}</div>
+      <div class="card-list">${(c.interactionCards || []).map((t, i) => mk(t, i, 'interaction')).join('') || '<div class="empty-state small"><p>暂无</p></div>'}</div>
       <div class="section-title">TA 收藏的歌</div>
-      <div>${favSongs.map(sg => `<div class="fav-song-item" data-sid="${sg.id}"><div class="song-cover" style="${sg.cover?`background-image:url(${sg.cover})`:''}">${sg.cover?'':'🎵'}</div>
-        <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist||'')}</div></div></div>`).join('') || '<div class="empty-state small"><p>暂无收藏</p></div>'}</div>`;
-    $('#btn-add-card')?.addEventListener('click', () => openCardModal('add','normal'));
-    $('#btn-add-inter')?.addEventListener('click', () => openCardModal('add','interaction'));
+      <div>${favSongs.map(sg => `<div class="fav-song-item" data-sid="${sg.id}"><div class="song-cover" style="${sg.cover ? `background-image:url(${sg.cover})` : ''}">${sg.cover ? '' : '🎵'}</div>
+        <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist || '')}</div></div></div>`).join('') || '<div class="empty-state small"><p>暂无收藏</p></div>'}</div>`;
+
+    $('#group-tabs')?.querySelectorAll('.group-tab[data-g]').forEach(btn => {
+      btn.addEventListener('click', () => { state.activeCardGroup = btn.dataset.g; renderCardsPanel(); });
+    });
+    $('#btn-add-group')?.addEventListener('click', () => {
+      const name = prompt('新分组名称');
+      if (!name || !name.trim()) return;
+      if (c.cardGroups[name.trim()]) { alert('已存在'); return; }
+      c.cardGroups[name.trim()] = [];
+      state.activeCardGroup = name.trim();
+      saveData(); renderCardsPanel();
+    });
+    $('#btn-add-card')?.addEventListener('click', () => openCardModal('add', 'normal'));
+    $('#btn-add-inter')?.addEventListener('click', () => openCardModal('add', 'interaction'));
+    $('#btn-batch-cards')?.addEventListener('click', openBatchCardModal);
+    $('#btn-file-cards')?.addEventListener('click', () => $('#file-cards-txt')?.click());
     $('#btn-settings')?.addEventListener('click', openSettingsModal);
     $('#btn-set-avatar')?.addEventListener('click', () => $('#file-avatar').click());
     $('#btn-set-bg')?.addEventListener('click', openBgModal);
-    cardsPanel.querySelectorAll('.card-btn.edit').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); openCardModal('edit', b.dataset.t, +b.dataset.i); }));
+    $('#btn-edit-status')?.addEventListener('click', openStatusModal);
+    $('#btn-moments')?.addEventListener('click', () => openMomentsPage());
+    cardsPanel.querySelectorAll('.card-btn.edit').forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation(); openCardModal('edit', b.dataset.t, +b.dataset.i);
+    }));
     cardsPanel.querySelectorAll('.card-btn.delete').forEach(b => b.addEventListener('click', e => {
       e.stopPropagation(); if (!confirm('删除？')) return;
-      const arr = b.dataset.t==='interaction' ? c.interactionCards : c.cards; arr.splice(+b.dataset.i,1); saveData(); renderCardsPanel();
+      if (b.dataset.t === 'interaction') c.interactionCards.splice(+b.dataset.i, 1);
+      else {
+        const arr = c.cardGroups[state.activeCardGroup] || [];
+        arr.splice(+b.dataset.i, 1);
+        c.cardGroups[state.activeCardGroup] = arr;
+        c.cards = Object.values(c.cardGroups).flat();
+      }
+      saveData(); renderCardsPanel();
     }));
     cardsPanel.querySelectorAll('.fav-song-item').forEach(el => el.addEventListener('click', () => {
       openListenWithContact(el.dataset.sid, c.id);
     }));
   }
   function openCardModal(mode, type, index) {
-    state.modalMode = mode==='edit'?'card-edit':'card-add'; state.editingCardType=type; state.editingCardIndex=mode==='edit'?index:null;
-    modalTitle.textContent = (mode==='edit'?'编辑':'添加') + (type==='interaction'?'互动字卡':'字卡');
+    state.modalMode = mode === 'edit' ? 'card-edit' : 'card-add';
+    state.editingCardType = type;
+    state.editingCardIndex = mode === 'edit' ? index : null;
+    modalTitle.textContent = (mode === 'edit' ? '编辑' : '添加') + (type === 'interaction' ? '互动字卡' : '字卡');
     modalBody.innerHTML = `<textarea id="modal-input" rows="3" placeholder="内容"></textarea>`;
     const input = $('#modal-input');
-    if (mode==='edit') { const c=state.contacts.find(x=>x.id===state.currentContactId); const arr=type==='interaction'?c.interactionCards:c.cards; input.value=arr[index]||''; }
-    modalOverlay.classList.remove('hidden'); input.focus();
+    if (mode === 'edit') {
+      const c = state.contacts.find(x => x.id === state.currentContactId);
+      const arr = type === 'interaction' ? c.interactionCards : (c.cardGroups[state.activeCardGroup] || []);
+      input.value = arr[index] || '';
+    }
+    modalOverlay.classList.remove('hidden');
+    input.focus();
+  }
+
+  function openBatchCardModal() {
+    state.modalMode = 'batch-cards';
+    modalTitle.textContent = '批量导入字卡（每行一条）';
+    modalBody.innerHTML = `<textarea id="modal-input" rows="8" placeholder="一行一条字卡内容"></textarea>
+      <div class="form-row" style="font-size:12px;color:var(--muted)">将导入到当前分组「${escapeHtml(state.activeCardGroup)}」</div>`;
+    modalOverlay.classList.remove('hidden');
+  }
+
+  function openStatusModal() {
+    const c = state.contacts.find(x => x.id === state.currentContactId);
+    if (!c) return;
+    state.modalMode = 'status';
+    modalTitle.textContent = '状态列表（每行一个）';
+    modalBody.innerHTML = `<textarea id="modal-input" rows="5">${escapeHtml((c.statuses || DEFAULT_STATUSES).join('\n'))}</textarea>`;
+    modalOverlay.classList.remove('hidden');
   }
   function openSettingsModal() {
     const c = state.contacts.find(x => x.id === state.currentContactId); if (!c) return;
@@ -1076,19 +1227,284 @@
       saveData(); renderCardsPanel(); closeModal(); return;
     }
     if (state.modalMode === 'card-add' || state.modalMode === 'card-edit') {
-      const text = ($('#modal-input')?.value||'').trim(); if(!text){alert('不能为空');return;}
-      const c = state.contacts.find(x=>x.id===state.currentContactId); if(!c) return;
-      const arr = state.editingCardType==='interaction' ? (c.interactionCards||(c.interactionCards=[])) : c.cards;
-      if (state.modalMode==='card-add') arr.push(text); else arr[state.editingCardIndex]=text;
+      const text = ($('#modal-input')?.value || '').trim();
+      if (!text) { alert('不能为空'); return; }
+      const c = state.contacts.find(x => x.id === state.currentContactId);
+      if (!c) return;
+      ensureContactShape(c);
+      if (state.editingCardType === 'interaction') {
+        if (!c.interactionCards) c.interactionCards = [];
+        if (state.modalMode === 'card-add') c.interactionCards.push(text);
+        else c.interactionCards[state.editingCardIndex] = text;
+      } else {
+        if (!c.cardGroups[state.activeCardGroup]) c.cardGroups[state.activeCardGroup] = [];
+        const arr = c.cardGroups[state.activeCardGroup];
+        if (state.modalMode === 'card-add') arr.push(text);
+        else arr[state.editingCardIndex] = text;
+        c.cards = Object.values(c.cardGroups).flat();
+      }
       saveData(); renderCardsPanel(); closeModal();
+      return;
+    }
+    if (state.modalMode === 'batch-cards') {
+      const raw = ($('#modal-input')?.value || '');
+      const lines = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      if (!lines.length) { alert('没有内容'); return; }
+      const c = state.contacts.find(x => x.id === state.currentContactId);
+      if (!c) return;
+      ensureContactShape(c);
+      if (!c.cardGroups[state.activeCardGroup]) c.cardGroups[state.activeCardGroup] = [];
+      c.cardGroups[state.activeCardGroup].push(...lines);
+      c.cards = Object.values(c.cardGroups).flat();
+      saveData(); renderCardsPanel(); closeModal();
+      return;
+    }
+    if (state.modalMode === 'status') {
+      const lines = ($('#modal-input')?.value || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const c = state.contacts.find(x => x.id === state.currentContactId);
+      if (!c) return;
+      c.statuses = lines.length ? lines : DEFAULT_STATUSES.slice();
+      if (!c.statuses.includes(c.currentStatus)) c.currentStatus = c.statuses[0];
+      saveData(); renderCardsPanel(); renderContactsList(); closeModal();
+      return;
     }
   }
 
   function updateStats() {
-    const sc=$('#stat-contacts'), sk=$('#stat-cards'), ss=$('#stat-songs');
+    const sc = $('#stat-contacts'), sk = $('#stat-cards'), ss = $('#stat-songs');
     if (sc) sc.textContent = state.contacts.length;
-    if (sk) sk.textContent = state.contacts.reduce((n,c)=>n+(c.cards?.length||0)+(c.interactionCards?.length||0),0);
+    if (sk) sk.textContent = state.contacts.reduce((n, c) => {
+      const n1 = c.cardGroups ? Object.values(c.cardGroups).flat().length : (c.cards?.length || 0);
+      return n + n1 + (c.interactionCards?.length || 0);
+    }, 0);
     if (ss) ss.textContent = state.songs.length;
+  }
+
+  function hideStickerPanel() {
+    $('#sticker-panel')?.classList.add('hidden');
+  }
+
+  function renderStickerPanel() {
+    const panel = $('#sticker-panel');
+    if (!panel) return;
+    const list = state.stickers || [];
+    if (!list.length) {
+      panel.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px">暂无表情，请在「我」页管理导入</div>';
+      return;
+    }
+    panel.innerHTML = list.map(s =>
+      `<div class="sticker-item" data-id="${s.id}"><img src="${s.data}" alt=""/></div>`
+    ).join('');
+    panel.querySelectorAll('.sticker-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const st = state.stickers.find(x => x.id === el.dataset.id);
+        if (!st || !state.chatContactId) return;
+        const msg = { id: genId('m'), from: 'user', type: 'sticker', stickerId: st.id, stickerData: st.data, time: Date.now() };
+        pushMsg(msg); appendMessage(msg); hideStickerPanel();
+        const c = state.contacts.find(x => x.id === state.chatContactId);
+        if (c) scheduleReplies(c);
+      });
+    });
+  }
+
+  function toggleStickerPanel() {
+    const panel = $('#sticker-panel');
+    if (!panel) return;
+    if (panel.classList.contains('hidden')) {
+      hideAttachPanel();
+      renderStickerPanel();
+      panel.classList.remove('hidden');
+    } else panel.classList.add('hidden');
+  }
+
+  function startStatusRotation() {
+    if (state.statusTimer) clearInterval(state.statusTimer);
+    state.statusTimer = setInterval(() => {
+      state.contacts.forEach(c => {
+        if (!c.statuses || c.statuses.length < 2) return;
+        if (Math.random() < 0.35) {
+          c.currentStatus = c.statuses[Math.floor(Math.random() * c.statuses.length)];
+        }
+      });
+      saveData();
+      if ($('#page-contacts')?.classList.contains('active')) renderContactsList();
+      if (state.chatContactId) {
+        const c = state.contacts.find(x => x.id === state.chatContactId);
+        if (c) {
+          const st = c.currentStatus ? ` · ${c.currentStatus}` : '';
+          pageTitle.innerHTML = `${escapeHtml(c.name)}<span class="header-status">${escapeHtml(st)}</span>`;
+        }
+      }
+    }, 45000 + Math.random() * 30000);
+  }
+
+  function openMomentsPage() {
+    const page = $('#moments-page');
+    if (!page) return;
+    page.classList.remove('hidden');
+    renderMoments();
+  }
+
+  function closeMomentsPage() {
+    $('#moments-page')?.classList.add('hidden');
+  }
+
+  function genRandomMoment() {
+    const c = state.contacts[Math.floor(Math.random() * state.contacts.length)];
+    if (!c) return null;
+    const pool = getContactCardPool(c);
+    const text = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '今天天气不错。';
+    let stickerData = null, stickerId = null;
+    if ((state.stickers || []).length && Math.random() < 0.35) {
+      const st = state.stickers[Math.floor(Math.random() * state.stickers.length)];
+      stickerId = st.id; stickerData = st.data;
+    }
+    return {
+      id: genId('mo'), contactId: c.id, text, stickerId, stickerData,
+      time: Date.now() - Math.floor(Math.random() * 86400000 * 3),
+      likes: [], comments: []
+    };
+  }
+
+  function renderMoments() {
+    const list = $('#moments-list');
+    if (!list) return;
+    if (!state.moments) state.moments = [];
+    if (state.moments.length < 3) {
+      for (let i = 0; i < 3; i++) {
+        const m = genRandomMoment();
+        if (m) state.moments.unshift(m);
+      }
+      saveData();
+    }
+    const sorted = state.moments.slice().sort((a, b) => b.time - a.time);
+    list.innerHTML = sorted.map(m => {
+      const c = state.contacts.find(x => x.id === m.contactId);
+      const name = c ? c.name : '未知';
+      const liked = (m.likes || []).includes('me');
+      return `<div class="moment-card" data-id="${m.id}">
+        <div class="moment-head">${c ? renderAvatarEl(c) : ''}<span class="moment-name">${escapeHtml(name)}</span>
+          <span class="moment-time">${formatTime(m.time)}</span></div>
+        <div class="moment-text">${escapeHtml(m.text || '')}</div>
+        ${m.stickerData ? `<div class="moment-sticker"><img src="${m.stickerData}"/></div>` : ''}
+        <div class="moment-actions">
+          <button data-act="like">${liked ? '已赞' : '赞'}</button>
+          <button data-act="comment">评论</button>
+        </div>
+        ${(m.likes || []).length ? `<div class="moment-likes">♥ ${(m.likes || []).length} 人觉得很赞</div>` : ''}
+        <div class="moment-comments">${(m.comments || []).map(cm =>
+          `<div class="moment-comment"><span class="who">${escapeHtml(cm.from)}</span>${escapeHtml(cm.text)}</div>`
+        ).join('')}</div>
+      </div>`;
+    }).join('') || '<div class="empty-state small"><p>暂无动态</p></div>';
+
+    list.querySelectorAll('.moment-card').forEach(card => {
+      const id = card.dataset.id;
+      const m = state.moments.find(x => x.id === id);
+      if (!m) return;
+      card.querySelector('[data-act="like"]')?.addEventListener('click', () => {
+        if (!m.likes) m.likes = [];
+        if (m.likes.includes('me')) m.likes = m.likes.filter(x => x !== 'me');
+        else m.likes.push('me');
+        saveData(); renderMoments();
+      });
+      card.querySelector('[data-act="comment"]')?.addEventListener('click', () => {
+        const text = prompt('说点什么');
+        if (!text || !text.trim()) return;
+        if (!m.comments) m.comments = [];
+        m.comments.push({ from: '我', text: text.trim(), time: Date.now() });
+        // 联系人回复
+        const c = state.contacts.find(x => x.id === m.contactId);
+        if (c && Math.random() < 0.7) {
+          setTimeout(() => {
+            const pool = getContactCardPool(c);
+            const reply = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '收到~';
+            m.comments.push({ from: c.name, text: reply, time: Date.now() });
+            saveData(); renderMoments();
+          }, 800 + Math.random() * 1200);
+        }
+        saveData(); renderMoments();
+      });
+    });
+  }
+
+  function exportBackup() {
+    const payload = buildPersistPayload();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `zijian-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function importBackupFile(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const p = JSON.parse(reader.result);
+        const data = normalizeLoaded(p);
+        state.contacts = data.contacts;
+        state.songs = data.songs;
+        state.chats = data.chats;
+        state.stickers = data.stickers || [];
+        state.moments = data.moments || [];
+        state.userBalance = data.userBalance;
+        state.theme = data.theme;
+        state.playMode = data.playMode || 'order';
+        applyTheme(state.theme);
+        saveData();
+        renderContactsList(); renderCardsPanel(); renderChatList(); renderSongList(); updateStats(); updateThemeUI();
+        alert('备份已恢复');
+      } catch (e) {
+        alert('导入失败：' + e.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function enableFloatDrag() {
+    const el = $('#float-player');
+    if (!el) return;
+    let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+    const onStart = (x, y) => {
+      dragging = true;
+      const r = el.getBoundingClientRect();
+      ox = r.left; oy = r.top; sx = x; sy = y;
+      el.style.left = ox + 'px';
+      el.style.top = oy + 'px';
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+      el.style.transform = 'none';
+    };
+    const onMove = (x, y) => {
+      if (!dragging) return;
+      let nx = ox + (x - sx);
+      let ny = oy + (y - sy);
+      nx = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, nx));
+      ny = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, ny));
+      el.style.left = nx + 'px';
+      el.style.top = ny + 'px';
+    };
+    const onEnd = () => { dragging = false; };
+    el.addEventListener('mousedown', e => {
+      if (e.target.closest('button')) return;
+      onStart(e.clientX, e.clientY);
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', onEnd);
+    el.addEventListener('touchstart', e => {
+      if (e.target.closest('button')) return;
+      const t = e.touches[0];
+      onStart(t.clientX, t.clientY);
+    }, { passive: true });
+    window.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      const t = e.touches[0];
+      onMove(t.clientX, t.clientY);
+    }, { passive: true });
+    window.addEventListener('touchend', onEnd);
   }
 
   /** 压缩图片：保持原始比例缩小，展示端用 CSS background-size:cover */
@@ -1132,9 +1548,12 @@
   async function init() {
     const data = await loadDataAsync();
     state.contacts = data.contacts; state.songs = data.songs; state.chats = data.chats;
+    state.stickers = data.stickers || []; state.moments = data.moments || [];
     state.userBalance = data.userBalance; state.theme = data.theme;
     state.playMode = data.playMode || 'order';
     applyTheme(state.theme);
+    startStatusRotation();
+    enableFloatDrag();
 
     $$('.tab-item').forEach(t => t.addEventListener('click', () => switchPage(t.dataset.page)));
     btnBack.addEventListener('click', leaveChat);
@@ -1227,6 +1646,56 @@
     listenSeek.addEventListener('input', () => {
       if (!listenAudio.duration) return;
       listenAudio.currentTime = (listenSeek.value / 100) * listenAudio.duration;
+    });
+
+    // 表情 / 备份 / 朋友圈 / 红包
+    $('#btn-sticker')?.addEventListener('click', toggleStickerPanel);
+    $('#btn-export-data')?.addEventListener('click', exportBackup);
+    $('#btn-import-data')?.addEventListener('click', () => $('#file-backup')?.click());
+    $('#file-backup')?.addEventListener('change', e => {
+      const f = e.target.files?.[0]; e.target.value = '';
+      if (f) importBackupFile(f);
+    });
+    $('#file-cards-txt')?.addEventListener('change', e => {
+      const f = e.target.files?.[0]; e.target.value = '';
+      if (!f) return;
+      const c = state.contacts.find(x => x.id === state.currentContactId);
+      if (!c) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const lines = String(reader.result || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        ensureContactShape(c);
+        if (!c.cardGroups[state.activeCardGroup]) c.cardGroups[state.activeCardGroup] = [];
+        c.cardGroups[state.activeCardGroup].push(...lines);
+        c.cards = Object.values(c.cardGroups).flat();
+        saveData(); renderCardsPanel();
+        alert(`已导入 ${lines.length} 条字卡`);
+      };
+      reader.readAsText(f);
+    });
+    $('#btn-manage-stickers')?.addEventListener('click', () => $('#file-stickers')?.click());
+    $('#file-stickers')?.addEventListener('change', async e => {
+      const files = Array.from(e.target.files || []);
+      e.target.value = '';
+      if (!files.length) return;
+      for (const f of files.slice(0, 40)) {
+        try {
+          const data = await compressImage(f, 200, 0.7);
+          state.stickers.push({ id: genId('st'), data });
+        } catch (_) {}
+      }
+      saveData();
+      alert(`已导入表情，当前共 ${state.stickers.length} 个`);
+    });
+    $('#moments-back')?.addEventListener('click', closeMomentsPage);
+    $('#moments-refresh')?.addEventListener('click', () => {
+      const m = genRandomMoment();
+      if (m) { state.moments.unshift(m); saveData(); }
+      renderMoments();
+    });
+    $('#rp-open-close')?.addEventListener('click', () => $('#rp-open-overlay')?.classList.add('hidden'));
+    $('#rp-open-overlay')?.addEventListener('click', e => {
+      if (e.target === $('#rp-open-overlay')) e.target.classList.add('hidden');
     });
 
     switchPage('chat');
