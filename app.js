@@ -102,6 +102,7 @@
     if (!Array.isArray(c.cards)) c.cards = Object.values(c.cardGroups).flat();
     if (!Array.isArray(c.statuses) || !c.statuses.length) c.statuses = DEFAULT_STATUSES.slice();
     if (!c.currentStatus) c.currentStatus = c.statuses[0];
+    if (typeof c.balance !== 'number' || isNaN(c.balance)) c.balance = 8888;
     return c;
   }
 
@@ -333,7 +334,10 @@
   function applyTheme(name) {
     if (!THEMES.includes(name)) name = 'classic';
     state.theme = name;
-    app.setAttribute('data-theme', name);
+    // 同时写在 html 与 #app，保证全局 CSS 变量生效
+    document.documentElement.setAttribute('data-theme', name);
+    if (app) app.setAttribute('data-theme', name);
+    document.body && document.body.setAttribute('data-theme', name);
   }
   function updateThemeUI() {
     $$('.theme-card').forEach(c => c.classList.toggle('active', c.dataset.theme === state.theme));
@@ -492,6 +496,7 @@
     if (!body || !page) return;
     body.innerHTML = `
       <div class="settings-section-title">资料</div>
+      <div class="settings-cell"><span>对方星币</span><span class="val">${ensureContactShape(c).balance ?? 0} ★</span></div>
       <div class="settings-cell" id="cs-avatar"><span>设置头像</span><span class="val">›</span></div>
       <div class="settings-cell" id="cs-bg"><span>设置聊天背景</span><span class="val">›</span></div>
       <div class="settings-cell" id="cs-status"><span>状态</span><span class="val">${escapeHtml(c.currentStatus || '')} ›</span></div>
@@ -563,15 +568,27 @@
     if (m.type === 'image') {
       return `<div class="msg-bubble msg-photo" style="padding:4px;background:transparent;box-shadow:none"><img src="${m.imageData || ''}" alt="图片"/></div>`;
     }
-    if (m.type === 'transfer') {
-      const opened = m.opened ? ' opened' : '';
-      const label = m.opened ? '已收款' : (m.from === 'user' ? '转账给对方' : '点击收款');
-      return `<div class="msg-bubble msg-transfer${opened}" data-money-id="${m.id}"><div class="tf-label">${label}</div><div class="tf-amount">${m.amount}<span class="tf-unit"> 星币</span></div>${m.note?`<div class="tf-note">${escapeHtml(m.note)}</div>`:''}</div>`;
-    }
-    if (m.type === 'redpacket') {
-      const opened = m.opened ? ' opened' : '';
-      const title = m.opened ? '已领取' : (m.note || '恭喜发财');
-      return `<div class="msg-bubble msg-redpacket${opened}" data-money-id="${m.id}"><div class="rp-icon">🧧</div><div class="rp-body"><div class="rp-title">${escapeHtml(title)}</div><div class="rp-amount">${m.opened ? m.amount + ' 星币' : '点击拆开'}</div></div></div>`;
+    if (m.type === 'transfer' || m.type === 'redpacket') {
+      const st = m.moneyStatus || (m.opened ? 'accepted' : 'pending');
+      const isTf = m.type === 'transfer';
+      let label;
+      if (st === 'accepted') label = isTf ? '已收款' : '已领取';
+      else if (st === 'returned') label = '已退还';
+      else if (m.from === 'user') label = isTf ? '转账给对方' : (m.note || '红包');
+      else label = isTf ? '转账给你' : (m.note || '红包');
+      let extra = '';
+      if (st === 'pending' && m.from === 'contact') {
+        extra = `<div class="msg-money-actions">
+          <button type="button" class="btn-accept" data-money-act="accept">接收</button>
+          <button type="button" class="btn-return" data-money-act="return">退还</button>
+        </div>`;
+      } else if (st === 'pending' && m.from === 'user') {
+        extra = `<div class="tf-note" style="opacity:.85;font-size:11px">等待对方处理…</div>`;
+      }
+      if (isTf) {
+        return `<div class="msg-bubble msg-transfer ${st}" data-money-id="${m.id}"><div class="tf-label">${label}</div><div class="tf-amount">${m.amount}<span class="tf-unit"> 星币</span></div>${m.note && st==='pending'?`<div class="tf-note">${escapeHtml(m.note)}</div>`:''}${extra}</div>`;
+      }
+      return `<div class="msg-bubble msg-redpacket ${st}" data-money-id="${m.id}"><div class="rp-icon">🧧</div><div class="rp-body"><div class="rp-title">${escapeHtml(label)}</div><div class="rp-amount">${m.amount} 星币</div>${extra}</div></div>`;
     }
     let q = '';
     if (m.quote) {
@@ -580,26 +597,115 @@
     }
     return `<div class="msg-bubble">${q}${escapeHtml(m.text||'')}</div>`;
   }
+
+  function refreshMoneyRow(msgId) {
+    if (!state.chatContactId) return;
+    const row = messageList?.querySelector(`.msg-row[data-id="${msgId}"]`);
+    const msgs = state.chats[state.chatContactId] || [];
+    const m = msgs.find(x => x.id === msgId);
+    if (!row || !m) return;
+    const av = row.querySelector('.msg-avatar');
+    const avHtml = av ? av.outerHTML : msgAvatarHtml(m.from);
+    const cls = m.from === 'user' ? 'user' : 'contact';
+    const body = `<div class="msg-col">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div>${readStatusHtml(m)}</div>`;
+    row.innerHTML = cls === 'contact' ? avHtml + body : body + avHtml;
+    bindMsgRowEvents(row);
+  }
+
+  function settleMoney(msg, action) {
+    // action: accept | return
+    if (!msg || (msg.moneyStatus && msg.moneyStatus !== 'pending')) return;
+    const contactId = state.chatContactId;
+    const c = state.contacts.find(x => x.id === contactId);
+    if (!c) return;
+    ensureContactShape(c);
+    const amt = Number(msg.amount) || 0;
+    if (action === 'accept') {
+      msg.moneyStatus = 'accepted';
+      msg.opened = true;
+      if (msg.from === 'contact') {
+        // 用户收 → 用户加钱，联系人已在发送时扣过
+        state.userBalance = Math.round((state.userBalance + amt) * 100) / 100;
+      } else {
+        // 联系人收用户的 → 联系人加钱，用户发送时已扣
+        c.balance = Math.round((c.balance + amt) * 100) / 100;
+      }
+    } else {
+      msg.moneyStatus = 'returned';
+      msg.opened = true;
+      if (msg.from === 'contact') {
+        // 用户退还 → 钱回联系人
+        c.balance = Math.round((c.balance + amt) * 100) / 100;
+      } else {
+        // 联系人退还 → 钱回用户
+        state.userBalance = Math.round((state.userBalance + amt) * 100) / 100;
+      }
+    }
+    const ub = $('#user-balance');
+    if (ub) ub.textContent = state.userBalance;
+    saveData();
+    refreshMoneyRow(msg.id);
+    if (msg.type === 'redpacket' && action === 'accept' && msg.from === 'contact') {
+      const overlay = $('#rp-open-overlay');
+      if (overlay) {
+        $('#rp-open-amount').textContent = amt;
+        $('#rp-open-note').textContent = msg.note || '恭喜发财';
+        overlay.classList.remove('hidden');
+      }
+    }
+  }
+
+  function scheduleContactMoneyResponse(msg, contact) {
+    // 联系人处理用户发来的红包/转账
+    const delay = randomDelay(1.5, 5);
+    state.pendingTimers.push(setTimeout(() => {
+      if (!msg || msg.moneyStatus !== 'pending') return;
+      // 70% 接收，30% 退还
+      settleMoney(msg, Math.random() < 0.7 ? 'accept' : 'return');
+      if (state.chatContactId === contact.id) {
+        // settleMoney 已刷新
+      }
+    }, delay * 1000));
+  }
+
+  function tryContactSendMoney(contact) {
+    ensureContactShape(contact);
+    // 可能向系统申请星币
+    if (Math.random() < 0.15) {
+      const grant = Math.floor(Math.random() * 500000) + 1;
+      contact.balance = Math.round((contact.balance + grant) * 100) / 100;
+      saveData();
+    }
+    if (contact.balance < 1) return;
+    if (Math.random() > 0.12) return; // 低概率发钱
+    const kind = Math.random() < 0.5 ? 'redpacket' : 'transfer';
+    const maxAmt = Math.min(contact.balance, 200);
+    const amount = Math.round((Math.random() * maxAmt * 0.8 + 1) * 100) / 100;
+    contact.balance = Math.round((contact.balance - amount) * 100) / 100;
+    const msg = {
+      id: genId('m'), from: 'contact', type: kind, amount,
+      note: kind === 'redpacket' ? '恭喜发财' : '',
+      time: Date.now(), moneyStatus: 'pending', opened: false
+    };
+    if (!state.chats[contact.id]) state.chats[contact.id] = [];
+    state.chats[contact.id].push(msg);
+    saveData();
+    if (state.chatContactId === contact.id) appendMessage(msg);
+    else renderChatList();
+  }
+
   function bindMoneyOpen(row) {
     const el = row.querySelector('[data-money-id]');
     if (!el) return;
-    el.addEventListener('click', () => {
-      const id = el.getAttribute('data-money-id');
-      const msgs = state.chats[state.chatContactId] || [];
-      const m = msgs.find(x => x.id === id);
-      if (!m || m.opened) return;
-      m.opened = true;
-      saveData();
-      if (m.type === 'redpacket') {
-        const overlay = $('#rp-open-overlay');
-        $('#rp-open-amount').textContent = m.amount;
-        $('#rp-open-note').textContent = m.note || '恭喜发财';
-        overlay?.classList.remove('hidden');
-      }
-      // 刷新该气泡
-      row.innerHTML = `${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div>`;
-      bindMoneyOpen(row);
-      if (m.type !== 'redpacket') showListenToast && showListenToast('已收款');
+    el.querySelectorAll('[data-money-act]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = el.getAttribute('data-money-id');
+        const msgs = state.chats[state.chatContactId] || [];
+        const m = msgs.find(x => x.id === id);
+        if (!m) return;
+        settleMoney(m, btn.getAttribute('data-money-act'));
+      });
     });
   }
   function msgAvatarHtml(from) {
@@ -858,6 +964,7 @@
       item.className = 'contact-item' + (c.id === state.currentContactId ? ' active' : '');
       item.innerHTML = `${renderAvatarEl(c)}<div class="contact-name">${escapeHtml(c.name)}</div>
         <div class="contact-status">${escapeHtml(c.currentStatus || '')}</div>
+        <div class="contact-balance">${typeof c.balance==='number'?c.balance:8888} ★</div>
         <button class="contact-del" data-id="${c.id}" title="删除">✕</button>`;
       item.addEventListener('click', e => {
         if (e.target.closest('.contact-del')) return;
@@ -1495,14 +1602,23 @@
   function confirmModal() {
     if (state.modalMode === 'import-song') { confirmImportSong(); return; }
     if (state.modalMode === 'transfer' || state.modalMode === 'redpacket') {
-      const amount = parseFloat($('#money-amount')?.value)||0;
-      const note = ($('#money-note')?.value||'').trim();
-      if (amount<=0) { alert('金额无效'); return; }
-      const msg = { id:genId('m'), from:'user', type:state.modalMode, text:'', amount, note: note||(state.modalMode==='redpacket'?'恭喜发财':''), time:Date.now() };
-      if (state.userBalance >= amount) { state.userBalance = Math.round((state.userBalance-amount)*100)/100; }
+      const amount = parseFloat($('#money-amount')?.value) || 0;
+      const note = ($('#money-note')?.value || '').trim();
+      if (amount <= 0) { alert('金额无效'); return; }
+      if (state.userBalance < amount) { alert('星币不足'); return; }
+      state.userBalance = Math.round((state.userBalance - amount) * 100) / 100;
+      const ub = $('#user-balance'); if (ub) ub.textContent = state.userBalance;
+      const msg = {
+        id: genId('m'), from: 'user', type: state.modalMode, text: '',
+        amount, note: note || (state.modalMode === 'redpacket' ? '恭喜发财' : ''),
+        time: Date.now(), moneyStatus: 'pending', opened: false
+      };
       pushMsg(msg); appendMessage(msg); saveData(); closeModal();
-      const c = state.contacts.find(x=>x.id===state.chatContactId);
-      if (c) scheduleReplies(c,1);
+      const c = state.contacts.find(x => x.id === state.chatContactId);
+      if (c) {
+        scheduleContactMoneyResponse(msg, c);
+        scheduleReplies(c, 1);
+      }
       return;
     }
     if (state.modalMode === 'balance') {
@@ -1714,6 +1830,8 @@
         const last = state.lastProactiveAt[c.id] || 0;
         if (now - last < intervalMin * 60 * 1000) return;
         state.lastProactiveAt[c.id] = now;
+        // 概率发红包/转账
+        tryContactSendMoney(c);
         const pool = getContactCardPool(c);
         const stickers = state.stickers || [];
         let msg;

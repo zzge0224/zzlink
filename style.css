@@ -1,4 +1,11 @@
-:root, [data-theme="classic"] {
+:root {
+  --canvas:#141311; --chrome:#1C1A17; --paper:#F6F1E7; --ink:#1C1915;
+  --accent:#3D9A62; --accent-soft:rgba(61,154,98,.15); --seal:#B23A3A;
+  --muted:#8A8478; --border:#2A2824; --gold:#D4A84B;
+  --bubble-user:#3D9A62; --bubble-user-text:#fff;
+  --bubble-contact:#F6F1E7; --bubble-contact-text:#1C1915; --msg-list-bg:#141311;
+}
+[data-theme="classic"] {
   --canvas:#141311; --chrome:#1C1A17; --paper:#F6F1E7; --ink:#1C1915;
   --accent:#3D9A62; --accent-soft:rgba(61,154,98,.15); --seal:#B23A3A;
   --muted:#8A8478; --border:#2A2824; --gold:#D4A84B;
@@ -14,51 +21,57 @@
 }
 /* 海盐芝士 */
 [data-theme="seasalt"] {
-  --canvas:#f0f9ff; --chrome:#ffffff; --paper:#2a3a45; --ink:#2a3a45;
+  --canvas:#f0f9ff; --chrome:#ffffff; --paper:#3a4550; --ink:#3a4550;
   --accent:#c09ded; --accent-soft:rgba(192,157,237,.22); --seal:#c5e0e0;
-  --muted:#7a8a95; --border:#d5e5f0; --gold:#c5e0e0;
-  --bubble-user:#c09ded; --bubble-user-text:#fff;
-  --bubble-contact:#ffffff; --bubble-contact-text:#2a3a45; --msg-list-bg:#e8f4fc;
+  --muted:#8a9aa5; --border:#d0e4f0; --gold:#c5e0e0;
+  --bubble-user:#c09ded; --bubble-user-text:#ffffff;
+  --bubble-contact:#ffffff; --bubble-contact-text:#3a4550; --msg-list-bg:#e8f4fc;
+  --header-bg:#ffffff; --tab-bg:#ffffff;
 }
 /* 薄荷黑巧 */
 [data-theme="mintchoc"] {
   --canvas:#ddf6e8; --chrome:#fffef2; --paper:#3a2e22; --ink:#3a2e22;
-  --accent:#775c3c; --accent-soft:rgba(119,92,60,.18); --seal:#c4b39d;
-  --muted:#8a7a68; --border:#c8e0d0; --gold:#c4b39d;
+  --accent:#775c3c; --accent-soft:rgba(119,92,60,.16); --seal:#c4b39d;
+  --muted:#8a7a68; --border:#c5e0d0; --gold:#c4b39d;
   --bubble-user:#775c3c; --bubble-user-text:#fffef2;
-  --bubble-contact:#fffef2; --bubble-contact-text:#3a2e22; --msg-list-bg:#cfeede;
+  --bubble-contact:#fffef2; --bubble-contact-text:#3a2e22; --msg-list-bg:#cfeee0;
+  --header-bg:#fffef2; --tab-bg:#fffef2;
 }
 /* 芋泥小方 */
 [data-theme="taro"] {
-  --canvas:#f2ebff; --chrome:#fffef8; --paper:#3a3050; --ink:#3a3050;
-  --accent:#c6b6ce; --accent-soft:rgba(187,164,222,.25); --seal:#bba4de;
-  --muted:#8a8098; --border:#e0d4f0; --gold:#bba4de;
-  --bubble-user:#bba4de; --bubble-user-text:#fff;
-  --bubble-contact:#fffef8; --bubble-contact-text:#3a3050; --msg-list-bg:#ebe0fa;
+  --canvas:#f2ebff; --chrome:#fffef8; --paper:#3d3550; --ink:#3d3550;
+  --accent:#c6b6ce; --accent-soft:rgba(187,164,222,.28); --seal:#bba4de;
+  --muted:#8a8098; --border:#e2d6f2; --gold:#bba4de;
+  --bubble-user:#bba4de; --bubble-user-text:#ffffff;
+  --bubble-contact:#fffef8; --bubble-contact-text:#3d3550; --msg-list-bg:#ebe0fa;
+  --header-bg:#fffef8; --tab-bg:#fffef8;
 }
 /* 蜜桃荔枝 */
 [data-theme="peach"] {
   --canvas:#ffeded; --chrome:#faf2ed; --paper:#4a3038; --ink:#4a3038;
-  --accent:#fb88a3; --accent-soft:rgba(251,136,163,.2); --seal:#f8d7dc;
-  --muted:#a08088; --border:#f0d0d8; --gold:#f8d7dc;
-  --bubble-user:#fb88a3; --bubble-user-text:#fff;
-  --bubble-contact:#faf2ed; --bubble-contact-text:#4a3038; --msg-list-bg:#ffe0e6;
+  --accent:#fb88a3; --accent-soft:rgba(251,136,163,.22); --seal:#f8d7dc;
+  --muted:#a88890; --border:#f0d4dc; --gold:#f8d7dc;
+  --bubble-user:#fb88a3; --bubble-user-text:#ffffff;
+  --bubble-contact:#faf2ed; --bubble-contact-text:#4a3038; --msg-list-bg:#ffe0e8;
+  --header-bg:#faf2ed; --tab-bg:#faf2ed;
 }
 /* 柚见青柠 */
 [data-theme="yuzu"] {
-  --canvas:#f2fff5; --chrome:#d2fadc; --paper:#2a4030; --ink:#2a4030;
-  --accent:#5bb89a; --accent-soft:rgba(91,184,154,.2); --seal:#b7e8e2;
-  --muted:#6a9078; --border:#c0e8cc; --gold:#fafcb6;
-  --bubble-user:#5bb89a; --bubble-user-text:#fff;
-  --bubble-contact:#ffffff; --bubble-contact-text:#2a4030; --msg-list-bg:#e0f8e8;
+  --canvas:#f2fff5; --chrome:#ffffff; --paper:#2a4030; --ink:#2a4030;
+  --accent:#7bc4b0; --accent-soft:rgba(183,232,226,.35); --seal:#b7e8e2;
+  --muted:#6a9078; --border:#c8ead4; --gold:#fafcb6;
+  --bubble-user:#7bc4b0; --bubble-user-text:#ffffff;
+  --bubble-contact:#d2fadc; --bubble-contact-text:#2a4030; --msg-list-bg:#e0f8e8;
+  --header-bg:#ffffff; --tab-bg:#ffffff;
 }
 /* 蓝藻乳酪 */
 [data-theme="algae"] {
   --canvas:#c7d3d8; --chrome:#fcf9e6; --paper:#3a2418; --ink:#3a2418;
-  --accent:#6a7a88; --accent-soft:rgba(106,122,136,.2); --seal:#b0a597;
+  --accent:#b0a597; --accent-soft:rgba(176,165,151,.25); --seal:#3a2418;
   --muted:#6a6058; --border:#a8b4b8; --gold:#b0a597;
-  --bubble-user:#6a7a88; --bubble-user-text:#fcf9e6;
+  --bubble-user:#b0a597; --bubble-user-text:#fcf9e6;
   --bubble-contact:#fcf9e6; --bubble-contact-text:#3a2418; --msg-list-bg:#b8c4c8;
+  --header-bg:#fcf9e6; --tab-bg:#fcf9e6;
 }
 [data-theme="lavender"] {
   --canvas:#1A1625; --chrome:#241E33; --paper:#F0EBF8; --ink:#1E1A28;
@@ -707,5 +720,24 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 [data-theme="algae"] .tab-bar,
 [data-theme="cream"] .tab-bar {
   background: var(--chrome);
-  border-top-color: var(--border);
+  border-top: 1px solid var(--border);
 }
+[data-theme="seasalt"] .tab-item.active,
+[data-theme="mintchoc"] .tab-item.active,
+[data-theme="taro"] .tab-item.active,
+[data-theme="peach"] .tab-item.active,
+[data-theme="yuzu"] .tab-item.active,
+[data-theme="algae"] .tab-item.active,
+[data-theme="cream"] .tab-item.active {
+  color: var(--accent);
+}
+
+.msg-money-actions { display:flex; gap:8px; margin-top:8px; }
+.msg-money-actions button {
+  flex:1; border:none; border-radius:8px; padding:6px 0; font-size:12px; cursor:pointer;
+}
+.btn-accept { background:rgba(255,255,255,.25); color:#fff; }
+.btn-return { background:rgba(0,0,0,.15); color:#fff; }
+.msg-transfer.pending, .msg-redpacket.pending { opacity:1; }
+.msg-transfer.returned, .msg-redpacket.returned { opacity:.7; filter:grayscale(.3); }
+.contact-balance { font-size:11px; color:var(--accent); margin-top:2px; }
