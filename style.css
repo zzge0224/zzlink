@@ -378,3 +378,67 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
   font-size:11px; padding:4px 8px; border-radius:10px;
   border:1px solid var(--border); background:var(--chrome); color:var(--muted); cursor:pointer;
 }
+
+/* 互动页 · 发现列表 */
+.discover-page { flex:1; overflow-y:auto; background:var(--canvas); }
+.discover-list { margin-top:12px; }
+.discover-item {
+  width:100%; display:flex; align-items:center; gap:14px;
+  padding:14px 18px; background:var(--chrome); border:none;
+  border-bottom:1px solid var(--border); color:var(--paper);
+  font-size:15px; cursor:pointer; text-align:left;
+}
+.discover-item:active { background:var(--accent-soft); }
+.discover-icon { font-size:22px; width:28px; text-align:center; }
+.discover-label { flex:1; }
+.discover-arrow { color:var(--muted); font-size:18px; }
+.music-subpage { padding:12px 16px; }
+.music-subpage.hidden { display:none; }
+.discover-list.hidden { display:none; }
+
+.btn-header-more {
+  background:none; border:none; color:var(--paper); font-size:22px;
+  padding:4px 10px; cursor:pointer; line-height:1;
+}
+.btn-header-more.hidden { display:none; }
+
+.chat-settings-page {
+  position:fixed; inset:0; z-index:190; background:var(--canvas);
+  display:flex; flex-direction:column; max-width:480px; margin:0 auto; left:0; right:0;
+}
+.chat-settings-page.hidden { display:none; }
+.chat-settings-body { flex:1; overflow-y:auto; padding:12px 16px; }
+.settings-cell {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 12px; background:var(--chrome); border-bottom:1px solid var(--border);
+  font-size:14px; color:var(--paper); cursor:pointer;
+}
+.settings-cell .val { color:var(--muted); font-size:13px; max-width:50%; text-align:right; }
+.settings-section-title {
+  font-size:12px; color:var(--muted); padding:14px 12px 6px;
+}
+.settings-cell input[type=number] {
+  width:72px; background:var(--canvas); border:1px solid var(--border);
+  border-radius:8px; color:var(--paper); padding:4px 8px; font-size:13px; text-align:right;
+}
+.settings-cell input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent); }
+
+/* 悬浮窗拖拽修复：禁止在拖动时撑满 */
+.float-player {
+  position: fixed !important;
+  z-index: 150 !important;
+  width: auto !important;
+  max-width: 200px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 48px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+.float-player.dragging {
+  opacity: 0.92;
+  pointer-events: none; /* 子元素不抢事件，由 window 处理 move */
+}
+.float-player.dragging * {
+  pointer-events: none !important;
+}

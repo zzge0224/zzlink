@@ -14,7 +14,9 @@
         <div id="header-avatar" class="header-avatar hidden" title="双击拍一拍"></div>
         <h1 id="page-title">聊天</h1>
       </div>
-      <div class="header-right"></div>
+      <div class="header-right">
+        <button id="btn-chat-more" class="btn-header-more hidden" title="更多">⋯</button>
+      </div>
     </header>
 
     <main class="app-main">
@@ -59,16 +61,31 @@
         </div>
       </section>
 
-      <section id="page-music" class="page">
-        <div class="music-page">
-          <div class="music-page-toolbar">
-            <button class="btn-primary" id="btn-import-song">＋ 导入歌曲</button>
+      <section id="page-interact" class="page">
+        <div class="discover-page">
+          <div class="discover-list">
+            <button class="discover-item" id="btn-goto-moments">
+              <span class="discover-icon">🌈</span>
+              <span class="discover-label">朋友圈</span>
+              <span class="discover-arrow">›</span>
+            </button>
+            <button class="discover-item" id="btn-goto-music">
+              <span class="discover-icon">🎵</span>
+              <span class="discover-label">音乐</span>
+              <span class="discover-arrow">›</span>
+            </button>
           </div>
-          <div id="song-list" class="song-list"></div>
-          <div id="song-list-empty" class="empty-state">
-            <div class="empty-icon">🎵</div>
-            <p>还没有歌曲</p>
-            <p class="hint">导入直链音频（mp3/m4a 等），可填歌词 LRC</p>
+          <div id="music-subpage" class="music-subpage hidden">
+            <div class="music-page-toolbar">
+              <button class="btn-xs" id="btn-music-back">‹ 返回</button>
+              <button class="btn-primary" id="btn-import-song">＋ 导入歌曲</button>
+            </div>
+            <div id="song-list" class="song-list"></div>
+            <div id="song-list-empty" class="empty-state">
+              <div class="empty-icon">🎵</div>
+              <p>还没有歌曲</p>
+              <p class="hint">粘贴网易云链接导入</p>
+            </div>
           </div>
         </div>
       </section>
@@ -110,7 +127,7 @@
     <nav class="tab-bar">
       <button class="tab-item active" data-page="chat"><span class="tab-icon">💬</span><span class="tab-label">聊天</span></button>
       <button class="tab-item" data-page="contacts"><span class="tab-icon">📇</span><span class="tab-label">联系人</span></button>
-      <button class="tab-item" data-page="music"><span class="tab-icon">🎵</span><span class="tab-label">音乐</span></button>
+      <button class="tab-item" data-page="interact"><span class="tab-icon">✨</span><span class="tab-label">互动</span></button>
       <button class="tab-item" data-page="me"><span class="tab-icon">👤</span><span class="tab-label">我</span></button>
     </nav>
   </div>
@@ -204,6 +221,16 @@
   <input type="file" id="file-backup" accept="application/json,.json" class="hidden" />
   <input type="file" id="file-cards-txt" accept=".txt,text/plain" class="hidden" />
   <input type="file" id="file-stickers" accept="image/*" multiple class="hidden" />
+
+  
+  <div id="chat-settings-page" class="chat-settings-page hidden">
+    <div class="moments-top">
+      <button id="chat-settings-back" class="listen-back">‹</button>
+      <h2>聊天设置</h2>
+      <div style="width:40px"></div>
+    </div>
+    <div class="chat-settings-body" id="chat-settings-body"></div>
+  </div>
 
   <script src="app.js"></script>
 </body>

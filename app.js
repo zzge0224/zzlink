@@ -10,7 +10,16 @@
   const IDB_VERSION = 1;
   const DEFAULT_SETTINGS = { minDelay: 1.5, maxDelay: 4, maxReplies: 2 };
   const DEFAULT_INTERACTION = ['轻轻拍了拍', '重重拍了拍', '拍了拍', '戳了戳', '碰了碰'];
-  const DEFAULT_LISTEN = { pauseChance: 0.18, favoriteChance: 0.12, pauseDurationMax: 6 };
+  const DEFAULT_LISTEN = {
+    pauseChance: 0.18,
+    favoriteChance: 0.12,
+    pauseDurationMax: 6,
+    momentsChance: 0.15,
+    replyChance: 0.92,
+    readNoReplyChance: 0.08,
+    pokeChance: 0.1,
+    proactiveMsgChance: 0.05
+  };
   const THEMES = ['classic', 'dark', 'cream', 'lavender'];
 
   const SAMPLE_LRC = `[00:00.00]示例歌词第一行
@@ -349,15 +358,21 @@
     if (tab) tab.classList.add('active');
     btnBack.classList.add('hidden');
     headerAvatar.classList.add('hidden');
+    $('#btn-chat-more')?.classList.add('hidden');
     hideAttachPanel();
     hideMsgMenu();
+    // 互动页子视图重置
+    $('#music-subpage')?.classList.add('hidden');
+    $('.discover-list') && document.querySelector('.discover-list')?.classList.remove('hidden');
     if (name === 'chat') {
       if (state.chatContactId) enterChat(state.chatContactId);
       else { pageTitle.textContent = '聊天'; showChatListView(); renderChatList(); }
     } else if (name === 'contacts') {
       pageTitle.textContent = '联系人'; renderContactsList(); renderCardsPanel();
-    } else if (name === 'music') {
-      pageTitle.textContent = '音乐'; renderSongList();
+    } else if (name === 'interact') {
+      pageTitle.textContent = '互动';
+      document.querySelector('.discover-list')?.classList.remove('hidden');
+      $('#music-subpage')?.classList.add('hidden');
     } else if (name === 'me') {
       pageTitle.textContent = '我'; updateStats(); updateThemeUI();
       const ub = $('#user-balance'); if (ub) ub.textContent = state.userBalance;
@@ -398,6 +413,7 @@
   function showChatListView() {
     chatListView.classList.remove('hidden'); chatDetailView.classList.add('hidden');
     btnBack.classList.add('hidden'); headerAvatar.classList.add('hidden');
+    $('#btn-chat-more')?.classList.add('hidden');
     pageTitle.textContent = '聊天'; state.quotingMsg = null; updateQuoteBar();
   }
   function applyContactChatBg(id) {
@@ -431,10 +447,84 @@
     applyContactChatBg(id);
     if (!state.chats[id]) state.chats[id] = [];
     renderMessages(); msgInput.value = ''; hideAttachPanel(); hideStickerPanel(); state.quotingMsg = null; updateQuoteBar();
+    $('#btn-chat-more')?.classList.remove('hidden');
   }
   function leaveChat() {
     clearPendingTimers(); state.chatContactId = null; state.quotingMsg = null;
+    $('#btn-chat-more')?.classList.add('hidden');
     showChatListView(); renderChatList();
+  }
+
+  function openChatSettings() {
+    const c = state.contacts.find(x => x.id === state.chatContactId);
+    if (!c) return;
+    ensureContactShape(c);
+    const s = c.settings || DEFAULT_SETTINGS;
+    const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
+    const body = $('#chat-settings-body');
+    const page = $('#chat-settings-page');
+    if (!body || !page) return;
+    body.innerHTML = `
+      <div class="settings-section-title">资料</div>
+      <div class="settings-cell" id="cs-avatar"><span>设置头像</span><span class="val">›</span></div>
+      <div class="settings-cell" id="cs-bg"><span>设置聊天背景</span><span class="val">›</span></div>
+      <div class="settings-cell" id="cs-status"><span>状态</span><span class="val">${escapeHtml(c.currentStatus || '')} ›</span></div>
+      <div class="settings-section-title">回复</div>
+      <div class="settings-cell"><span>最小延迟(秒)</span><input type="number" id="cs-min" step="0.5" value="${s.minDelay}"/></div>
+      <div class="settings-cell"><span>最大延迟(秒)</span><input type="number" id="cs-max" step="0.5" value="${s.maxDelay}"/></div>
+      <div class="settings-cell"><span>每次最多回复条数</span><input type="number" id="cs-count" min="1" max="3" value="${s.maxReplies}"/></div>
+      <div class="settings-cell"><span>回复概率</span><input type="number" id="cs-reply" step="0.01" min="0" max="1" value="${lc.replyChance}"/></div>
+      <div class="settings-cell"><span>已读不回概率</span><input type="number" id="cs-noreply" step="0.01" min="0" max="1" value="${lc.readNoReplyChance}"/></div>
+      <div class="settings-section-title">互动概率</div>
+      <div class="settings-cell"><span>一起听·暂停概率</span><input type="number" id="cs-pause" step="0.01" min="0" max="1" value="${lc.pauseChance}"/></div>
+      <div class="settings-cell"><span>一起听·收藏概率</span><input type="number" id="cs-fav" step="0.01" min="0" max="1" value="${lc.favoriteChance}"/></div>
+      <div class="settings-cell"><span>暂停最长秒数</span><input type="number" id="cs-pdur" min="1" max="30" value="${lc.pauseDurationMax}"/></div>
+      <div class="settings-cell"><span>朋友圈发动态概率</span><input type="number" id="cs-moments" step="0.01" min="0" max="1" value="${lc.momentsChance}"/></div>
+      <div class="settings-cell"><span>主动拍一拍概率</span><input type="number" id="cs-poke" step="0.01" min="0" max="1" value="${lc.pokeChance}"/></div>
+      <div class="settings-cell"><span>主动发消息概率</span><input type="number" id="cs-proactive" step="0.01" min="0" max="1" value="${lc.proactiveMsgChance}"/></div>
+      <div style="padding:16px"><button class="btn-primary" id="cs-save" style="width:100%">保存</button></div>`;
+    page.classList.remove('hidden');
+
+    $('#cs-avatar')?.addEventListener('click', () => {
+      state.currentContactId = c.id;
+      $('#file-avatar')?.click();
+    });
+    $('#cs-bg')?.addEventListener('click', () => {
+      state.currentContactId = c.id;
+      openBgModal();
+    });
+    $('#cs-status')?.addEventListener('click', () => {
+      state.currentContactId = c.id;
+      openStatusModal();
+    });
+    $('#cs-save')?.addEventListener('click', () => {
+      const num = (id, def) => {
+        const v = parseFloat($(id)?.value);
+        return isNaN(v) ? def : v;
+      };
+      let min = Math.max(0.5, Math.min(30, num('#cs-min', 1.5)));
+      let max = Math.max(min, Math.min(60, num('#cs-max', 4)));
+      let count = Math.max(1, Math.min(3, parseInt($('#cs-count')?.value, 10) || 2));
+      c.settings = { minDelay: min, maxDelay: max, maxReplies: count };
+      const clamp01 = v => Math.max(0, Math.min(1, v));
+      c.listenConfig = {
+        pauseChance: clamp01(num('#cs-pause', 0.18)),
+        favoriteChance: clamp01(num('#cs-fav', 0.12)),
+        pauseDurationMax: Math.max(1, Math.min(30, num('#cs-pdur', 6))),
+        momentsChance: clamp01(num('#cs-moments', 0.15)),
+        replyChance: clamp01(num('#cs-reply', 0.92)),
+        readNoReplyChance: clamp01(num('#cs-noreply', 0.08)),
+        pokeChance: clamp01(num('#cs-poke', 0.1)),
+        proactiveMsgChance: clamp01(num('#cs-proactive', 0.05))
+      };
+      saveData();
+      page.classList.add('hidden');
+      alert('已保存');
+    });
+  }
+
+  function closeChatSettings() {
+    $('#chat-settings-page')?.classList.add('hidden');
   }
   function renderMsgBubble(m) {
     if (m.type === 'system' || m.type === 'poke') return `<div class="msg-system">${escapeHtml(m.text)}</div>`;
@@ -544,6 +634,11 @@
   function scheduleReplies(contact, forceCount) {
     clearPendingTimers();
     const s = contact.settings || DEFAULT_SETTINGS;
+    const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
+    // 已读不回
+    if (!forceCount && Math.random() < (lc.readNoReplyChance || 0)) return;
+    // 回复概率
+    if (!forceCount && Math.random() > (lc.replyChance == null ? 1 : lc.replyChance)) return;
     const maxR = Math.min(3, Math.max(1, s.maxReplies || 2));
     const count = forceCount || (Math.floor(Math.random() * maxR) + 1);
     const pool = getContactCardPool(contact);
@@ -628,15 +723,10 @@
     const favSongs = (c.favorites || []).map(fid => state.songs.find(s => s.id === fid)).filter(Boolean);
     cardsPanel.innerHTML = `
       <div class="cards-header"><h2>${escapeHtml(c.name)}</h2>
-        <button class="btn-xs" id="btn-moments">朋友圈</button>
-        <button class="btn-settings" id="btn-settings">设置</button>
+        <button class="btn-xs" id="btn-open-chat">去聊天</button>
       </div>
-      <div class="settings-summary">状态 <strong>${escapeHtml(c.currentStatus || '')}</strong> · 延迟 <strong>${s.minDelay}~${s.maxDelay}s</strong></div>
-      <div class="contact-custom-bar">
-        <button class="btn-custom" id="btn-set-avatar">头像</button>
-        <button class="btn-custom" id="btn-set-bg">背景</button>
-        <button class="btn-custom" id="btn-edit-status">状态</button>
-      </div>
+      <div class="settings-summary">状态 <strong>${escapeHtml(c.currentStatus || '')}</strong> · 字卡设置请在聊天页右上角 ⋯</div>
+      <div class="contact-custom-bar"></div>
       <div class="section-title">字卡分组</div>
       <div class="group-tabs" id="group-tabs">
         ${groups.map(g => `<button class="group-tab ${g === gName ? 'active' : ''}" data-g="${escapeHtml(g)}">${escapeHtml(g)}</button>`).join('')}
@@ -669,11 +759,10 @@
     $('#btn-add-inter')?.addEventListener('click', () => openCardModal('add', 'interaction'));
     $('#btn-batch-cards')?.addEventListener('click', openBatchCardModal);
     $('#btn-file-cards')?.addEventListener('click', () => $('#file-cards-txt')?.click());
-    $('#btn-settings')?.addEventListener('click', openSettingsModal);
-    $('#btn-set-avatar')?.addEventListener('click', () => $('#file-avatar').click());
-    $('#btn-set-bg')?.addEventListener('click', openBgModal);
-    $('#btn-edit-status')?.addEventListener('click', openStatusModal);
-    $('#btn-moments')?.addEventListener('click', () => openMomentsPage());
+    $('#btn-open-chat')?.addEventListener('click', () => {
+      switchPage('chat');
+      enterChat(c.id);
+    });
     cardsPanel.querySelectorAll('.card-btn.edit').forEach(b => b.addEventListener('click', e => {
       e.stopPropagation(); openCardModal('edit', b.dataset.t, +b.dataset.i);
     }));
@@ -1078,11 +1167,19 @@
 
   function showFloatPlayer() {
     const el = $('#float-player');
-    if (el) el.classList.remove('hidden');
+    if (!el) return;
+    el.classList.remove('hidden', 'dragging');
+    el.style.maxWidth = '200px';
+    el.style.maxHeight = '48px';
+    el.style.height = 'auto';
+    el.style.width = 'auto';
   }
   function hideFloatPlayer() {
     const el = $('#float-player');
-    if (el) el.classList.add('hidden');
+    if (el) {
+      el.classList.add('hidden');
+      el.classList.remove('dragging');
+    }
   }
   function updateFloatUI(song) {
     const t = $('#float-title');
@@ -1465,39 +1562,63 @@
 
   function enableFloatDrag() {
     const el = $('#float-player');
-    if (!el) return;
+    if (!el || el._dragBound) return;
+    el._dragBound = true;
     let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
-    const onStart = (x, y) => {
+    const W = () => Math.min(el.offsetWidth || 180, 200);
+    const H = () => Math.min(el.offsetHeight || 44, 48);
+
+    const onStart = (x, y, e) => {
+      // 点按钮不拖
+      if (e && e.target && e.target.closest && e.target.closest('button')) return false;
       dragging = true;
+      el.classList.add('dragging');
       const r = el.getBoundingClientRect();
-      ox = r.left; oy = r.top; sx = x; sy = y;
+      // 用实际可见尺寸，避免被错误撑开
+      ox = r.left;
+      oy = r.top;
+      sx = x;
+      sy = y;
+      el.style.width = W() + 'px';
+      el.style.maxWidth = '200px';
+      el.style.height = 'auto';
+      el.style.maxHeight = '48px';
       el.style.left = ox + 'px';
       el.style.top = oy + 'px';
       el.style.right = 'auto';
       el.style.bottom = 'auto';
       el.style.transform = 'none';
+      el.style.margin = '0';
+      return true;
     };
     const onMove = (x, y) => {
       if (!dragging) return;
+      const w = W(), h = H();
       let nx = ox + (x - sx);
       let ny = oy + (y - sy);
-      nx = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, nx));
-      ny = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, ny));
+      nx = Math.max(4, Math.min(window.innerWidth - w - 4, nx));
+      ny = Math.max(4, Math.min(window.innerHeight - h - 4, ny));
       el.style.left = nx + 'px';
       el.style.top = ny + 'px';
+      el.style.width = w + 'px';
+      el.style.maxHeight = '48px';
     };
-    const onEnd = () => { dragging = false; };
+    const onEnd = () => {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove('dragging');
+      el.style.pointerEvents = '';
+    };
+
     el.addEventListener('mousedown', e => {
-      if (e.target.closest('button')) return;
-      onStart(e.clientX, e.clientY);
+      if (!onStart(e.clientX, e.clientY, e)) return;
       e.preventDefault();
     });
     window.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
     window.addEventListener('mouseup', onEnd);
     el.addEventListener('touchstart', e => {
-      if (e.target.closest('button')) return;
       const t = e.touches[0];
-      onStart(t.clientX, t.clientY);
+      if (!onStart(t.clientX, t.clientY, e)) return;
     }, { passive: true });
     window.addEventListener('touchmove', e => {
       if (!dragging) return;
@@ -1505,6 +1626,7 @@
       onMove(t.clientX, t.clientY);
     }, { passive: true });
     window.addEventListener('touchend', onEnd);
+    window.addEventListener('touchcancel', onEnd);
   }
 
   /** 压缩图片：保持原始比例缩小，展示端用 CSS background-size:cover */
@@ -1647,6 +1769,22 @@
       if (!listenAudio.duration) return;
       listenAudio.currentTime = (listenSeek.value / 100) * listenAudio.duration;
     });
+
+    // 互动页
+    $('#btn-goto-moments')?.addEventListener('click', openMomentsPage);
+    $('#btn-goto-music')?.addEventListener('click', () => {
+      document.querySelector('.discover-list')?.classList.add('hidden');
+      $('#music-subpage')?.classList.remove('hidden');
+      pageTitle.textContent = '音乐';
+      renderSongList();
+    });
+    $('#btn-music-back')?.addEventListener('click', () => {
+      $('#music-subpage')?.classList.add('hidden');
+      document.querySelector('.discover-list')?.classList.remove('hidden');
+      pageTitle.textContent = '互动';
+    });
+    $('#btn-chat-more')?.addEventListener('click', openChatSettings);
+    $('#chat-settings-back')?.addEventListener('click', closeChatSettings);
 
     // 表情 / 备份 / 朋友圈 / 红包
     $('#btn-sticker')?.addEventListener('click', toggleStickerPanel);
