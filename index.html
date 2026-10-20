@@ -92,14 +92,28 @@
 
       <section id="page-me" class="page">
         <div class="me-content">
-          <div class="avatar-large" id="me-avatar" style="background:#3D9A62" title="点击更换头像">昕</div>
-          <h2 id="me-name">昕</h2>
-          <p class="hint" style="font-size:12px;color:var(--muted);margin-bottom:8px">点击头像可更换</p>
-          <p class="subtitle">字笺 · 纸上心意</p>
-          <div class="balance-card">
-            <div class="balance-label">我的星币</div>
-            <div class="balance-value"><span id="user-balance">888</span><span class="balance-unit">★</span></div>
-            <button class="btn-sm" id="btn-edit-balance">修改余额</button>
+          <div class="me-profile-card">
+            <div class="me-profile-row">
+              <div class="avatar-large" id="me-avatar" style="background:#3D9A62" title="点击更换头像">昕</div>
+              <div class="me-profile-info">
+                <h2 id="me-name">昕</h2>
+                <p class="me-id">字笺 · 纸上心意</p>
+                <p class="me-hint">点击头像更换</p>
+              </div>
+            </div>
+            <div class="me-balance-row">
+              <div class="me-balance-left">
+                <span class="me-balance-label">星币</span>
+                <span class="me-balance-num"><span id="user-balance">888</span> ★</span>
+              </div>
+              <button class="btn-sm" id="btn-edit-balance">充值/修改</button>
+            </div>
+          </div>
+          <div class="me-menu">
+            <button class="me-menu-item" id="btn-manage-stickers"><span class="mm-icon">😊</span><span>表情包</span><span class="mm-arrow">›</span></button>
+            <button class="me-menu-item" id="btn-moments-cover"><span class="mm-icon">🖼️</span><span>朋友圈封面</span><span class="mm-arrow">›</span></button>
+            <button class="me-menu-item" id="btn-export-data"><span class="mm-icon">📦</span><span>导出备份</span><span class="mm-arrow">›</span></button>
+            <button class="me-menu-item" id="btn-import-data"><span class="mm-icon">📥</span><span>导入备份</span><span class="mm-arrow">›</span></button>
           </div>
           <div class="theme-section">
             <div class="section-label">主题皮肤</div>
@@ -114,11 +128,6 @@
             <div class="stat-item"><span class="stat-num" id="stat-contacts">0</span><span class="stat-label">联系人</span></div>
             <div class="stat-item"><span class="stat-num" id="stat-cards">0</span><span class="stat-label">字卡</span></div>
             <div class="stat-item"><span class="stat-num" id="stat-songs">0</span><span class="stat-label">歌曲</span></div>
-          </div>
-          <div class="toolbar-row" style="justify-content:center;margin-bottom:16px">
-            <button class="btn-xs" id="btn-export-data">导出备份 JSON</button>
-            <button class="btn-xs" id="btn-import-data">导入备份 JSON</button>
-            <button class="btn-xs" id="btn-manage-stickers">管理表情包</button>
           </div>
           <button class="btn-outline" id="btn-reset-data">重置示例数据</button>
         </div>
@@ -201,13 +210,27 @@
   
   <!-- 朋友圈 -->
   <div id="moments-page" class="moments-page hidden">
-    <div class="moments-top">
+    <div class="moments-top transparent">
       <button id="moments-back" class="listen-back">‹</button>
       <h2>朋友圈</h2>
       <button id="moments-refresh" class="btn-xs">刷新</button>
     </div>
-    <div id="moments-list" class="moments-list"></div>
+    <div class="moments-scroll">
+      <div class="moments-cover" id="moments-cover">
+        <div class="moments-cover-user">
+          <span class="moments-cover-name" id="moments-cover-name">昕</span>
+          <div class="moments-cover-avatar" id="moments-cover-avatar">昕</div>
+        </div>
+      </div>
+      <div id="moments-list" class="moments-list"></div>
+    </div>
+    <div id="moment-comment-bar" class="moment-comment-bar hidden">
+      <input type="text" id="moment-comment-input" placeholder="发表评论：" />
+      <button id="moment-comment-sticker" class="mcb-btn" title="表情">☺</button>
+      <button id="moment-comment-send" class="mcb-send">发送</button>
+    </div>
   </div>
+  <input type="file" id="file-moments-cover" accept="image/*" class="hidden" />
 
   <!-- 红包打开 -->
   <div id="rp-open-overlay" class="rp-open-overlay hidden">

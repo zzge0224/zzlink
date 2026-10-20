@@ -123,7 +123,8 @@
       playMode: p.playMode || 'order',
       userAvatar: p.userAvatar || null,
       userName: p.userName || '昕',
-      lastProactiveAt: p.lastProactiveAt || {}
+      lastProactiveAt: p.lastProactiveAt || {},
+      momentsCover: p.momentsCover || null
     };
   }
 
@@ -186,7 +187,8 @@
       userAvatar: state.userAvatar || null,
       userName: state.userName || '昕',
       lastProactiveAt: state.lastProactiveAt || {},
-      _v: 9
+      momentsCover: state.momentsCover || null,
+      _v: 10
     };
   }
 
@@ -732,18 +734,32 @@
     }
   }
   function doPoke() {
-    const c = state.contacts.find(x => x.id === state.chatContactId); if (!c) return;
-    const poke = { id:genId('m'), from:'system', type:'poke', text:`你拍了拍 ${c.name}`, time:Date.now() };
-    pushMsg(poke); appendMessage(poke);
+    const c = state.contacts.find(x => x.id === state.chatContactId);
+    if (!c) return;
+    // 防双击/多入口重复触发
+    const now = Date.now();
+    if (doPoke._last && now - doPoke._last < 800) return;
+    doPoke._last = now;
+    const poke = { id: genId('m'), from: 'system', type: 'poke', text: `你拍了拍 ${c.name}`, time: now };
+    pushMsg(poke);
+    appendMessage(poke);
+    const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
     state.pendingTimers.push(setTimeout(() => {
       if (state.chatContactId !== c.id) return;
-      if (Math.random() < 0.7) {
+      // 对方回拍（不算用户那条的重复）
+      if (Math.random() < (lc.pokeChance != null ? Math.max(0.4, lc.pokeChance + 0.5) : 0.65)) {
         const acts = c.interactionCards?.length ? c.interactionCards : DEFAULT_INTERACTION;
-        const back = { id:genId('m'), from:'system', type:'poke', text:`${c.name}${acts[Math.floor(Math.random()*acts.length)]}你`, time:Date.now() };
-        pushMsg(back); appendMessage(back);
+        const back = {
+          id: genId('m'), from: 'system', type: 'poke',
+          text: `${c.name}${acts[Math.floor(Math.random() * acts.length)]}你`,
+          time: Date.now()
+        };
+        pushMsg(back);
+        appendMessage(back);
+      } else {
+        scheduleReplies(c, 1);
       }
-      scheduleReplies(c, 1);
-    }, randomDelay(0.8,2.2)*1000));
+    }, randomDelay(0.8, 2.2) * 1000));
   }
   function sendMessage() {
     const text = msgInput.value.trim(); if (!text || !state.chatContactId) return;
@@ -1553,11 +1569,52 @@
     const page = $('#moments-page');
     if (!page) return;
     page.classList.remove('hidden');
+    updateMomentsCoverUI();
+    hideMomentCommentBar();
     renderMoments();
   }
 
   function closeMomentsPage() {
     $('#moments-page')?.classList.add('hidden');
+    hideMomentCommentBar();
+  }
+
+  function updateMomentsCoverUI() {
+    const cover = $('#moments-cover');
+    const nameEl = $('#moments-cover-name');
+    const av = $('#moments-cover-avatar');
+    if (nameEl) nameEl.textContent = state.userName || '昕';
+    if (av) {
+      if (state.userAvatar) {
+        av.style.backgroundImage = `url(${state.userAvatar})`;
+        av.textContent = '';
+      } else {
+        av.style.backgroundImage = '';
+        av.style.background = 'var(--accent)';
+        av.textContent = (state.userName || '昕').charAt(0);
+      }
+    }
+    if (cover) {
+      if (state.momentsCover) {
+        cover.style.backgroundImage = `url(${state.momentsCover})`;
+      } else {
+        cover.style.backgroundImage = '';
+      }
+    }
+  }
+
+  function hideMomentCommentBar() {
+    const bar = $('#moment-comment-bar');
+    if (bar) bar.classList.add('hidden');
+    state._commentMomentId = null;
+  }
+
+  function showMomentCommentBar(momentId) {
+    state._commentMomentId = momentId;
+    const bar = $('#moment-comment-bar');
+    const input = $('#moment-comment-input');
+    if (bar) bar.classList.remove('hidden');
+    if (input) { input.value = ''; input.focus(); }
   }
 
   function genRandomMoment() {
@@ -1575,6 +1632,23 @@
       time: Date.now() - Math.floor(Math.random() * 86400000 * 3),
       likes: [], comments: []
     };
+  }
+
+  function replyToMomentLater(m) {
+    const c = state.contacts.find(x => x.id === m.contactId);
+    if (!c || Math.random() > 0.65) return;
+    setTimeout(() => {
+      if (!m.comments) m.comments = [];
+      const pool = getContactCardPool(c);
+      if ((state.stickers || []).length && Math.random() < 0.3) {
+        const st = state.stickers[Math.floor(Math.random() * state.stickers.length)];
+        m.comments.push({ from: c.name, stickerData: st.data, time: Date.now() });
+      } else {
+        m.comments.push({ from: c.name, text: pool.length ? pool[Math.floor(Math.random() * pool.length)] : '收到~', time: Date.now() });
+      }
+      saveData();
+      renderMoments();
+    }, 700 + Math.random() * 1200);
   }
 
   function renderMoments() {
@@ -1609,12 +1683,11 @@
             ${m.stickerData ? `<div class="moment-sticker"><img src="${m.stickerData}"/></div>` : ''}
             <div class="moment-foot">
               <span class="moment-time">${ago}</span>
-              <button class="moment-more" data-act="menu">···</button>
+              <button class="moment-more" data-act="menu" type="button">···</button>
             </div>
             <div class="moment-action-bar hidden" data-bar>
-              <button data-act="like">${liked ? '取消' : '赞'}</button>
-              <button data-act="comment">评论</button>
-              <button data-act="sticker">表情</button>
+              <button data-act="like" type="button">${liked ? '取消' : '赞'}</button>
+              <button data-act="comment" type="button">评论</button>
             </div>
             ${(m.likes || []).length ? `<div class="moment-likes">♥ ${(m.likes || []).map(x => x === 'me' ? '我' : x).join('、')}</div>` : ''}
             <div class="moment-comments">${(m.comments || []).map(cm => {
@@ -1624,7 +1697,7 @@
           </div>
         </div>
       </div>`;
-    }).join('') || '<div class="empty-state small"><p>暂无动态</p></div>';
+    }).join('') || '<div class="empty-state small"><p>暂无动态，点右上角刷新</p></div>';
 
     list.querySelectorAll('.moment-card').forEach(card => {
       const id = card.dataset.id;
@@ -1633,69 +1706,39 @@
       const bar = card.querySelector('[data-bar]');
       card.querySelector('[data-act="menu"]')?.addEventListener('click', e => {
         e.stopPropagation();
+        // 关闭其他
+        list.querySelectorAll('[data-bar]').forEach(b => { if (b !== bar) b.classList.add('hidden'); });
         bar?.classList.toggle('hidden');
       });
-      card.querySelector('[data-act="like"]')?.addEventListener('click', () => {
+      card.querySelector('[data-act="like"]')?.addEventListener('click', e => {
+        e.stopPropagation();
         if (!m.likes) m.likes = [];
         if (m.likes.includes('me')) m.likes = m.likes.filter(x => x !== 'me');
         else m.likes.push('me');
-        saveData(); renderMoments();
+        saveData();
+        renderMoments();
       });
-      const addComment = (payload) => {
-        if (!m.comments) m.comments = [];
-        m.comments.push(payload);
-        const c = state.contacts.find(x => x.id === m.contactId);
-        if (c && Math.random() < 0.7) {
-          setTimeout(() => {
-            const pool = getContactCardPool(c);
-            if ((state.stickers || []).length && Math.random() < 0.3) {
-              const st = state.stickers[Math.floor(Math.random() * state.stickers.length)];
-              m.comments.push({ from: c.name, stickerData: st.data, time: Date.now() });
-            } else {
-              const reply = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '收到~';
-              m.comments.push({ from: c.name, text: reply, time: Date.now() });
-            }
-            saveData(); renderMoments();
-          }, 800 + Math.random() * 1200);
-        }
-        saveData(); renderMoments();
-      };
-      card.querySelector('[data-act="comment"]')?.addEventListener('click', () => {
-        const text = prompt('说点什么');
-        if (!text || !text.trim()) return;
-        addComment({ from: '我', text: text.trim(), time: Date.now() });
-      });
-      card.querySelector('[data-act="sticker"]')?.addEventListener('click', () => {
-        if (!(state.stickers || []).length) { alert('请先在「我」页导入表情包'); return; }
-        // 简单选择：用最近导入的列表弹窗
-        state.modalMode = 'moment-sticker';
-        state._momentCommentId = m.id;
-        modalTitle.textContent = '选择表情评论';
-        modalBody.innerHTML = `<div class="sticker-panel" style="max-height:240px">${state.stickers.map(s =>
-          `<div class="sticker-item" data-id="${s.id}"><img src="${s.data}"/></div>`).join('')}</div>`;
-        modalOverlay.classList.remove('hidden');
-        modalBody.querySelectorAll('.sticker-item').forEach(el => {
-          el.addEventListener('click', () => {
-            const st = state.stickers.find(x => x.id === el.dataset.id);
-            if (!st) return;
-            closeModal();
-            const target = state.moments.find(x => x.id === state._momentCommentId);
-            if (!target) return;
-            if (!target.comments) target.comments = [];
-            target.comments.push({ from: '我', stickerData: st.data, time: Date.now() });
-            const c = state.contacts.find(x => x.id === target.contactId);
-            if (c && Math.random() < 0.6) {
-              setTimeout(() => {
-                const pool = getContactCardPool(c);
-                target.comments.push({ from: c.name, text: pool.length ? pool[Math.floor(Math.random() * pool.length)] : '哈哈', time: Date.now() });
-                saveData(); renderMoments();
-              }, 600);
-            }
-            saveData(); renderMoments();
-          });
-        });
+      card.querySelector('[data-act="comment"]')?.addEventListener('click', e => {
+        e.stopPropagation();
+        bar?.classList.add('hidden');
+        showMomentCommentBar(m.id);
       });
     });
+  }
+
+  function submitMomentComment(text, stickerData) {
+    const mid = state._commentMomentId;
+    if (!mid) return;
+    const m = state.moments.find(x => x.id === mid);
+    if (!m) return;
+    if (!m.comments) m.comments = [];
+    if (stickerData) m.comments.push({ from: '我', stickerData, time: Date.now() });
+    else if (text && text.trim()) m.comments.push({ from: '我', text: text.trim(), time: Date.now() });
+    else return;
+    hideMomentCommentBar();
+    saveData();
+    renderMoments();
+    replyToMomentLater(m);
   }
 
   function openStickerManager() {
@@ -1893,6 +1936,7 @@
     state.userAvatar = data.userAvatar || null;
     state.userName = data.userName || '昕';
     state.lastProactiveAt = data.lastProactiveAt || {};
+    state.momentsCover = data.momentsCover || null;
     applyTheme(state.theme);
     startStatusRotation();
     scheduleProactiveMessages();
@@ -2068,6 +2112,41 @@
       const m = genRandomMoment();
       if (m) { state.moments.unshift(m); saveData(); }
       renderMoments();
+    });
+    $('#moment-comment-send')?.addEventListener('click', () => {
+      submitMomentComment($('#moment-comment-input')?.value || '');
+    });
+    $('#moment-comment-input')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitMomentComment($('#moment-comment-input')?.value || '');
+      }
+    });
+    $('#moment-comment-sticker')?.addEventListener('click', () => {
+      if (!(state.stickers || []).length) { alert('请先导入表情包'); return; }
+      state.modalMode = 'moment-sticker';
+      modalTitle.textContent = '选择表情';
+      modalBody.innerHTML = `<div class="sticker-panel" style="max-height:240px">${state.stickers.map(s =>
+        `<div class="sticker-item" data-id="${s.id}"><img src="${s.data}"/></div>`).join('')}</div>`;
+      modalOverlay.classList.remove('hidden');
+      modalBody.querySelectorAll('.sticker-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const st = state.stickers.find(x => x.id === el.dataset.id);
+          closeModal();
+          if (st) submitMomentComment('', st.data);
+        });
+      });
+    });
+    $('#btn-moments-cover')?.addEventListener('click', () => $('#file-moments-cover')?.click());
+    $('#file-moments-cover')?.addEventListener('change', async e => {
+      const f = e.target.files?.[0]; e.target.value = '';
+      if (!f) return;
+      try {
+        state.momentsCover = await compressImage(f, 900, 0.72);
+        saveData();
+        updateMomentsCoverUI();
+        alert('朋友圈封面已更新');
+      } catch (_) { alert('图片失败'); }
     });
     $('#rp-open-close')?.addEventListener('click', () => $('#rp-open-overlay')?.classList.add('hidden'));
     $('#rp-open-overlay')?.addEventListener('click', e => {
