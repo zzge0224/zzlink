@@ -1,10 +1,13 @@
 /**
  * 字笺 · ZiJian — 聊天 / 字卡 / 音乐一起听 / 主题
- * 无外部 API，纯本地 localStorage
+ * 主存储：IndexedDB（大容量）；兼容迁移 localStorage
  */
 (function () {
   'use strict';
-  const STORAGE_KEY = 'zijian_data_v6';
+  const STORAGE_KEY = 'zijian_data_v7';
+  const IDB_NAME = 'zijian_db';
+  const IDB_STORE = 'kv';
+  const IDB_VERSION = 1;
   const DEFAULT_SETTINGS = { minDelay: 1.5, maxDelay: 4, maxReplies: 2 };
   const DEFAULT_INTERACTION = ['轻轻拍了拍', '重重拍了拍', '拍了拍', '戳了戳', '碰了碰'];
   const DEFAULT_LISTEN = { pauseChance: 0.18, favoriteChance: 0.12, pauseDurationMax: 6 };
@@ -54,48 +57,185 @@
     currentContactId: null, chatContactId: null,
     editingCardIndex: null, editingCardType: 'normal', modalMode: null,
     pendingTimers: [], quotingMsg: null, longPressMsg: null,
+    playMode: 'order', // order | random | loop | one
     // 一起听
     listenSongId: null, listenContactId: null, listenInterval: null,
-    listenLyrics: [], listenLyricIdx: -1, pendingSong: null
+    listenLyrics: [], listenLyricIdx: -1, pendingSong: null,
+    listenQueue: [], listenIndex: 0, floatVisible: false
   };
 
-  function loadData() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const p = JSON.parse(raw);
-        if (Array.isArray(p.contacts) && p.contacts.length) {
-          p.contacts.forEach(c => {
-            if (!c.settings) c.settings = { ...DEFAULT_SETTINGS };
-            if (!c.interactionCards) c.interactionCards = [...DEFAULT_INTERACTION];
-            if (!c.favorites) c.favorites = [];
-            if (!c.listenConfig) c.listenConfig = { ...DEFAULT_LISTEN };
-            if (c.avatarImg === undefined) c.avatarImg = null;
-          });
-          return {
-            contacts: p.contacts,
-            songs: Array.isArray(p.songs) ? p.songs : JSON.parse(JSON.stringify(DEFAULT_SONGS)),
-            chats: p.chats || {},
-            userBalance: typeof p.userBalance === 'number' ? p.userBalance : 888,
-            theme: THEMES.includes(p.theme) ? p.theme : 'classic'
-          };
-        }
-      }
-    } catch (e) { console.warn(e); }
+  function normalizeLoaded(p) {
+    if (!p || !Array.isArray(p.contacts) || !p.contacts.length) {
+      return {
+        contacts: JSON.parse(JSON.stringify(DEFAULT_CONTACTS)),
+        songs: JSON.parse(JSON.stringify(DEFAULT_SONGS)),
+        chats: {}, userBalance: 888, theme: 'classic', playMode: 'order'
+      };
+    }
+    p.contacts.forEach(c => {
+      if (!c.settings) c.settings = { ...DEFAULT_SETTINGS };
+      if (!c.interactionCards) c.interactionCards = [...DEFAULT_INTERACTION];
+      if (!c.favorites) c.favorites = [];
+      if (!c.listenConfig) c.listenConfig = { ...DEFAULT_LISTEN };
+      if (c.avatarImg === undefined) c.avatarImg = null;
+      if (c.chatBgImg === undefined) c.chatBgImg = null;
+      if (c.chatBgColor === undefined) c.chatBgColor = null;
+    });
     return {
-      contacts: JSON.parse(JSON.stringify(DEFAULT_CONTACTS)),
-      songs: JSON.parse(JSON.stringify(DEFAULT_SONGS)),
-      chats: {}, userBalance: 888, theme: 'classic'
+      contacts: p.contacts,
+      songs: Array.isArray(p.songs) ? p.songs : JSON.parse(JSON.stringify(DEFAULT_SONGS)),
+      chats: p.chats || {},
+      userBalance: typeof p.userBalance === 'number' ? p.userBalance : 888,
+      theme: THEMES.includes(p.theme) ? p.theme : 'classic',
+      playMode: p.playMode || 'order'
     };
   }
 
-  function saveData() {
+  function openIdb() {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) { reject(new Error('no idb')); return; }
+      const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('idb open fail'));
+    });
+  }
+
+  function idbGet(key) {
+    return openIdb().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }));
+  }
+
+  function idbSet(key, value) {
+    return openIdb().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(value, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    }));
+  }
+
+  function buildPersistPayload() {
+    // 歌词过长时截断，封面/背景走 IDB 不限 localStorage
+    const songs = (state.songs || []).map(s => {
+      const o = { ...s };
+      if (o.lrc && o.lrc.length > 20000) o.lrc = o.lrc.slice(0, 20000);
+      return o;
+    });
+    const chats = {};
+    Object.keys(state.chats || {}).forEach(cid => {
+      const arr = state.chats[cid] || [];
+      chats[cid] = arr.length > 500 ? arr.slice(-500) : arr;
+    });
+    return {
+      contacts: state.contacts,
+      songs,
+      chats,
+      userBalance: state.userBalance,
+      theme: state.theme,
+      playMode: state.playMode || 'order',
+      _v: 7
+    };
+  }
+
+  async function loadDataAsync() {
+    // 1) IndexedDB
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        contacts: state.contacts, songs: state.songs, chats: state.chats,
-        userBalance: state.userBalance, theme: state.theme
-      }));
-    } catch (e) { console.error(e); alert('保存失败'); }
+      const fromIdb = await idbGet(STORAGE_KEY);
+      if (fromIdb && fromIdb.contacts) return normalizeLoaded(fromIdb);
+    } catch (e) { console.warn('idb load', e); }
+    // 2) 旧版 localStorage 迁移
+    try {
+      const keys = ['zijian_data_v7', 'zijian_data_v6', 'zijian_data_v5', 'zijian_data_v4'];
+      for (const k of keys) {
+        const raw = localStorage.getItem(k);
+        if (!raw) continue;
+        const p = JSON.parse(raw);
+        if (p && Array.isArray(p.contacts) && p.contacts.length) {
+          const data = normalizeLoaded(p);
+          // 异步写入 IDB，不阻塞
+          idbSet(STORAGE_KEY, data).catch(() => {});
+          return data;
+        }
+      }
+    } catch (e) { console.warn('ls load', e); }
+    return normalizeLoaded(null);
+  }
+
+  let _saveTimer = null;
+  let _saveChain = Promise.resolve();
+
+  function saveData() {
+    // 防抖合并频繁写入（发消息不会卡）
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => {
+      _saveTimer = null;
+      const payload = buildPersistPayload();
+      _saveChain = _saveChain.then(async () => {
+        try {
+          await idbSet(STORAGE_KEY, payload);
+          // 轻量备份到 localStorage（无大图时）
+          try {
+            const light = {
+              contacts: payload.contacts.map(c => ({
+                ...c,
+                chatBgImg: c.chatBgImg && c.chatBgImg.length > 40000 ? null : c.chatBgImg,
+                avatarImg: c.avatarImg && c.avatarImg.length > 30000 ? null : c.avatarImg
+              })),
+              songs: (payload.songs || []).slice(0, 30).map(s => ({
+                id: s.id, title: s.title, artist: s.artist, cover: '',
+                src: s.src, lrc: '', lrcUrl: s.lrcUrl || '', mode: s.mode, neteaseId: s.neteaseId
+              })),
+              chats: {},
+              userBalance: payload.userBalance,
+              theme: payload.theme,
+              playMode: payload.playMode,
+              _v: 7
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(light));
+          } catch (_) { /* 备份失败可忽略 */ }
+          return true;
+        } catch (e) {
+          console.error('save idb fail', e);
+          // 回退 localStorage 精简保存
+          try {
+            const slim = {
+              contacts: state.contacts.map(c => {
+                const x = { ...c };
+                if (x.chatBgImg && x.chatBgImg.length > 60000) x.chatBgImg = null;
+                if (x.avatarImg && x.avatarImg.length > 40000) x.avatarImg = null;
+                return x;
+              }),
+              songs: (state.songs || []).map(s => ({
+                id: s.id, title: s.title, artist: s.artist, cover: s.cover,
+                src: s.src, lrc: '', lrcUrl: s.lrcUrl || '', mode: s.mode, neteaseId: s.neteaseId
+              })),
+              chats: state.chats,
+              userBalance: state.userBalance,
+              theme: state.theme,
+              playMode: state.playMode || 'order'
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
+            return true;
+          } catch (e2) {
+            console.error('save ls fail', e2);
+            if (!saveData._warned) {
+              saveData._warned = true;
+              alert('存储空间不足，请删除部分歌曲或背景图后再试。聊天消息可能未完整保存。');
+            }
+            return false;
+          }
+        }
+      });
+    }, 120);
+    return true;
   }
 
   const $ = s => document.querySelector(s);
@@ -240,9 +380,20 @@
   function applyContactChatBg(id) {
     const c = state.contacts.find(x => x.id === id);
     if (!c) return;
-    if (c.chatBgImg) { messageList.style.backgroundImage = `url(${c.chatBgImg})`; messageList.style.backgroundColor = ''; }
-    else if (c.chatBgColor) { messageList.style.backgroundImage = ''; messageList.style.backgroundColor = c.chatBgColor; }
-    else { messageList.style.backgroundImage = ''; messageList.style.backgroundColor = ''; }
+    // 始终用 cover + center，避免拉伸变形
+    messageList.style.backgroundSize = 'cover';
+    messageList.style.backgroundPosition = 'center center';
+    messageList.style.backgroundRepeat = 'no-repeat';
+    if (c.chatBgImg) {
+      messageList.style.backgroundImage = `url(${c.chatBgImg})`;
+      messageList.style.backgroundColor = '';
+    } else if (c.chatBgColor) {
+      messageList.style.backgroundImage = '';
+      messageList.style.backgroundColor = c.chatBgColor;
+    } else {
+      messageList.style.backgroundImage = '';
+      messageList.style.backgroundColor = '';
+    }
   }
   function enterChat(id) {
     const c = state.contacts.find(x => x.id === id); if (!c) return;
@@ -507,34 +658,42 @@
     return await res.json();
   }
 
-  async function metingItemToSong(item) {
-    // item: { name, artist, url, pic, lrc }
-    let lrcText = '';
-    if (item.lrc) {
-      try {
-        // lrc 字段可能是代理 URL
-        if (/^https?:\/\//i.test(item.lrc)) {
-          const r = await fetch(item.lrc + (item.lrc.includes('?') ? '&' : '?') + 'r=' + Date.now());
-          lrcText = await r.text();
-        } else {
-          lrcText = item.lrc;
-        }
-      } catch (_) {}
-    }
-    // 从 url 代理链提取 netease id 便于去重
+  function metingItemToSong(item) {
+    // 导入时不拉取整份歌词，避免撑爆 localStorage；播放时再按需获取
     let nid = '';
     const um = (item.url || '').match(/[?&]id=(\d+)/);
     if (um) nid = um[1];
+    let lrcUrl = '';
+    if (item.lrc && /^https?:\/\//i.test(item.lrc)) lrcUrl = item.lrc;
+    else if (nid) lrcUrl = `${METING}?server=netease&type=lrc&id=${nid}`;
     return {
       id: genId('song'),
       title: item.name || '未知歌曲',
       artist: item.artist || '未知歌手',
       cover: item.pic || '',
       src: item.url || '',
-      lrc: lrcText || '',
+      lrc: '',
+      lrcUrl,
       mode: 'direct',
       neteaseId: nid
     };
+  }
+
+  async function ensureSongLrc(song) {
+    if (!song) return '';
+    if (song.lrc && song.lrc.length > 10) return song.lrc;
+    if (!song.lrcUrl && !song.neteaseId) return '';
+    const url = song.lrcUrl || `${METING}?server=netease&type=lrc&id=${song.neteaseId}`;
+    try {
+      const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'r=' + Date.now());
+      const text = await r.text();
+      if (text && !text.startsWith('<')) {
+        song.lrc = text.length > 12000 ? text.slice(0, 12000) : text;
+        // 不强制立刻 save，避免频繁写盘
+        return song.lrc;
+      }
+    } catch (_) {}
+    return '';
   }
 
   function openImportSong() {
@@ -547,7 +706,7 @@
       </div>
       <div class="form-row" style="font-size:12px;color:var(--muted);line-height:1.5">
         粘贴链接后点确定，将自动获取歌名、歌手、封面、歌词与试听地址。<br/>
-        歌单会批量导入（最多 80 首，已存在的会跳过）。
+        歌单会批量导入（最多 500 首，已存在的会跳过）。歌词在播放时按需加载。
       </div>
       <div id="imp-status" style="font-size:13px;color:var(--accent);min-height:1.2em"></div>`;
     modalOverlay.classList.remove('hidden');
@@ -587,8 +746,7 @@
         if (state.songs.some(s => s.neteaseId === String(res.id))) {
           alert('曲库中已有该歌曲');
         } else {
-          if (statusEl) statusEl.textContent = '正在获取歌词…';
-          const song = await metingItemToSong(item);
+          const song = metingItemToSong(item);
           song.neteaseId = String(res.id);
           state.songs.unshift(song);
           saveData();
@@ -601,7 +759,7 @@
         if (statusEl) statusEl.textContent = '正在获取歌单…';
         const data = await fetchMeting('playlist', res.id);
         if (!Array.isArray(data) || !data.length) throw new Error('歌单为空或获取失败');
-        const limit = Math.min(data.length, 80);
+        const limit = Math.min(data.length, 500);
         let added = 0, skipped = 0;
         for (let i = 0; i < limit; i++) {
           const item = data[i];
@@ -611,7 +769,7 @@
           if (um) nid = um[1];
           if (nid && state.songs.some(s => s.neteaseId === nid)) { skipped++; continue; }
           try {
-            const song = await metingItemToSong(item);
+            const song = metingItemToSong(item);
             if (nid) song.neteaseId = nid;
             state.songs.push(song);
             added++;
@@ -649,27 +807,109 @@
     pickOverlay.classList.remove('hidden');
   }
 
+  const PLAY_MODE_LABEL = { order: '顺序', random: '随机', loop: '列表循环', one: '单曲循环' };
+
   function openListenWithContact(songId, contactId) {
     const song = state.songs.find(s => s.id === songId);
     const contact = state.contacts.find(c => c.id === contactId);
     if (!song || !contact) return;
-    state.listenSongId = songId;
     state.listenContactId = contactId;
+    // 队列：当前曲库全部（有 src 的优先）
+    state.listenQueue = state.songs.map(s => s.id);
+    state.listenIndex = Math.max(0, state.listenQueue.indexOf(songId));
+    if (state.listenIndex < 0) {
+      state.listenQueue.unshift(songId);
+      state.listenIndex = 0;
+    }
     listenWithName.textContent = `和 ${contact.name} 一起听`;
+    updatePlayModeBtn();
+    loadListenTrack(songId, true);
+    listenPage.classList.remove('hidden');
+    hideFloatPlayer();
+    startListenSimulation();
+  }
+
+  async function loadListenTrack(songId, autoplay) {
+    const song = state.songs.find(s => s.id === songId);
+    if (!song) return;
+    state.listenSongId = songId;
     listenTitle.textContent = song.title;
     listenArtist.textContent = song.artist || '';
     if (song.cover) { listenCover.style.backgroundImage = `url(${song.cover})`; listenCover.textContent = ''; }
     else { listenCover.style.backgroundImage = ''; listenCover.textContent = '🎵'; }
-    state.listenLyrics = parseLrc(song.lrc);
+    updateFloatUI(song);
+    listenLyricsEl.innerHTML = '<div class="lyric-line">加载歌词中…</div>';
+    const lrcText = await ensureSongLrc(song);
+    state.listenLyrics = parseLrc(lrcText);
     state.listenLyricIdx = -1;
     renderListenLyrics();
     listenAudio.src = song.src || '';
     listenAudio.load();
     listenSeek.value = 0; listenCur.textContent = '0:00'; listenDur.textContent = '0:00';
-    listenPlay.textContent = '▶';
     listenCover.classList.remove('spinning');
-    listenPage.classList.remove('hidden');
-    startListenSimulation();
+    listenPlay.textContent = '▶';
+    if (autoplay && song.src) {
+      listenAudio.play().then(() => {
+        listenPlay.textContent = '⏸';
+        listenCover.classList.add('spinning');
+        updateFloatPlaying(true);
+      }).catch(() => showListenToast('播放失败，可尝试换一首'));
+    }
+  }
+
+  function pickNextIndex(dir) {
+    const n = state.listenQueue.length;
+    if (!n) return -1;
+    const mode = state.playMode || 'order';
+    if (mode === 'one' && dir === 1) return state.listenIndex;
+    if (mode === 'random') {
+      if (n === 1) return 0;
+      let i = state.listenIndex;
+      while (i === state.listenIndex) i = Math.floor(Math.random() * n);
+      return i;
+    }
+    // order / loop
+    let next = state.listenIndex + dir;
+    if (mode === 'loop' || mode === 'order') {
+      if (next >= n) next = mode === 'loop' ? 0 : -1;
+      if (next < 0) next = mode === 'loop' ? n - 1 : -1;
+    }
+    return next;
+  }
+
+  function playNext(dir) {
+    const next = pickNextIndex(dir || 1);
+    if (next < 0) {
+      listenPlay.textContent = '▶';
+      listenCover.classList.remove('spinning');
+      updateFloatPlaying(false);
+      showListenToast('列表已播完');
+      return;
+    }
+    state.listenIndex = next;
+    loadListenTrack(state.listenQueue[next], true);
+  }
+
+  function cyclePlayMode() {
+    const modes = ['order', 'random', 'loop', 'one'];
+    const i = modes.indexOf(state.playMode || 'order');
+    state.playMode = modes[(i + 1) % modes.length];
+    saveData();
+    updatePlayModeBtn();
+    showListenToast('播放模式：' + PLAY_MODE_LABEL[state.playMode]);
+  }
+
+  function updatePlayModeBtn() {
+    const btn = $('#listen-mode');
+    if (btn) btn.textContent = PLAY_MODE_LABEL[state.playMode || 'order'] || '顺序';
+  }
+
+  function minimizeListenPage() {
+    // 收起到悬浮窗，不停止播放
+    stopListenSimulation();
+    listenPage.classList.add('hidden');
+    showFloatPlayer();
+    state.floatVisible = true;
   }
 
   function closeListenPage() {
@@ -678,7 +918,35 @@
     listenAudio.removeAttribute('src');
     listenCover.classList.remove('spinning');
     listenPage.classList.add('hidden');
-    state.listenSongId = null; state.listenContactId = null;
+    hideFloatPlayer();
+    state.listenSongId = null;
+    state.listenContactId = null;
+    state.floatVisible = false;
+    updateFloatPlaying(false);
+  }
+
+  function showFloatPlayer() {
+    const el = $('#float-player');
+    if (el) el.classList.remove('hidden');
+  }
+  function hideFloatPlayer() {
+    const el = $('#float-player');
+    if (el) el.classList.add('hidden');
+  }
+  function updateFloatUI(song) {
+    const t = $('#float-title');
+    const a = $('#float-artist');
+    const c = $('#float-cover');
+    if (t) t.textContent = song ? song.title : '';
+    if (a) a.textContent = song ? (song.artist || '') : '';
+    if (c) {
+      if (song && song.cover) { c.style.backgroundImage = `url(${song.cover})`; c.textContent = ''; }
+      else { c.style.backgroundImage = ''; c.textContent = '🎵'; }
+    }
+  }
+  function updateFloatPlaying(playing) {
+    const btn = $('#float-play');
+    if (btn) btn.textContent = playing ? '⏸' : '▶';
   }
 
   function renderListenLyrics() {
@@ -727,6 +995,7 @@
         listenAudio.pause();
         listenPlay.textContent = '▶';
         listenCover.classList.remove('spinning');
+        updateFloatPlaying(false);
         showListenToast(`${contact.name} 暂停了播放`);
         const dur = (1 + Math.random() * Math.max(1, (cfg.pauseDurationMax || 6) - 1)) * 1000;
         setTimeout(() => {
@@ -734,6 +1003,7 @@
           listenAudio.play().catch(() => {});
           listenPlay.textContent = '⏸';
           listenCover.classList.add('spinning');
+          updateFloatPlaying(true);
           showListenToast('继续播放');
         }, dur);
       } else if (r < cfg.pauseChance + cfg.favoriteChance) {
@@ -757,11 +1027,13 @@
       listenAudio.play().then(() => {
         listenPlay.textContent = '⏸';
         listenCover.classList.add('spinning');
+        updateFloatPlaying(true);
       }).catch(() => showListenToast('播放失败，请检查音频链接'));
     } else {
       listenAudio.pause();
       listenPlay.textContent = '▶';
       listenCover.classList.remove('spinning');
+      updateFloatPlaying(false);
     }
   }
 
@@ -819,13 +1091,31 @@
     if (ss) ss.textContent = state.songs.length;
   }
 
-  function compressImage(file, maxSize=400, q=0.7) {
-    return new Promise((resolve,reject) => {
+  /** 压缩图片：保持原始比例缩小，展示端用 CSS background-size:cover */
+  function compressImage(file, maxSize = 720, q = 0.72) {
+    return new Promise((resolve, reject) => {
       const r = new FileReader();
-      r.onload = e => { const img=new Image(); img.onload=()=>{ const cv=document.createElement('canvas'); let w=img.width,h=img.height;
-        if(w>maxSize||h>maxSize){ if(w>h){h=Math.round(h*maxSize/w);w=maxSize;}else{w=Math.round(w*maxSize/h);h=maxSize;} }
-        cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); resolve(cv.toDataURL('image/jpeg',q)); }; img.onerror=reject; img.src=e.target.result; };
-      r.onerror=reject; r.readAsDataURL(file);
+      r.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          const maxEdge = Math.max(w, h);
+          if (maxEdge > maxSize) {
+            const scale = maxSize / maxEdge;
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
+          const cv = document.createElement('canvas');
+          cv.width = w;
+          cv.height = h;
+          cv.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(cv.toDataURL('image/jpeg', q));
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      r.onerror = reject;
+      r.readAsDataURL(file);
     });
   }
 
@@ -839,10 +1129,11 @@
     renderContactsList(); renderCardsPanel(); renderChatList(); showChatListView(); renderSongList(); updateStats(); updateThemeUI();
   }
 
-  function init() {
-    const data = loadData();
+  async function init() {
+    const data = await loadDataAsync();
     state.contacts = data.contacts; state.songs = data.songs; state.chats = data.chats;
     state.userBalance = data.userBalance; state.theme = data.theme;
+    state.playMode = data.playMode || 'order';
     applyTheme(state.theme);
 
     $$('.tab-item').forEach(t => t.addEventListener('click', () => switchPage(t.dataset.page)));
@@ -869,12 +1160,24 @@
     $('#file-avatar').addEventListener('change', async e => {
       const f=e.target.files?.[0]; e.target.value='';
       const c=state.contacts.find(x=>x.id===state.currentContactId); if(!c||!f) return;
-      try { c.avatarImg=await compressImage(f,200,0.65); saveData(); renderContactsList(); renderCardsPanel(); if(state.chatContactId===c.id) enterChat(c.id); } catch(_){ alert('图片失败'); }
+      try {
+        c.avatarImg = await compressImage(f, 200, 0.65);
+        if (!saveData()) alert('头像已设置，但存储空间不足，刷新后可能丢失');
+        renderContactsList(); renderCardsPanel();
+        if (state.chatContactId === c.id) enterChat(c.id);
+      } catch(_){ alert('图片失败'); }
     });
     $('#file-bg').addEventListener('change', async e => {
       const f=e.target.files?.[0]; e.target.value='';
       const c=state.contacts.find(x=>x.id===state.currentContactId); if(!c||!f) return;
-      try { c.chatBgImg=await compressImage(f,600,0.65); c.chatBgColor=null; saveData(); closeModal(); if(state.chatContactId===c.id) applyContactChatBg(c.id); } catch(_){ alert('图片失败'); }
+      try {
+        // 居中裁剪 + 较强压缩，避免比例失衡与存储溢出
+        c.chatBgImg = await compressImage(f, 900, 0.7);
+        c.chatBgColor = null;
+        if (!saveData()) alert('背景已应用，但存储空间不足，建议删除部分歌曲后再保存');
+        closeModal();
+        if (state.chatContactId === c.id) applyContactChatBg(c.id);
+      } catch(_){ alert('图片失败'); }
     });
 
     btnSend.addEventListener('click', sendMessage);
@@ -893,8 +1196,23 @@
     // 音乐
     $('#btn-import-song').addEventListener('click', openImportSong);
     $('#pick-contact-cancel').addEventListener('click', () => pickOverlay.classList.add('hidden'));
-    $('#listen-back').addEventListener('click', closeListenPage);
+    $('#listen-back').addEventListener('click', () => {
+      // 有在播内容则收起为悬浮窗，否则直接关闭
+      if (state.listenSongId && listenAudio.src) minimizeListenPage();
+      else closeListenPage();
+    });
     listenPlay.addEventListener('click', togglePlay);
+    $('#listen-prev')?.addEventListener('click', () => playNext(-1));
+    $('#listen-next')?.addEventListener('click', () => playNext(1));
+    $('#listen-mode')?.addEventListener('click', cyclePlayMode);
+    $('#listen-mini')?.addEventListener('click', minimizeListenPage);
+    $('#float-play')?.addEventListener('click', togglePlay);
+    $('#float-expand')?.addEventListener('click', () => {
+      hideFloatPlayer();
+      listenPage.classList.remove('hidden');
+      if (state.listenContactId) startListenSimulation();
+    });
+    $('#float-close')?.addEventListener('click', closeListenPage);
     listenAudio.addEventListener('timeupdate', () => {
       if (!listenAudio.duration) return;
       listenSeek.value = (listenAudio.currentTime / listenAudio.duration) * 100;
@@ -902,7 +1220,10 @@
       syncLyrics(listenAudio.currentTime);
     });
     listenAudio.addEventListener('loadedmetadata', () => { listenDur.textContent = formatSec(listenAudio.duration); });
-    listenAudio.addEventListener('ended', () => { listenPlay.textContent='▶'; listenCover.classList.remove('spinning'); });
+    listenAudio.addEventListener('ended', () => {
+      // 按播放模式自动下一首 / 单曲循环
+      playNext(1);
+    });
     listenSeek.addEventListener('input', () => {
       if (!listenAudio.duration) return;
       listenAudio.currentTime = (listenSeek.value / 100) * listenAudio.duration;
@@ -911,6 +1232,7 @@
     switchPage('chat');
     updateStats();
     updateThemeUI();
+    updatePlayModeBtn();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

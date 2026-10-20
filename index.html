@@ -128,10 +128,26 @@
       <span id="listen-dur">0:00</span>
     </div>
     <div class="listen-controls">
+      <button id="listen-mode" class="listen-side-btn" title="播放模式">顺序</button>
+      <button id="listen-prev" class="listen-side-btn" title="上一首">⏮</button>
       <button id="listen-play" class="listen-play-btn">▶</button>
+      <button id="listen-next" class="listen-side-btn" title="下一首">⏭</button>
+      <button id="listen-mini" class="listen-side-btn" title="收起为悬浮窗">⤵</button>
     </div>
     <div id="listen-toast" class="listen-toast hidden"></div>
     <audio id="listen-audio" preload="metadata"></audio>
+  </div>
+
+  <!-- 一起听悬浮窗 -->
+  <div id="float-player" class="float-player hidden">
+    <div id="float-cover" class="float-cover">🎵</div>
+    <div class="float-info">
+      <div id="float-title" class="float-title">未播放</div>
+      <div id="float-artist" class="float-artist"></div>
+    </div>
+    <button id="float-play" class="float-btn">▶</button>
+    <button id="float-expand" class="float-btn" title="展开">▲</button>
+    <button id="float-close" class="float-btn" title="关闭">✕</button>
   </div>
 
   <div id="pick-contact-overlay" class="modal-overlay hidden">
