@@ -8,7 +8,6 @@
 </head>
 <body>
   <div id="app" data-theme="classic">
-    <!-- 顶部标题栏 -->
     <header class="app-header">
       <button id="btn-back" class="btn-back hidden" title="返回">‹</button>
       <div class="header-center">
@@ -18,9 +17,8 @@
       <div class="header-right"></div>
     </header>
 
-    <!-- 主内容区 -->
     <main class="app-main">
-      <!-- 聊天页 -->
+      <!-- 聊天 -->
       <section id="page-chat" class="page active">
         <div id="chat-list-view">
           <div id="chat-list" class="chat-list"></div>
@@ -30,43 +28,8 @@
             <p class="hint">字卡会以纸笺形式回复</p>
           </div>
         </div>
-
         <div id="chat-detail-view" class="hidden">
-          <!-- 一起听面板（可折叠） -->
-          <div id="music-panel" class="music-panel collapsed">
-            <div class="music-panel-header" id="music-panel-toggle">
-              <span class="music-panel-title">🎵 一起听</span>
-              <span class="music-panel-arrow">▾</span>
-            </div>
-            <div class="music-panel-body">
-              <div id="music-player-wrap" class="music-player-wrap">
-                <div class="music-empty" id="music-empty">粘贴网易云链接开始一起听</div>
-                <iframe id="music-iframe" class="music-iframe hidden"
-                  frameborder="no" border="0" marginwidth="0" marginheight="0"
-                  width="100%" height="86"
-                  allow="autoplay; encrypted-media"
-                  referrerpolicy="no-referrer-when-downgrade"
-                  scrolling="no"></iframe>
-              </div>
-              <div class="music-status" id="music-status">
-                <span class="music-status-dot"></span>
-                <span id="music-status-text">对方未在听</span>
-              </div>
-              <div class="music-actions">
-                <input type="text" id="music-link-input" placeholder="粘贴网易云单曲/歌单链接…" />
-                <button id="btn-music-load" class="btn-music">加载</button>
-              </div>
-              <div class="music-fav-row">
-                <select id="music-fav-select" class="music-fav-select">
-                  <option value="">收藏的歌单/单曲</option>
-                </select>
-                <button id="btn-music-save" class="btn-music-sm" title="收藏当前">★</button>
-              </div>
-            </div>
-          </div>
-
           <div id="message-list" class="message-list"></div>
-
           <div id="quote-bar" class="quote-bar hidden">
             <div class="quote-bar-content">
               <span class="quote-bar-label">引用</span>
@@ -74,118 +37,125 @@
             </div>
             <button id="quote-bar-close" class="quote-bar-close">✕</button>
           </div>
-
           <div id="attach-panel" class="attach-panel hidden">
-            <button class="attach-btn" data-action="transfer">
-              <span class="attach-icon">💸</span>
-              <span>转账</span>
-            </button>
-            <button class="attach-btn" data-action="redpacket">
-              <span class="attach-icon">🧧</span>
-              <span>红包</span>
-            </button>
+            <button class="attach-btn" data-action="transfer"><span class="attach-icon">💸</span><span>转账</span></button>
+            <button class="attach-btn" data-action="redpacket"><span class="attach-icon">🧧</span><span>红包</span></button>
           </div>
-
           <div class="composer">
-            <button id="btn-attach" class="btn-attach" title="附件">+</button>
+            <button id="btn-attach" class="btn-attach">+</button>
             <textarea id="msg-input" placeholder="说点什么..." rows="1"></textarea>
             <button id="btn-send" class="btn-send">发送</button>
           </div>
         </div>
       </section>
 
-      <!-- 联系人页 -->
+      <!-- 联系人 -->
       <section id="page-contacts" class="page">
         <div class="contacts-layout">
           <div class="contacts-list" id="contacts-list"></div>
           <div class="cards-panel" id="cards-panel">
-            <div class="empty-state small">
-              <p>选择一位联系人查看字卡库</p>
-            </div>
+            <div class="empty-state small"><p>选择一位联系人查看字卡库</p></div>
           </div>
         </div>
       </section>
 
-      <!-- 我页 -->
+      <!-- 音乐 -->
+      <section id="page-music" class="page">
+        <div class="music-page">
+          <div class="music-page-toolbar">
+            <button class="btn-primary" id="btn-import-song">导入歌曲</button>
+            <button class="btn-outline" id="btn-listen-together">一起听</button>
+          </div>
+          <div id="song-list" class="song-list"></div>
+          <div id="song-list-empty" class="empty-state">
+            <div class="empty-icon">🎵</div>
+            <p>还没有歌曲</p>
+            <p class="hint">点击「导入歌曲」添加直链或网易云 ID</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 我 -->
       <section id="page-me" class="page">
         <div class="me-content">
           <div class="avatar-large" id="me-avatar" style="background:#3D9A62">昕</div>
           <h2>昕</h2>
           <p class="subtitle">字笺 · 纸上心意</p>
-
           <div class="balance-card">
             <div class="balance-label">我的星币</div>
-            <div class="balance-value">
-              <span id="user-balance">888</span>
-              <span class="balance-unit">★</span>
-            </div>
+            <div class="balance-value"><span id="user-balance">888</span><span class="balance-unit">★</span></div>
             <button class="btn-sm" id="btn-edit-balance">修改余额</button>
           </div>
-
-          <!-- 主题选择 -->
           <div class="theme-section">
             <div class="section-label">主题皮肤</div>
             <div class="theme-grid" id="theme-grid">
-              <button class="theme-card active" data-theme="classic">
-                <div class="theme-preview classic-preview"></div>
-                <span>经典绿</span>
-              </button>
-              <button class="theme-card" data-theme="dark">
-                <div class="theme-preview dark-preview"></div>
-                <span>暗夜黑</span>
-              </button>
-              <button class="theme-card" data-theme="cream">
-                <div class="theme-preview cream-preview"></div>
-                <span>奶油白</span>
-              </button>
-              <button class="theme-card" data-theme="lavender">
-                <div class="theme-preview lavender-preview"></div>
-                <span>淡紫</span>
-              </button>
+              <button class="theme-card active" data-theme="classic"><div class="theme-preview classic-preview"></div><span>经典绿</span></button>
+              <button class="theme-card" data-theme="dark"><div class="theme-preview dark-preview"></div><span>暗夜黑</span></button>
+              <button class="theme-card" data-theme="cream"><div class="theme-preview cream-preview"></div><span>奶油白</span></button>
+              <button class="theme-card" data-theme="lavender"><div class="theme-preview lavender-preview"></div><span>淡紫</span></button>
             </div>
           </div>
-
           <div class="stats">
-            <div class="stat-item">
-              <span class="stat-num" id="stat-contacts">0</span>
-              <span class="stat-label">联系人</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-num" id="stat-cards">0</span>
-              <span class="stat-label">字卡总数</span>
-            </div>
+            <div class="stat-item"><span class="stat-num" id="stat-contacts">0</span><span class="stat-label">联系人</span></div>
+            <div class="stat-item"><span class="stat-num" id="stat-cards">0</span><span class="stat-label">字卡</span></div>
+            <div class="stat-item"><span class="stat-num" id="stat-songs">0</span><span class="stat-label">歌曲</span></div>
           </div>
           <button class="btn-outline" id="btn-reset-data">重置示例数据</button>
         </div>
       </section>
     </main>
 
-    <!-- 底部 Tab 导航 -->
     <nav class="tab-bar">
-      <button class="tab-item active" data-page="chat">
-        <span class="tab-icon">💬</span>
-        <span class="tab-label">聊天</span>
-      </button>
-      <button class="tab-item" data-page="contacts">
-        <span class="tab-icon">📇</span>
-        <span class="tab-label">联系人</span>
-      </button>
-      <button class="tab-item" data-page="me">
-        <span class="tab-icon">👤</span>
-        <span class="tab-label">我</span>
-      </button>
+      <button class="tab-item active" data-page="chat"><span class="tab-icon">💬</span><span class="tab-label">聊天</span></button>
+      <button class="tab-item" data-page="contacts"><span class="tab-icon">📇</span><span class="tab-label">联系人</span></button>
+      <button class="tab-item" data-page="music"><span class="tab-icon">🎵</span><span class="tab-label">音乐</span></button>
+      <button class="tab-item" data-page="me"><span class="tab-icon">👤</span><span class="tab-label">我</span></button>
     </nav>
   </div>
 
-  <!-- 消息操作菜单 -->
-  <div id="msg-action-menu" class="msg-action-menu hidden">
-    <button data-action="quote">引用</button>
+  <!-- 一起听全屏 -->
+  <div id="listen-page" class="listen-page hidden">
+    <div class="listen-header">
+      <button id="listen-back" class="btn-back-listen">‹</button>
+      <div class="listen-header-info">
+        <div id="listen-with-name">一起听</div>
+        <div id="listen-mode-hint" class="listen-mode-hint"></div>
+      </div>
+    </div>
+    <div class="listen-body">
+      <div class="listen-cover-wrap">
+        <div id="listen-cover" class="listen-cover rotating">🎵</div>
+      </div>
+      <div id="listen-title" class="listen-title">—</div>
+      <div id="listen-artist" class="listen-artist">—</div>
+      <div id="listen-lrc-wrap" class="listen-lrc-wrap">
+        <div id="listen-lrc" class="listen-lrc"><div class="lrc-line">暂无歌词</div></div>
+      </div>
+      <div id="listen-iframe-wrap" class="listen-iframe-wrap hidden">
+        <p class="iframe-tip">嵌入模式：无法同步歌词与对方操作</p>
+        <iframe id="listen-iframe" frameborder="no" border="0" width="100%" height="86"
+          allow="autoplay; encrypted-media" referrerpolicy="no-referrer-when-downgrade" scrolling="no"></iframe>
+      </div>
+      <div id="listen-controls" class="listen-controls">
+        <div class="progress-row">
+          <span id="listen-cur">0:00</span>
+          <input type="range" id="listen-progress" min="0" max="1000" value="0" />
+          <span id="listen-dur">0:00</span>
+        </div>
+        <div class="control-row">
+          <button id="btn-listen-play" class="btn-play">▶</button>
+        </div>
+        <button id="btn-manual-play" class="btn-manual-play hidden">点击继续播放</button>
+      </div>
+    </div>
+    <div id="listen-toast" class="listen-toast hidden"></div>
   </div>
 
-  <!-- 通用弹窗 -->
+  <div id="msg-action-menu" class="msg-action-menu hidden"><button data-action="quote">引用</button></div>
+
   <div id="modal-overlay" class="modal-overlay hidden">
     <div class="modal">
-      <h3 id="modal-title">添加字卡</h3>
+      <h3 id="modal-title">标题</h3>
       <div id="modal-body"></div>
       <div class="modal-actions">
         <button class="btn-ghost" id="modal-cancel">取消</button>
@@ -194,10 +164,9 @@
     </div>
   </div>
 
-  <!-- 隐藏文件选择 -->
   <input type="file" id="file-avatar" accept="image/*" class="hidden" />
   <input type="file" id="file-bg" accept="image/*" class="hidden" />
-
+  <audio id="audio-el" preload="metadata"></audio>
   <script src="app.js"></script>
 </body>
 </html>
