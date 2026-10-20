@@ -471,40 +471,165 @@
     }));
   }
 
-  function openImportSong() {
-    state.modalMode = 'import-song';
-    modalTitle.textContent = '导入歌曲';
-    modalBody.innerHTML = `
-      <div class="form-row"><label>音频直链 URL（mp3/m4a 等，用于实际播放）</label>
-        <input type="url" id="imp-src" placeholder="https://.../song.mp3"/></div>
-      <div class="form-row"><label>歌名 *</label><input type="text" id="imp-title" placeholder="歌名"/></div>
-      <div class="form-row"><label>歌手</label><input type="text" id="imp-artist" placeholder="歌手"/></div>
-      <div class="form-row"><label>封面图 URL（可选）</label><input type="url" id="imp-cover" placeholder="https://..."/></div>
-      <div class="form-row"><label>LRC 歌词（可选）</label><textarea id="imp-lrc" rows="4" placeholder="[00:00.00]歌词"></textarea></div>
-      <div class="form-row" style="font-size:12px;color:var(--muted)">不调用任何外部 API。请自行填写信息；一起听需要有效的音频直链才能播放与同步歌词。</div>`;
-    modalOverlay.classList.remove('hidden');
+  const METING = 'https://api.injahow.cn/meting/';
+
+  function parseNeteaseResource(input) {
+    if (!input || typeof input !== 'string') return null;
+    const str = input.trim();
+    // 歌单
+    let m = str.match(/playlist\?id=(\d+)/i) || str.match(/\/playlist\/(\d+)/i);
+    if (m) return { kind: 'playlist', id: m[1] };
+    if (/playlist|歌单/i.test(str)) {
+      m = str.match(/[?&#]id=(\d+)/i);
+      if (m) return { kind: 'playlist', id: m[1] };
+    }
+    // 单曲
+    m = str.match(/song\?id=(\d+)/i) || str.match(/\/song\/(\d+)/i);
+    if (m) return { kind: 'song', id: m[1] };
+    if (/song|单曲/i.test(str)) {
+      m = str.match(/[?&#]id=(\d+)/i);
+      if (m) return { kind: 'song', id: m[1] };
+    }
+    // 纯数字
+    m = str.match(/^\s*(\d{5,})\s*$/);
+    if (m) return { kind: 'song', id: m[1] };
+    m = str.match(/[?&#]id=(\d{5,})/i);
+    if (m) return { kind: 'song', id: m[1] };
+    return null;
   }
 
-  function confirmImportSong() {
-    const src = ($('#imp-src')?.value || '').trim();
-    const title = ($('#imp-title')?.value || '').trim();
-    const artist = ($('#imp-artist')?.value || '').trim();
-    const cover = ($('#imp-cover')?.value || '').trim();
-    const lrc = ($('#imp-lrc')?.value || '').trim();
-    if (!title) { alert('请填写歌名'); return; }
-    if (src && !/^https?:\/\//i.test(src) && !src.startsWith('blob:') && !src.startsWith('data:')) {
-      alert('音频链接需以 http(s) 开头'); return;
+  async function fetchMeting(type, id) {
+    const url = `${METING}?server=netease&type=${type}&id=${encodeURIComponent(id)}&r=${Date.now()}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('接口请求失败 ' + res.status);
+    const ct = res.headers.get('content-type') || '';
+    if (type === 'lrc') return await res.text();
+    return await res.json();
+  }
+
+  async function metingItemToSong(item) {
+    // item: { name, artist, url, pic, lrc }
+    let lrcText = '';
+    if (item.lrc) {
+      try {
+        // lrc 字段可能是代理 URL
+        if (/^https?:\/\//i.test(item.lrc)) {
+          const r = await fetch(item.lrc + (item.lrc.includes('?') ? '&' : '?') + 'r=' + Date.now());
+          lrcText = await r.text();
+        } else {
+          lrcText = item.lrc;
+        }
+      } catch (_) {}
     }
-    // 尝试从直链猜测歌名
-    let finalTitle = title;
-    if (!finalTitle && src) {
-      try { finalTitle = decodeURIComponent(src.split('/').pop().split('?')[0].replace(/\.\w+$/,'')) || '未命名'; } catch(_) { finalTitle = '未命名'; }
-    }
-    const song = {
-      id: genId('song'), title: finalTitle || '未命名', artist: artist || '未知歌手',
-      cover, src, lrc, mode: src ? 'direct' : 'embed'
+    // 从 url 代理链提取 netease id 便于去重
+    let nid = '';
+    const um = (item.url || '').match(/[?&]id=(\d+)/);
+    if (um) nid = um[1];
+    return {
+      id: genId('song'),
+      title: item.name || '未知歌曲',
+      artist: item.artist || '未知歌手',
+      cover: item.pic || '',
+      src: item.url || '',
+      lrc: lrcText || '',
+      mode: 'direct',
+      neteaseId: nid
     };
-    state.songs.unshift(song); saveData(); renderSongList(); updateStats(); closeModal();
+  }
+
+  function openImportSong() {
+    state.modalMode = 'import-song';
+    modalTitle.textContent = '导入歌曲 / 歌单';
+    modalBody.innerHTML = `
+      <div class="form-row">
+        <label>网易云单曲或歌单链接</label>
+        <input type="text" id="imp-link" placeholder="粘贴 https://music.163.com/playlist?id=... 或 song?id=..."/>
+      </div>
+      <div class="form-row" style="font-size:12px;color:var(--muted);line-height:1.5">
+        粘贴链接后点确定，将自动获取歌名、歌手、封面、歌词与试听地址。<br/>
+        歌单会批量导入（最多 80 首，已存在的会跳过）。
+      </div>
+      <div id="imp-status" style="font-size:13px;color:var(--accent);min-height:1.2em"></div>`;
+    modalOverlay.classList.remove('hidden');
+    $('#imp-link')?.focus();
+  }
+
+  async function confirmImportSong() {
+    const link = ($('#imp-link')?.value || '').trim();
+    const statusEl = $('#imp-status');
+    if (!link) { alert('请粘贴链接'); return; }
+
+    // 也支持纯音频直链手动兜底
+    if (/\.(mp3|m4a|flac|ogg|wav)(\?|$)/i.test(link) || /^https?:\/\/.+\.(mp3|m4a)/i.test(link)) {
+      const name = decodeURIComponent((link.split('/').pop() || '直链音频').split('?')[0].replace(/\.\w+$/, '')) || '直链音频';
+      state.songs.unshift({ id: genId('song'), title: name, artist: '本地直链', cover: '', src: link, lrc: '', mode: 'direct' });
+      saveData(); renderSongList(); updateStats(); closeModal();
+      return;
+    }
+
+    const res = parseNeteaseResource(link);
+    if (!res) {
+      alert('无法识别链接。请使用：\nhttps://music.163.com/song?id=xxx\nhttps://music.163.com/playlist?id=xxx');
+      return;
+    }
+
+    const confirmBtn = $('#modal-confirm');
+    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = '导入中…'; }
+    if (statusEl) statusEl.textContent = '正在获取…';
+
+    try {
+      if (res.kind === 'song') {
+        if (statusEl) statusEl.textContent = '正在获取单曲信息…';
+        const data = await fetchMeting('song', res.id);
+        const item = Array.isArray(data) ? data[0] : data;
+        if (!item || !item.name) throw new Error('未找到该歌曲');
+        // 去重
+        if (state.songs.some(s => s.neteaseId === String(res.id))) {
+          alert('曲库中已有该歌曲');
+        } else {
+          if (statusEl) statusEl.textContent = '正在获取歌词…';
+          const song = await metingItemToSong(item);
+          song.neteaseId = String(res.id);
+          state.songs.unshift(song);
+          saveData();
+          renderSongList();
+          updateStats();
+          alert('已导入：' + song.title);
+        }
+        closeModal();
+      } else {
+        if (statusEl) statusEl.textContent = '正在获取歌单…';
+        const data = await fetchMeting('playlist', res.id);
+        if (!Array.isArray(data) || !data.length) throw new Error('歌单为空或获取失败');
+        const limit = Math.min(data.length, 80);
+        let added = 0, skipped = 0;
+        for (let i = 0; i < limit; i++) {
+          const item = data[i];
+          if (statusEl) statusEl.textContent = `导入中 ${i + 1}/${limit}：${item.name || ''}`;
+          let nid = '';
+          const um = (item.url || '').match(/[?&]id=(\d+)/);
+          if (um) nid = um[1];
+          if (nid && state.songs.some(s => s.neteaseId === nid)) { skipped++; continue; }
+          try {
+            const song = await metingItemToSong(item);
+            if (nid) song.neteaseId = nid;
+            state.songs.push(song);
+            added++;
+          } catch (_) { skipped++; }
+        }
+        saveData();
+        renderSongList();
+        updateStats();
+        alert(`歌单导入完成\n新增 ${added} 首，跳过 ${skipped} 首`);
+        closeModal();
+      }
+    } catch (err) {
+      console.error(err);
+      alert('导入失败：' + (err.message || '网络错误，请稍后重试'));
+      if (statusEl) statusEl.textContent = '';
+    } finally {
+      if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '确定'; }
+    }
   }
 
   // ===== 一起听 =====
