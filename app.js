@@ -84,7 +84,29 @@
     listenLyrics: [], listenLyricIdx: -1, pendingSong: null,
     listenQueue: [], listenIndex: 0, floatVisible: false,
     statusTimer: null, proactiveTimer: null, activeCardGroup: '默认',
-    lastProactiveAt: {}
+    lastProactiveAt: {},
+    // 未读 / 置顶 / 信箱
+    unread: {},          // contactId -> number
+    groupUnread: {},     // groupId -> number
+    pinned: [],          // ['c:id' | 'g:id']
+    letters: [],         // 信箱
+    mailboxConfig: {
+      minIntervalH: 6, maxIntervalH: 36,
+      minWords: 20, maxWords: 120,
+      replyChance: 0.55,
+      enabled: true
+    },
+    mailboxUnread: 0,
+    momentNotifs: 0,
+    lastLetterAt: {},
+    letterTimer: null
+  };
+
+  const DEFAULT_MAILBOX = {
+    minIntervalH: 6, maxIntervalH: 36,
+    minWords: 20, maxWords: 120,
+    replyChance: 0.55,
+    enabled: true
   };
 
   function ensureContactShape(c) {
@@ -206,7 +228,15 @@
       userName: state.userName || '昕',
       lastProactiveAt: state.lastProactiveAt || {},
       momentsCover: state.momentsCover || null,
-      _v: 11
+      unread: state.unread || {},
+      groupUnread: state.groupUnread || {},
+      pinned: state.pinned || [],
+      letters: (state.letters || []).slice(-80),
+      mailboxConfig: state.mailboxConfig || { ...DEFAULT_MAILBOX },
+      mailboxUnread: state.mailboxUnread || 0,
+      momentNotifs: state.momentNotifs || 0,
+      lastLetterAt: state.lastLetterAt || {},
+      _v: 12
     };
   }
 
@@ -410,6 +440,8 @@
     } else if (name === 'me') {
       pageTitle.textContent = '我';
       ensureMeMenu();
+    scheduleLetterSystem();
+    updateTabDots();
       updateMeAvatarUI();
       updateStats();
       updateThemeUI();
@@ -437,23 +469,184 @@
     if (msg.type === 'ask') return '[提问] ' + (msg.title || msg.text || '');
     return (msg.from === 'user' ? '我: ' : '') + (msg.text || '');
   }
+
+  function sessionKey(kind, id) { return (kind === 'group' ? 'g:' : 'c:') + id; }
+  function isPinned(kind, id) {
+    return (state.pinned || []).includes(sessionKey(kind, id));
+  }
+  function togglePin(kind, id) {
+    const k = sessionKey(kind, id);
+    if (!state.pinned) state.pinned = [];
+    const i = state.pinned.indexOf(k);
+    if (i >= 0) state.pinned.splice(i, 1);
+    else state.pinned.unshift(k);
+    saveData();
+    renderChatList();
+  }
+  function addUnread(kind, id, n) {
+    n = n || 1;
+    if (kind === 'group') {
+      if (!state.groupUnread) state.groupUnread = {};
+      state.groupUnread[id] = (state.groupUnread[id] || 0) + n;
+    } else {
+      if (!state.unread) state.unread = {};
+      state.unread[id] = (state.unread[id] || 0) + n;
+    }
+    updateTabDots();
+  }
+  function clearUnread(kind, id) {
+    if (kind === 'group') {
+      if (state.groupUnread) state.groupUnread[id] = 0;
+    } else {
+      if (state.unread) state.unread[id] = 0;
+    }
+    saveData();
+    updateTabDots();
+  }
+  function totalUnread() {
+    let n = 0;
+    Object.values(state.unread || {}).forEach(v => n += (v || 0));
+    Object.values(state.groupUnread || {}).forEach(v => n += (v || 0));
+    return n;
+  }
+  function updateTabDots() {
+    const chatTab = document.querySelector('.tab-item[data-page="chat"]');
+    if (chatTab) {
+      let dot = chatTab.querySelector('.tab-dot');
+      if (!dot) { dot = document.createElement('span'); dot.className = 'tab-dot'; chatTab.appendChild(dot); }
+      dot.classList.toggle('on', totalUnread() > 0);
+    }
+    const interTab = document.querySelector('.tab-item[data-page="interact"]');
+    if (interTab) {
+      let dot = interTab.querySelector('.tab-dot');
+      if (!dot) { dot = document.createElement('span'); dot.className = 'tab-dot'; interTab.appendChild(dot); }
+      const on = (state.mailboxUnread || 0) + (state.momentNotifs || 0) > 0;
+      dot.classList.toggle('on', on);
+    }
+    const bm = $('#badge-mailbox');
+    if (bm) {
+      const u = state.mailboxUnread || 0;
+      bm.textContent = u > 99 ? '99+' : String(u);
+      bm.classList.toggle('hidden', u <= 0);
+    }
+    const bn = $('#badge-moments');
+    const bn2 = $('#badge-moments-main');
+    const mn = state.momentNotifs || 0;
+    [bn, bn2].forEach(el => {
+      if (!el) return;
+      el.textContent = mn > 99 ? '99+' : String(mn);
+      el.classList.toggle('hidden', mn <= 0);
+    });
+  }
+
+  function notifyContactMessage(contactId, msg) {
+    if (!msg || msg.from === 'user' || msg.from === 'system') return;
+    if (state.chatContactId === contactId) return;
+    addUnread('contact', contactId, 1);
+    saveData();
+    if (!state.chatContactId) renderChatList();
+  }
+
+  function getGroupPreviewText(msg) {
+    if (!msg) return '暂无消息，点击进入群聊';
+    if (msg.type === 'sticker') return (msg.from === 'user' ? '我: ' : ((msg.name || '') + ': ')) + '[表情]';
+    const who = msg.from === 'user' ? '我' : (msg.name || '');
+    const text = msg.text || '[消息]';
+    return who ? `${who}: ${text}` : text;
+  }
+
   function renderChatList() {
-    const items = state.contacts.map(c => {
+    const contactItems = (state.contacts || []).map(c => {
       const msgs = state.chats[c.id] || [];
-      return { contact: c, last: msgs.length ? msgs[msgs.length - 1] : null };
-    }).sort((a, b) => (b.last?.time || 0) - (a.last?.time || 0));
-    if (!items.length) { chatList.innerHTML = ''; chatListEmpty.classList.remove('hidden'); return; }
+      return {
+        kind: 'contact',
+        id: c.id,
+        contact: c,
+        last: msgs.length ? msgs[msgs.length - 1] : null,
+        time: msgs.length ? msgs[msgs.length - 1].time : 0
+      };
+    });
+    const groupItems = (state.groups || []).map(g => {
+      const msgs = g.messages || [];
+      const last = msgs.length ? msgs[msgs.length - 1] : null;
+      return {
+        kind: 'group',
+        id: g.id,
+        group: g,
+        last,
+        time: last ? last.time : (g.createdAt || 0)
+      };
+    });
+    const items = contactItems.concat(groupItems).sort((a, b) => {
+      const pa = isPinned(a.kind === 'group' ? 'group' : 'contact', a.id) ? 1 : 0;
+      const pb = isPinned(b.kind === 'group' ? 'group' : 'contact', b.id) ? 1 : 0;
+      if (pb !== pa) return pb - pa;
+      return (b.time || 0) - (a.time || 0);
+    });
+    if (!items.length) {
+      chatList.innerHTML = '';
+      chatListEmpty.classList.remove('hidden');
+      return;
+    }
     chatListEmpty.classList.add('hidden');
-    chatList.innerHTML = items.map(({ contact, last }) => `
-      <div class="chat-item" data-id="${contact.id}">
+    chatList.innerHTML = items.map(it => {
+      if (it.kind === 'group') {
+        const g = it.group;
+        const av = g.avatarImg
+          ? `<div class="avatar chat-group-av" style="background-image:url(${g.avatarImg})"></div>`
+          : `<div class="avatar chat-group-av" style="background:#5B8DEF">群</div>`;
+        const n = (g.memberIds || []).length;
+        const ur = (state.groupUnread && state.groupUnread[g.id]) || 0;
+        const pin = isPinned('group', g.id);
+        return `<div class="chat-item ${pin ? 'pinned' : ''}" data-kind="group" data-id="${g.id}">
+          ${av}
+          <div class="chat-item-info">
+            <div class="chat-item-name">${pin ? '<span class="chat-pin-mark">置顶</span>' : ''}${escapeHtml(g.name || '未命名群聊')} <span class="chat-group-tag">${n}人</span></div>
+            <div class="chat-item-preview">${escapeHtml(getGroupPreviewText(it.last))}</div>
+          </div>
+          <div class="chat-item-time">${it.last ? formatTime(it.last.time) : ''}</div>
+          ${ur ? `<span class="unread-badge">${ur > 99 ? '99+' : ur}</span>` : ''}
+        </div>`;
+      }
+      const contact = it.contact;
+      const ur = (state.unread && state.unread[contact.id]) || 0;
+      const pin = isPinned('contact', contact.id);
+      return `<div class="chat-item ${pin ? 'pinned' : ''}" data-kind="contact" data-id="${contact.id}">
         ${renderAvatarEl(contact)}
         <div class="chat-item-info">
-          <div class="chat-item-name">${escapeHtml(contact.name)}</div>
-          <div class="chat-item-preview">${escapeHtml(getPreviewText(last))}</div>
+          <div class="chat-item-name">${pin ? '<span class="chat-pin-mark">置顶</span>' : ''}${escapeHtml(contact.name)}</div>
+          <div class="chat-item-preview">${escapeHtml(getPreviewText(it.last))}</div>
         </div>
-        <div class="chat-item-time">${last ? formatTime(last.time) : ''}</div>
-      </div>`).join('');
-    chatList.querySelectorAll('.chat-item').forEach(el => el.addEventListener('click', () => enterChat(el.dataset.id)));
+        <div class="chat-item-time">${it.last ? formatTime(it.last.time) : ''}</div>
+        ${ur ? `<span class="unread-badge">${ur > 99 ? '99+' : ur}</span>` : ''}
+      </div>`;
+    }).join('');
+    chatList.querySelectorAll('.chat-item').forEach(el => {
+      el.addEventListener('click', () => {
+        if (el.dataset.kind === 'group') openGroupFromChatList(el.dataset.id);
+        else enterChat(el.dataset.id);
+      });
+      let pt = null;
+      const start = () => { pt = setTimeout(() => {
+        const kind = el.dataset.kind === 'group' ? 'group' : 'contact';
+        const pinned = isPinned(kind, el.dataset.id);
+        if (confirm(pinned ? '取消置顶？' : '置顶该会话？')) togglePin(kind, el.dataset.id);
+      }, 550); };
+      const end = () => { if (pt) clearTimeout(pt); };
+      el.addEventListener('touchstart', start, { passive: true });
+      el.addEventListener('touchend', end);
+      el.addEventListener('mousedown', start);
+      el.addEventListener('mouseup', end);
+      el.addEventListener('mouseleave', end);
+    });
+    updateTabDots();
+  }
+
+  function openGroupFromChatList(gid) {
+    // 从聊天列表进入群聊：切到联系人页的群聊视图
+    switchPage('contacts');
+    openGroupPage();
+    enterGroup(gid);
   }
   function showChatListView() {
     chatListView.classList.remove('hidden'); chatDetailView.classList.add('hidden');
@@ -482,6 +675,7 @@
   function enterChat(id) {
     const c = state.contacts.find(x => x.id === id); if (!c) return;
     state.chatContactId = id;
+    clearUnread('contact', id);
     chatListView.classList.add('hidden'); chatDetailView.classList.remove('hidden');
     btnBack.classList.remove('hidden');
     const st = c.currentStatus ? ` · ${c.currentStatus}` : '';
@@ -517,6 +711,8 @@
       <div class="settings-cell"><span>对方星币</span><span class="val">${ensureContactShape(c).balance ?? 0} ★</span></div>
       <div class="settings-cell" id="cs-avatar"><span>设置头像</span><span class="val">›</span></div>
       <div class="settings-cell" id="cs-bg"><span>设置聊天背景</span><span class="val">›</span></div>
+      <div class="settings-cell" id="cs-search"><span>搜索聊天记录</span><span class="val">›</span></div>
+      <div class="settings-cell" id="cs-pin"><span>置顶会话</span><span class="val">›</span></div>
       <div class="settings-cell" id="cs-status"><span>状态</span><span class="val">${escapeHtml(c.currentStatus || '')} ›</span></div>
       <div class="settings-section-title">回复</div>
       <div class="settings-cell"><span>最小延迟(秒)</span><input type="number" id="cs-min" step="0.5" value="${s.minDelay}"/></div>
@@ -549,6 +745,14 @@
     $('#cs-bg')?.addEventListener('click', () => {
       state.currentContactId = c.id;
       openBgModal();
+    });
+    $('#cs-search')?.addEventListener('click', () => {
+      $('#chat-settings-page')?.classList.add('hidden');
+      openChatSearch();
+    });
+    $('#cs-pin')?.addEventListener('click', () => {
+      togglePin('contact', c.id);
+      alert(isPinned('contact', c.id) ? '已置顶' : '已取消置顶');
     });
     $('#cs-status')?.addEventListener('click', () => {
       state.currentContactId = c.id;
@@ -905,9 +1109,13 @@
     if (state.quotingMsg) { quoteBarText.textContent = truncate(state.quotingMsg.text||getPreviewText(state.quotingMsg),30); quoteBar.classList.remove('hidden'); }
     else quoteBar.classList.add('hidden');
   }
-  function pushMsg(msg) {
-    if (!state.chats[state.chatContactId]) state.chats[state.chatContactId] = [];
-    state.chats[state.chatContactId].push(msg); saveData();
+  function pushMsg(msg, contactId) {
+    const cid = contactId || state.chatContactId;
+    if (!cid) return;
+    if (!state.chats[cid]) state.chats[cid] = [];
+    state.chats[cid].push(msg);
+    if (msg && msg.from === 'contact') notifyContactMessage(cid, msg);
+    saveData();
   }
   function clearPendingTimers() { state.pendingTimers.forEach(clearTimeout); state.pendingTimers = []; }
   function getContactCardPool(contact) {
@@ -2047,6 +2255,24 @@
       openSurveyPickerModal();
       return;
     }
+    if (state.modalMode === 'mailbox-settings') {
+      state.mailboxConfig = {
+        enabled: !!$('#mb-on')?.checked,
+        minIntervalH: parseFloat($('#mb-min-h')?.value) || 6,
+        maxIntervalH: parseFloat($('#mb-max-h')?.value) || 36,
+        minWords: parseInt($('#mb-min-w')?.value, 10) || 20,
+        maxWords: parseInt($('#mb-max-w')?.value, 10) || 120,
+        replyChance: Math.max(0, Math.min(1, parseFloat($('#mb-reply')?.value) || 0.55))
+      };
+      if (state.mailboxConfig.maxIntervalH < state.mailboxConfig.minIntervalH) {
+        state.mailboxConfig.maxIntervalH = state.mailboxConfig.minIntervalH;
+      }
+      saveData();
+      scheduleLetterSystem();
+      closeModal();
+      alert('信箱设置已保存');
+      return;
+    }
     if (state.modalMode === 'moments-settings') {
       (state.contacts || []).forEach(c => {
         ensureContactShape(c);
@@ -2075,7 +2301,7 @@
       if (!state.groups) state.groups = [];
       const g = { id: genId('g'), name, memberIds: ids, messages: [] };
       ensureGroupShape(g);
-      state.groups.push(g);
+      g.createdAt = Date.now(); state.groups.push(g);
       saveData();
       closeModal();
       openGroupPage();
@@ -2751,6 +2977,246 @@
   }
 
 
+
+  // ===== 全局搜索 =====
+  function runGlobalSearch(q) {
+    q = (q || '').trim().toLowerCase();
+    const box = $('#search-results');
+    if (!box) return;
+    if (!q) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    const hits = [];
+    (state.contacts || []).forEach(c => {
+      if ((c.name || '').toLowerCase().includes(q)) {
+        hits.push({ type: '联系人', title: c.name, sub: c.currentStatus || '', act: () => { switchPage('contacts'); state.currentContactId = c.id; renderContactsList(); renderCardsPanel(); } });
+      }
+      const cards = getContactCardPool(c) || [];
+      cards.forEach((text, i) => {
+        if (String(text).toLowerCase().includes(q)) {
+          hits.push({ type: '字卡', title: truncate(text, 40), sub: c.name, act: () => { switchPage('contacts'); state.currentContactId = c.id; renderContactsList(); renderCardsPanel(); } });
+        }
+      });
+      const msgs = state.chats[c.id] || [];
+      msgs.forEach(m => {
+        if (m.text && String(m.text).toLowerCase().includes(q)) {
+          hits.push({ type: '聊天', title: truncate(m.text, 36), sub: c.name + ' · ' + formatTime(m.time), act: () => { enterChat(c.id); setTimeout(() => jumpToMessage(m.id), 200); } });
+        }
+      });
+    });
+    (state.groups || []).forEach(g => {
+      if ((g.name || '').toLowerCase().includes(q)) {
+        hits.push({ type: '群聊', title: g.name, sub: '', act: () => openGroupFromChatList(g.id) });
+      }
+      (g.messages || []).forEach(m => {
+        if (m.text && String(m.text).toLowerCase().includes(q)) {
+          hits.push({ type: '群消息', title: truncate(m.text, 36), sub: g.name, act: () => openGroupFromChatList(g.id) });
+        }
+      });
+    });
+    box.innerHTML = hits.slice(0, 40).map((h, i) =>
+      `<div class="search-hit" data-i="${i}"><span class="sh-type">${h.type}</span>${escapeHtml(h.title)}<div style="font-size:11px;color:var(--muted)">${escapeHtml(h.sub || '')}</div></div>`
+    ).join('') || '<div class="search-hit">无结果</div>';
+    box.classList.remove('hidden');
+    box._hits = hits;
+    box.querySelectorAll('.search-hit[data-i]').forEach(el => {
+      el.addEventListener('click', () => {
+        const h = hits[+el.dataset.i];
+        if (h && h.act) h.act();
+        box.classList.add('hidden');
+        const inp = $('#global-search'); if (inp) inp.value = '';
+      });
+    });
+  }
+
+  function jumpToMessage(msgId) {
+    const row = messageList?.querySelector(`[data-id="${msgId}"]`);
+    if (!row) { alert('未找到该消息（可能已被裁剪）'); return; }
+    row.classList.add('msg-hit');
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => row.classList.remove('msg-hit'), 1500);
+  }
+
+  function openChatSearch() {
+    const bar = $('#chat-search-bar');
+    if (!bar) return;
+    bar.classList.remove('hidden');
+    $('#chat-search-input')?.focus();
+  }
+
+  function runChatSearch() {
+    const q = ($('#chat-search-input')?.value || '').trim().toLowerCase();
+    if (!q || !state.chatContactId) return;
+    const msgs = state.chats[state.chatContactId] || [];
+    const found = [...msgs].reverse().find(m => m.text && String(m.text).toLowerCase().includes(q));
+    if (!found) { alert('本聊天中没有匹配消息'); return; }
+    jumpToMessage(found.id);
+  }
+
+  // ===== 信箱 =====
+  function scheduleLetterSystem() {
+    if (state.letterTimer) clearTimeout(state.letterTimer);
+    const cfg = Object.assign({}, DEFAULT_MAILBOX, state.mailboxConfig || {});
+    if (!cfg.enabled) return;
+    const minH = Math.max(0.05, Number(cfg.minIntervalH) || 6);
+    const maxH = Math.max(minH, Number(cfg.maxIntervalH) || 36);
+    // 开发体验：用分钟缩放 — 实际按小时；此处用小时
+    const delayH = minH + Math.random() * (maxH - minH);
+    const delayMs = delayH * 3600 * 1000;
+    // 若间隔过长，也允许最短 30s 检查一次（首次）
+    const wait = Math.min(delayMs, Math.max(15000, delayMs));
+    state.letterTimer = setTimeout(() => {
+      tryDeliverLetter();
+      scheduleLetterSystem();
+    }, Math.min(wait, 120000)); // 最长 2 分钟轮询一次是否该写信（按 lastLetterAt 判断）
+  }
+
+  function tryDeliverLetter() {
+    const cfg = Object.assign({}, DEFAULT_MAILBOX, state.mailboxConfig || {});
+    if (!cfg.enabled) return;
+    const contacts = state.contacts || [];
+    if (!contacts.length) return;
+    const minH = Math.max(0.05, Number(cfg.minIntervalH) || 6);
+    const maxH = Math.max(minH, Number(cfg.maxIntervalH) || 36);
+    const now = Date.now();
+    const candidates = contacts.filter(c => {
+      const last = (state.lastLetterAt || {})[c.id] || 0;
+      const need = (minH + Math.random() * (maxH - minH)) * 3600 * 1000;
+      // 演示：将“小时”映射，若用户设很小也能较快收到；正常按小时
+      return now - last >= Math.min(need, need);
+    });
+    if (!candidates.length) return;
+    // 随机一个联系人
+    const c = candidates[Math.floor(Math.random() * candidates.length)];
+    const pool = getContactCardPool(c);
+    if (!pool.length) return;
+    const minW = Math.max(5, Number(cfg.minWords) || 20);
+    const maxW = Math.max(minW, Number(cfg.maxWords) || 120);
+    // 拼几条字卡凑字数
+    let text = '';
+    const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+    for (const line of shuffled) {
+      text = text ? (text + '\n' + line) : line;
+      if (text.length >= minW) break;
+    }
+    if (text.length > maxW) text = text.slice(0, maxW) + '…';
+    if (!text.trim()) return;
+    if (!state.letters) state.letters = [];
+    state.letters.unshift({
+      id: genId('lt'),
+      contactId: c.id,
+      from: 'contact',
+      name: c.name,
+      text,
+      time: now,
+      favorite: false,
+      read: false,
+      replies: []
+    });
+    if (state.letters.length > 80) state.letters.length = 80;
+    if (!state.lastLetterAt) state.lastLetterAt = {};
+    state.lastLetterAt[c.id] = now;
+    state.mailboxUnread = (state.mailboxUnread || 0) + 1;
+    saveData();
+    updateTabDots();
+  }
+
+  function renderMailbox() {
+    const list = $('#mailbox-list');
+    const empty = $('#mailbox-empty');
+    if (!list) return;
+    const letters = state.letters || [];
+    if (!letters.length) {
+      list.innerHTML = '';
+      empty?.classList.remove('hidden');
+      return;
+    }
+    empty?.classList.add('hidden');
+    list.innerHTML = letters.map(L => {
+      const unread = L.read === false;
+      return `<div class="letter-card ${unread ? 'unread' : ''}" data-lid="${L.id}">
+        <div class="letter-from">${escapeHtml(L.name || '来信')}${L.favorite ? ' <span class="letter-fav">★</span>' : ''}</div>
+        <div class="letter-time">${formatTime(L.time)}</div>
+        <div class="letter-body">${escapeHtml(L.text)}</div>
+        ${(L.replies || []).map(r => `<div class="letter-body" style="opacity:.85;margin-top:8px;border-left:2px solid var(--accent);padding-left:8px">我：${escapeHtml(r.text)}<div class="letter-time">${formatTime(r.time)}</div></div>`).join('')}
+        <div class="letter-actions">
+          <button type="button" class="btn-xs" data-lact="read">标为已读</button>
+          <button type="button" class="btn-xs" data-lact="fav">${L.favorite ? '取消收藏' : '收藏'}</button>
+          <button type="button" class="btn-xs" data-lact="reply">回信</button>
+          <button type="button" class="btn-xs" data-lact="del">删除</button>
+        </div>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('.letter-card').forEach(card => {
+      const id = card.dataset.lid;
+      const L = (state.letters || []).find(x => x.id === id);
+      if (!L) return;
+      card.querySelectorAll('[data-lact]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const act = btn.dataset.lact;
+          if (act === 'read') {
+            if (L.read === false) {
+              L.read = true;
+              state.mailboxUnread = Math.max(0, (state.mailboxUnread || 1) - 1);
+            }
+          } else if (act === 'fav') {
+            L.favorite = !L.favorite;
+          } else if (act === 'del') {
+            if (!confirm('删除这封信？')) return;
+            if (L.read === false) state.mailboxUnread = Math.max(0, (state.mailboxUnread || 1) - 1);
+            state.letters = state.letters.filter(x => x.id !== id);
+          } else if (act === 'reply') {
+            const text = prompt('回信内容：');
+            if (!text || !text.trim()) return;
+            if (!L.replies) L.replies = [];
+            L.replies.push({ text: text.trim(), time: Date.now() });
+            L.read = true;
+            // 联系人可能再回信
+            const cfg = Object.assign({}, DEFAULT_MAILBOX, state.mailboxConfig || {});
+            if (Math.random() < (cfg.replyChance || 0.55)) {
+              const c = state.contacts.find(x => x.id === L.contactId);
+              const pool = c ? getContactCardPool(c) : [];
+              if (pool.length) {
+                setTimeout(() => {
+                  L.replies.push({ text: pool[Math.floor(Math.random() * pool.length)], time: Date.now(), from: 'contact' });
+                  saveData();
+                  if ($('#mailbox-subpage') && !$('#mailbox-subpage').classList.contains('hidden')) renderMailbox();
+                }, 1500 + Math.random() * 2500);
+              }
+            }
+          }
+          saveData();
+          updateTabDots();
+          renderMailbox();
+        });
+      });
+    });
+  }
+
+  function openMailboxSettings() {
+    const cfg = Object.assign({}, DEFAULT_MAILBOX, state.mailboxConfig || {});
+    state.modalMode = 'mailbox-settings';
+    modalTitle.textContent = '信箱设置';
+    modalBody.innerHTML = `
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <input type="checkbox" id="mb-on" ${cfg.enabled ? 'checked' : ''}/> 启用随机来信
+      </label>
+      <div class="form-row"><label>来信间隔最少（小时）</label><input type="number" id="mb-min-h" step="0.5" min="0.1" value="${cfg.minIntervalH}"/></div>
+      <div class="form-row"><label>来信间隔最多（小时）</label><input type="number" id="mb-max-h" step="0.5" min="0.1" value="${cfg.maxIntervalH}"/></div>
+      <div class="form-row"><label>信件最少字数</label><input type="number" id="mb-min-w" min="5" value="${cfg.minWords}"/></div>
+      <div class="form-row"><label>信件最多字数</label><input type="number" id="mb-max-w" min="10" value="${cfg.maxWords}"/></div>
+      <div class="form-row"><label>对方回信概率 (0~1)</label><input type="number" id="mb-reply" step="0.01" min="0" max="1" value="${cfg.replyChance}"/></div>
+      <p style="font-size:11px;color:var(--muted)">信件内容来自联系人字卡库拼接。间隔按小时计算。</p>`;
+    modalOverlay.classList.remove('hidden');
+  }
+
+  function openMailboxPage() {
+    document.querySelector('.discover-list')?.classList.add('hidden');
+    $('#music-subpage')?.classList.add('hidden');
+    $('#memorial-subpage')?.classList.add('hidden');
+    $('#mailbox-subpage')?.classList.remove('hidden');
+    pageTitle.textContent = '信箱';
+    renderMailbox();
+  }
+
   function ensureMeMenu() {
     const host = document.querySelector('#page-me .me-content');
     if (!host) return;
@@ -2815,6 +3281,14 @@
     state.memorials = data.memorials || [];
     state.questionnaires = data.questionnaires || [];
     state.groups = data.groups || [];
+    state.unread = data.unread || {};
+    state.groupUnread = data.groupUnread || {};
+    state.pinned = Array.isArray(data.pinned) ? data.pinned : [];
+    state.letters = Array.isArray(data.letters) ? data.letters : [];
+    state.mailboxConfig = Object.assign({}, DEFAULT_MAILBOX, data.mailboxConfig || {});
+    state.mailboxUnread = data.mailboxUnread || 0;
+    state.momentNotifs = data.momentNotifs || 0;
+    state.lastLetterAt = data.lastLetterAt || {};
     state.userBalance = data.userBalance; state.theme = data.theme;
     state.playMode = data.playMode || 'order';
     state.userAvatar = data.userAvatar || null;
@@ -2829,7 +3303,27 @@
     updateMeAvatarUI();
 
     $$('.tab-item').forEach(t => t.addEventListener('click', () => switchPage(t.dataset.page)));
-    btnBack.addEventListener('click', leaveChat);
+    btnBack.addEventListener('click', () => {
+      // 群聊返回
+      if (state.activeGroupId) {
+        const view = $('#group-chat-view');
+        if (view && !view.classList.contains('hidden')) {
+          state.activeGroupId = null;
+          view.classList.add('hidden');
+          view.style.display = 'none';
+          $('#group-list')?.classList.remove('hidden');
+          $('#group-title').textContent = '群聊';
+          $('#group-settings')?.classList.add('hidden');
+          $('#group-new')?.classList.remove('hidden');
+          btnBack.classList.add('hidden');
+          pageTitle.textContent = '联系人';
+          renderGroupList();
+          renderChatList();
+          return;
+        }
+      }
+      leaveChat();
+    });
 
     let lastTap=0;
     headerAvatar.addEventListener('click', () => {
@@ -3134,6 +3628,23 @@
       document.querySelector('.discover-list')?.classList.remove('hidden');
       pageTitle.textContent = '互动';
     });
+    $('#btn-goto-mailbox')?.addEventListener('click', openMailboxPage);
+    $('#btn-mailbox-back')?.addEventListener('click', () => {
+      $('#mailbox-subpage')?.classList.add('hidden');
+      document.querySelector('.discover-list')?.classList.remove('hidden');
+      pageTitle.textContent = '互动';
+    });
+    $('#btn-mailbox-settings')?.addEventListener('click', openMailboxSettings);
+    $('#btn-goto-moment-notifs')?.addEventListener('click', () => {
+      state.momentNotifs = 0;
+      saveData();
+      updateTabDots();
+      openMomentsPage();
+    });
+    $('#global-search')?.addEventListener('input', e => runGlobalSearch(e.target.value));
+    $('#btn-open-search')?.addEventListener('click', () => runGlobalSearch($('#global-search')?.value));
+    $('#chat-search-go')?.addEventListener('click', runChatSearch);
+    $('#chat-search-close')?.addEventListener('click', () => $('#chat-search-bar')?.classList.add('hidden'));
     $('#btn-goto-memorial')?.addEventListener('click', () => {
       document.querySelector('.discover-list')?.classList.add('hidden');
       $('#music-subpage')?.classList.add('hidden');
@@ -3726,13 +4237,16 @@
     const g = (state.groups || []).find(x => x.id === gid);
     if (!g) return;
     state.activeGroupId = gid;
+    clearUnread('group', gid);
     ensureGroupShape(g);
     $('#group-list')?.classList.add('hidden');
     const view = $('#group-chat-view');
     if (view) { view.classList.remove('hidden'); view.style.display = 'flex'; }
     $('#group-title').textContent = g.name;
+    pageTitle.textContent = g.name || '群聊';
     $('#group-settings')?.classList.remove('hidden');
     $('#group-new')?.classList.add('hidden');
+    btnBack.classList.remove('hidden');
     renderGroupMessages();
     applyGroupChatBg(g);
   }
@@ -3915,6 +4429,10 @@
           m = { id: genId('gm'), from: 'contact', contactId: c.id, name: c.name, type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: Date.now() };
         } else return;
         g.messages.push(m);
+        if (state.activeGroupId !== g.id) {
+          addUnread('group', g.id, 1);
+          renderChatList();
+        }
         saveData();
         if (state.activeGroupId === g.id) renderGroupMessages();
       }, delay * 1000);

@@ -22,6 +22,11 @@
     <main class="app-main">
       <section id="page-chat" class="page active">
         <div id="chat-list-view">
+          <div class="chat-list-toolbar">
+            <input type="search" id="global-search" class="search-input" placeholder="搜索聊天 / 联系人 / 字卡" autocomplete="off"/>
+            <button type="button" class="btn-xs" id="btn-open-search">搜</button>
+          </div>
+          <div id="search-results" class="search-results hidden"></div>
           <div id="chat-list" class="chat-list"></div>
           <div id="chat-list-empty" class="empty-state">
             <div class="empty-icon">💬</div>
@@ -31,6 +36,11 @@
         </div>
         <div id="chat-detail-view" class="hidden">
           <div id="chat-pin-memorial" class="chat-pin-memorial hidden"></div>
+          <div id="chat-search-bar" class="chat-search-bar hidden">
+            <input type="search" id="chat-search-input" placeholder="搜索本聊天记录" />
+            <button type="button" class="btn-xs" id="chat-search-go">定位</button>
+            <button type="button" class="btn-xs" id="chat-search-close">✕</button>
+          </div>
           <div id="message-list" class="message-list"></div>
           <div id="quote-bar" class="quote-bar hidden">
             <div class="quote-bar-content">
@@ -77,6 +87,7 @@
             <button class="discover-item" id="btn-goto-moments">
               <span class="discover-icon">🌈</span>
               <span class="discover-label">朋友圈</span>
+              <span class="discover-badge hidden" id="badge-moments-main">0</span>
               <span class="discover-arrow">›</span>
             </button>
             <button class="discover-item" id="btn-goto-music">
@@ -89,6 +100,18 @@
               <span class="discover-label">纪念</span>
               <span class="discover-arrow">›</span>
             </button>
+            <button class="discover-item" id="btn-goto-mailbox">
+              <span class="discover-icon">✉️</span>
+              <span class="discover-label">信箱</span>
+              <span class="discover-badge hidden" id="badge-mailbox">0</span>
+              <span class="discover-arrow">›</span>
+            </button>
+            <button class="discover-item" id="btn-goto-moment-notifs">
+              <span class="discover-icon">🔔</span>
+              <span class="discover-label">动态提醒</span>
+              <span class="discover-badge hidden" id="badge-moments">0</span>
+              <span class="discover-arrow">›</span>
+            </button>
           </div>
           <div id="memorial-subpage" class="music-subpage hidden">
             <div class="music-page-toolbar">
@@ -96,6 +119,14 @@
               <button class="btn-primary" id="btn-add-memorial">＋ 添加纪念</button>
             </div>
             <div id="memorial-list" class="memorial-list"></div>
+          </div>
+          <div id="mailbox-subpage" class="music-subpage hidden">
+            <div class="music-page-toolbar">
+              <button class="btn-xs" id="btn-mailbox-back">‹ 返回</button>
+              <button class="btn-xs" id="btn-mailbox-settings">设置</button>
+            </div>
+            <div id="mailbox-list" class="mailbox-list"></div>
+            <div class="empty-state small" id="mailbox-empty"><p>还没有来信</p><p class="hint">联系人会按设定随机写信</p></div>
           </div>
           <div id="music-subpage" class="music-subpage hidden">
             <div class="music-page-toolbar">
