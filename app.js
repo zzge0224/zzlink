@@ -407,13 +407,17 @@
       else { pageTitle.textContent = '聊天'; showChatListView(); renderChatList(); }
     } else if (name === 'contacts') {
       pageTitle.textContent = '联系人'; renderContactsList(); renderCardsPanel();
+    } else if (name === 'me') {
+      pageTitle.textContent = '我';
+      ensureMeMenu();
+      updateMeAvatarUI();
+      updateStats();
+      updateThemeUI();
+      const ub = $('#user-balance'); if (ub) ub.textContent = state.userBalance;
     } else if (name === 'interact') {
       pageTitle.textContent = '互动';
       document.querySelector('.discover-list')?.classList.remove('hidden');
       $('#music-subpage')?.classList.add('hidden');
-    } else if (name === 'me') {
-      pageTitle.textContent = '我'; updateStats(); updateThemeUI();
-      const ub = $('#user-balance'); if (ub) ub.textContent = state.userBalance;
     }
   }
 
@@ -2746,6 +2750,47 @@
     renderContactsList(); renderCardsPanel(); renderChatList(); showChatListView(); renderSongList(); updateStats(); updateThemeUI();
   }
 
+
+  function ensureMeMenu() {
+    const host = document.querySelector('#page-me .me-content');
+    if (!host) return;
+    let menu = document.getElementById('me-menu');
+    if (!menu) {
+      menu = document.createElement('div');
+      menu.className = 'me-menu';
+      menu.id = 'me-menu';
+      menu.innerHTML = [
+        '<button class="me-menu-item" id="btn-manage-stickers" type="button"><span class="mm-icon">😊</span><span class="mm-text">表情包管理</span><span class="mm-arrow">›</span></button>',
+        '<button class="me-menu-item" id="btn-moments-cover" type="button"><span class="mm-icon">🖼️</span><span class="mm-text">朋友圈封面</span><span class="mm-arrow">›</span></button>',
+        '<button class="me-menu-item" id="btn-export-data" type="button"><span class="mm-icon">📦</span><span class="mm-text">导出全部数据</span><span class="mm-arrow">›</span></button>',
+        '<button class="me-menu-item" id="btn-import-data" type="button"><span class="mm-icon">📥</span><span class="mm-text">导入备份数据</span><span class="mm-arrow">›</span></button>'
+      ].join('');
+      const theme = host.querySelector('.theme-section');
+      if (theme) host.insertBefore(menu, theme);
+      else host.appendChild(menu);
+    }
+    const stickers = document.getElementById('btn-manage-stickers');
+    const cover = document.getElementById('btn-moments-cover');
+    const exp = document.getElementById('btn-export-data');
+    const imp = document.getElementById('btn-import-data');
+    if (stickers && !stickers._bound) {
+      stickers._bound = true;
+      stickers.addEventListener('click', function (e) { e.preventDefault(); openStickerManager(); });
+    }
+    if (cover && !cover._bound) {
+      cover._bound = true;
+      cover.addEventListener('click', function () { document.getElementById('file-moments-cover')?.click(); });
+    }
+    if (exp && !exp._bound) {
+      exp._bound = true;
+      exp.addEventListener('click', function () { exportBackup(); });
+    }
+    if (imp && !imp._bound) {
+      imp._bound = true;
+      imp.addEventListener('click', function () { document.getElementById('file-backup')?.click(); });
+    }
+  }
+
   function updateMeAvatarUI() {
     const el = $('#me-avatar');
     const nameEl = $('#me-name');
@@ -3226,6 +3271,7 @@
     updatePlayModeBtn();
     wireAvatarPoolFiles();
     wireAskSurvey();
+    ensureMeMenu();
   }
 
   // ========== 头像池随机更换（灵感：Mochi 字卡 · 小红书@言序）==========

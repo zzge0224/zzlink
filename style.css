@@ -994,3 +994,56 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
   display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; align-items: center;
 }
 .card-item.selected { outline: 2px solid var(--accent); background: var(--accent-soft); }
+
+/* 我页：必须可滚动，菜单必须可见 */
+#page-me.page.active {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  height: 100% !important;
+}
+#page-me .me-content {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  padding: 16px 16px 40px !important;
+  box-sizing: border-box !important;
+}
+#page-me .me-menu {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  height: auto !important;
+  min-height: 48px !important;
+  background: var(--chrome) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  margin: 0 0 16px !important;
+  overflow: visible !important;
+  flex-shrink: 0 !important;
+}
+#page-me .me-menu-item {
+  display: flex !important;
+  visibility: visible !important;
+  width: 100% !important;
+  min-height: 48px !important;
+  padding: 14px 16px !important;
+  color: var(--paper) !important;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  font-size: 15px !important;
+  align-items: center !important;
+  gap: 12px !important;
+  box-sizing: border-box !important;
+}
+#page-me .me-menu-item:last-child { border-bottom: none !important; }
+#page-me .mm-text { flex: 1; text-align: left; color: var(--paper) !important; }
+#page-me .mm-arrow { color: var(--muted) !important; }
+#page-me .me-profile-card { flex-shrink: 0; }
+#page-me .theme-section { flex-shrink: 0; }

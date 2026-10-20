@@ -128,39 +128,49 @@
                 <span class="me-balance-label">星币</span>
                 <span class="me-balance-num"><span id="user-balance">888</span> ★</span>
               </div>
-              <button class="btn-sm" id="btn-edit-balance">充值/修改</button>
+              <button class="btn-sm" id="btn-edit-balance" type="button">充值/修改</button>
             </div>
           </div>
-          <div class="me-menu">
-            <div class="section-label" style="padding:0 4px 8px">数据与资源</div>
-            <button class="me-menu-item" id="btn-manage-stickers" type="button"><span class="mm-icon">😊</span><span>表情包管理</span><span class="mm-arrow">›</span></button>
-            <button class="me-menu-item" id="btn-moments-cover" type="button"><span class="mm-icon">🖼️</span><span>朋友圈封面</span><span class="mm-arrow">›</span></button>
-            <button class="me-menu-item" id="btn-export-data" type="button"><span class="mm-icon">📦</span><span>导出全部数据</span><span class="mm-arrow">›</span></button>
-            <button class="me-menu-item" id="btn-import-data" type="button"><span class="mm-icon">📥</span><span>导入备份数据</span><span class="mm-arrow">›</span></button>
+
+          <div class="me-menu" id="me-menu">
+            <button class="me-menu-item" id="btn-manage-stickers" type="button">
+              <span class="mm-icon">😊</span><span class="mm-text">表情包管理</span><span class="mm-arrow">›</span>
+            </button>
+            <button class="me-menu-item" id="btn-moments-cover" type="button">
+              <span class="mm-icon">🖼️</span><span class="mm-text">朋友圈封面</span><span class="mm-arrow">›</span>
+            </button>
+            <button class="me-menu-item" id="btn-export-data" type="button">
+              <span class="mm-icon">📦</span><span class="mm-text">导出全部数据</span><span class="mm-arrow">›</span>
+            </button>
+            <button class="me-menu-item" id="btn-import-data" type="button">
+              <span class="mm-icon">📥</span><span class="mm-text">导入备份数据</span><span class="mm-arrow">›</span>
+            </button>
           </div>
+
           <div class="theme-section">
             <div class="section-label">主题皮肤</div>
             <div class="theme-grid" id="theme-grid">
-              <button class="theme-card active" data-theme="classic"><div class="theme-preview classic-preview"></div><span>经典绿</span></button>
-              <button class="theme-card" data-theme="dark"><div class="theme-preview dark-preview"></div><span>暗夜黑</span></button>
-              <button class="theme-card" data-theme="seasalt"><div class="theme-preview seasalt-preview"></div><span>海盐芝士</span></button>
-              <button class="theme-card" data-theme="mintchoc"><div class="theme-preview mintchoc-preview"></div><span>薄荷黑巧</span></button>
-              <button class="theme-card" data-theme="taro"><div class="theme-preview taro-preview"></div><span>芋泥小方</span></button>
-              <button class="theme-card" data-theme="peach"><div class="theme-preview peach-preview"></div><span>蜜桃荔枝</span></button>
-              <button class="theme-card" data-theme="yuzu"><div class="theme-preview yuzu-preview"></div><span>柚见青柠</span></button>
-              <button class="theme-card" data-theme="algae"><div class="theme-preview algae-preview"></div><span>蓝藻乳酪</span></button>
-              <button class="theme-card" data-theme="lavender"><div class="theme-preview lavender-preview"></div><span>淡紫</span></button>
-              <button class="theme-card" data-theme="cream"><div class="theme-preview cream-preview"></div><span>奶油白</span></button>
-              <button class="theme-card" data-theme="rose"><div class="theme-preview rose-preview"></div><span>玫瑰粉</span></button>
-              <button class="theme-card" data-theme="ocean"><div class="theme-preview ocean-preview"></div><span>海洋蓝</span></button>
+              <button class="theme-card active" data-theme="classic" type="button"><div class="theme-preview classic-preview"></div><span>经典绿</span></button>
+              <button class="theme-card" data-theme="dark" type="button"><div class="theme-preview dark-preview"></div><span>暗夜黑</span></button>
+              <button class="theme-card" data-theme="seasalt" type="button"><div class="theme-preview seasalt-preview"></div><span>海盐芝士</span></button>
+              <button class="theme-card" data-theme="mintchoc" type="button"><div class="theme-preview mintchoc-preview"></div><span>薄荷黑巧</span></button>
+              <button class="theme-card" data-theme="taro" type="button"><div class="theme-preview taro-preview"></div><span>芋泥小方</span></button>
+              <button class="theme-card" data-theme="peach" type="button"><div class="theme-preview peach-preview"></div><span>蜜桃荔枝</span></button>
+              <button class="theme-card" data-theme="yuzu" type="button"><div class="theme-preview yuzu-preview"></div><span>柚见青柠</span></button>
+              <button class="theme-card" data-theme="algae" type="button"><div class="theme-preview algae-preview"></div><span>蓝藻乳酪</span></button>
+              <button class="theme-card" data-theme="lavender" type="button"><div class="theme-preview lavender-preview"></div><span>淡紫</span></button>
+              <button class="theme-card" data-theme="cream" type="button"><div class="theme-preview cream-preview"></div><span>奶油白</span></button>
+              <button class="theme-card" data-theme="rose" type="button"><div class="theme-preview rose-preview"></div><span>玫瑰粉</span></button>
+              <button class="theme-card" data-theme="ocean" type="button"><div class="theme-preview ocean-preview"></div><span>海洋蓝</span></button>
             </div>
           </div>
+
           <div class="stats">
             <div class="stat-item"><span class="stat-num" id="stat-contacts">0</span><span class="stat-label">联系人</span></div>
             <div class="stat-item"><span class="stat-num" id="stat-cards">0</span><span class="stat-label">字卡</span></div>
             <div class="stat-item"><span class="stat-num" id="stat-songs">0</span><span class="stat-label">歌曲</span></div>
           </div>
-          <button class="btn-outline" id="btn-reset-data">重置示例数据</button>
+          <button class="btn-outline" id="btn-reset-data" type="button">重置示例数据</button>
         </div>
       </section>
     </main>
