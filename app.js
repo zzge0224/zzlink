@@ -23,6 +23,9 @@
     proactiveIntervalMin: 30,
     avatarSwapChance: 0.08,
     askChance: 0.1,
+    // 提问 / 问卷回答延迟（秒）
+    askMinDelay: 2,
+    askMaxDelay: 8,
     momentsSticker: true,
     momentCommentChance: 0.65,
     // 拼字卡：把多条短字卡拼成一句再发送
@@ -144,8 +147,13 @@
       return {
         contacts: JSON.parse(JSON.stringify(DEFAULT_CONTACTS)).map(ensureContactShape),
         songs: JSON.parse(JSON.stringify(DEFAULT_SONGS)),
-        chats: {}, stickers: [], moments: [],
-        userBalance: 888, theme: 'classic', playMode: 'order'
+        chats: {}, stickers: [], moments: [], memorials: [], questionnaires: [], groups: [],
+        userBalance: 888, theme: 'classic', playMode: 'order',
+        unread: {}, groupUnread: {}, pinned: [], letters: [],
+        mailboxConfig: { ...DEFAULT_MAILBOX }, mailboxUnread: 0, momentNotifs: 0,
+        lastLetterAt: {}, lastProactiveAt: {}, momentsCover: null,
+        userAvatar: null, userAvatarPool: [], userName: '昕',
+        notifyEnabled: false
       };
     }
     p.contacts.forEach(ensureContactShape);
@@ -165,7 +173,16 @@
       userAvatarPool: Array.isArray(p.userAvatarPool) ? p.userAvatarPool : [],
       userName: p.userName || '昕',
       lastProactiveAt: p.lastProactiveAt || {},
-      momentsCover: p.momentsCover || null
+      momentsCover: p.momentsCover || null,
+      unread: p.unread || {},
+      groupUnread: p.groupUnread || {},
+      pinned: Array.isArray(p.pinned) ? p.pinned : [],
+      letters: Array.isArray(p.letters) ? p.letters : [],
+      mailboxConfig: Object.assign({}, DEFAULT_MAILBOX, p.mailboxConfig || {}),
+      mailboxUnread: p.mailboxUnread || 0,
+      momentNotifs: p.momentNotifs || 0,
+      lastLetterAt: p.lastLetterAt || {},
+      notifyEnabled: !!p.notifyEnabled
     };
   }
 
@@ -241,7 +258,8 @@
       mailboxUnread: state.mailboxUnread || 0,
       momentNotifs: state.momentNotifs || 0,
       lastLetterAt: state.lastLetterAt || {},
-      _v: 12
+      notifyEnabled: !!state.notifyEnabled,
+      _v: 13
     };
   }
 
@@ -422,6 +440,11 @@
 
   // ===== Tab =====
   function switchPage(name) {
+    if (name !== 'chat') {
+      document.getElementById('app')?.classList.remove('chat-detail-open');
+    } else if (!state.chatContactId) {
+      document.getElementById('app')?.classList.remove('chat-detail-open');
+    }
     $$('.page').forEach(p => p.classList.remove('active'));
     $$('.tab-item').forEach(t => t.classList.remove('active'));
     const page = $(`#page-${name}`);
@@ -445,11 +468,10 @@
     } else if (name === 'me') {
       pageTitle.textContent = '我';
       ensureMeMenu();
-    scheduleLetterSystem();
-    updateTabDots();
       updateMeAvatarUI();
       updateStats();
       updateThemeUI();
+      updateNotifyUI();
       const ub = $('#user-balance'); if (ub) ub.textContent = state.userBalance;
     } else if (name === 'interact') {
       pageTitle.textContent = '互动';
@@ -542,6 +564,53 @@
       el.textContent = mn > 99 ? '99+' : String(mn);
       el.classList.toggle('hidden', mn <= 0);
     });
+  }
+
+  function maybeBrowserNotify(contact, msg) {
+    try {
+      if (!state.notifyEnabled) return;
+      if (typeof Notification === 'undefined') return;
+      if (Notification.permission !== 'granted') return;
+      // 仅页面不可见时弹系统通知（前台不打扰）
+      if (document.visibilityState === 'visible' && state.chatContactId === contact.id) return;
+      const title = (contact && contact.name) ? contact.name : '字笺';
+      let body = '[新消息]';
+      if (msg) {
+        if (msg.type === 'sticker') body = '[表情]';
+        else if (msg.type === 'image') body = '[图片]';
+        else if (msg.text) body = String(msg.text).slice(0, 60);
+        else body = getPreviewText(msg) || body;
+      }
+      const n = new Notification(title, { body: body, tag: 'zijian-' + (contact && contact.id), renotify: true });
+      n.onclick = function () {
+        window.focus();
+        n.close();
+        if (contact && contact.id) {
+          switchPage('chat');
+          enterChat(contact.id);
+        }
+      };
+    } catch (e) { console.warn('notify', e); }
+  }
+
+  function requestNotifyPermission() {
+    if (typeof Notification === 'undefined') {
+      alert('当前浏览器不支持系统通知');
+      return Promise.resolve(false);
+    }
+    return Notification.requestPermission().then(function (p) {
+      state.notifyEnabled = (p === 'granted');
+      saveData();
+      updateNotifyUI();
+      if (p === 'granted') alert('已开启：离开页面时有新消息会尝试弹出通知');
+      else alert('未获得通知权限，可在浏览器设置中允许本站通知');
+      return state.notifyEnabled;
+    });
+  }
+
+  function updateNotifyUI() {
+    const btn = document.getElementById('btn-toggle-notify');
+    if (btn) btn.textContent = state.notifyEnabled ? '通知：已开启' : '通知：未开启';
   }
 
   function notifyContactMessage(contactId, msg) {
@@ -696,12 +765,17 @@
     renderMessages(); msgInput.value = ''; hideAttachPanel(); hideStickerPanel(); state.quotingMsg = null; updateQuoteBar();
     $('#btn-chat-more')?.classList.remove('hidden');
     updateChatPinMemorial(id);
+    document.getElementById('app')?.classList.add('chat-detail-open');
   }
   function leaveChat() {
-    clearPendingTimers(); state.chatContactId = null; state.quotingMsg = null;
+    // 不取消待发送的回复定时器，否则切走界面后联系人消息会丢失
+    hideTyping();
+    state.chatContactId = null;
+    state.quotingMsg = null;
     $('#btn-chat-more')?.classList.add('hidden');
     const pin = $('#chat-pin-memorial');
     if (pin) { pin.classList.add('hidden'); pin.textContent = ''; }
+    document.getElementById('app')?.classList.remove('chat-detail-open');
     showChatListView(); renderChatList();
   }
 
@@ -745,6 +819,8 @@
       <div class="settings-cell" id="cs-user-avatar-pool"><span>我的头像池</span><span class="val">›</span></div>
       <div class="settings-cell"><span>头像随机更换概率</span><input type="number" id="cs-av-swap" step="0.01" min="0" max="1" value="${lc.avatarSwapChance != null ? lc.avatarSwapChance : 0.08}"/></div>
       <div class="settings-cell"><span>查岗提问概率</span><input type="number" id="cs-ask-chance" step="0.01" min="0" max="1" value="${lc.askChance != null ? lc.askChance : 0.1}"/></div>
+      <div class="settings-cell"><span>回答问卷/提问最短(秒)</span><input type="number" id="cs-ask-min" step="0.5" min="0.5" max="120" value="${lc.askMinDelay != null ? lc.askMinDelay : 2}"/></div>
+      <div class="settings-cell"><span>回答问卷/提问最长(秒)</span><input type="number" id="cs-ask-max" step="0.5" min="0.5" max="300" value="${lc.askMaxDelay != null ? lc.askMaxDelay : 8}"/></div>
       <div style="padding:16px"><button class="btn-primary" id="cs-save" style="width:100%">保存</button></div>`;
     page.classList.remove('hidden');
 
@@ -794,6 +870,12 @@
         proactiveIntervalMin: Math.max(0, Math.min(10080, num('#cs-proactive', 30))),
         avatarSwapChance: clamp01(num('#cs-av-swap', 0.08)),
         askChance: clamp01(num('#cs-ask-chance', 0.1)),
+        askMinDelay: Math.max(0.5, Math.min(120, num('#cs-ask-min', 2))),
+        askMaxDelay: (function () {
+          var amin = Math.max(0.5, Math.min(120, num('#cs-ask-min', 2)));
+          var amax = Math.max(0.5, Math.min(300, num('#cs-ask-max', 8)));
+          return Math.max(amin, amax);
+        })(),
         spliceChance: clamp01(num('#cs-splice', 0.35)),
         spliceMin,
         spliceMax,
@@ -1183,31 +1265,46 @@
     return hasAscii ? picked.join(' ') : picked.join('');
   }
 
+  function deliverContactMsg(contact, msg) {
+    if (!contact || !msg) return;
+    if (!state.chats[contact.id]) state.chats[contact.id] = [];
+    // 避免重复 push：若已由 pushMsg 写入则跳过
+    const arr = state.chats[contact.id];
+    if (!arr.find(x => x.id === msg.id)) arr.push(msg);
+    saveData();
+    if (state.chatContactId === contact.id) {
+      appendMessage(msg);
+      hideTyping();
+    } else {
+      notifyContactMessage(contact.id, msg);
+      maybeBrowserNotify(contact, msg);
+    }
+    renderChatList();
+    updateTabDots();
+  }
+
   function scheduleReplies(contact, forceCount) {
+    // 只清「本联系人」相关的旧定时器，避免打断其它会话的待发消息
     clearPendingTimers();
     const s = contact.settings || DEFAULT_SETTINGS;
     const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
     const minD = Math.max(0.5, s.minDelay || 1.5);
     const maxD = Math.max(minD, s.maxDelay || 4);
+    const contactId = contact.id;
 
-    // 已读延迟（先变已读，再决定是否回复）
     const readDelay = randomDelay(
       Math.min(0.5, minD * 0.35),
       Math.min(2.2, Math.max(0.8, minD * 0.85))
     );
 
-    // 已读不回：按设置概率
     const willNoreply = !forceCount && Math.random() < (Number(lc.readNoReplyChance) || 0);
-    // 回复概率（在未触发已读不回时）
     const willSkipReply = !forceCount && !willNoreply &&
       Math.random() > (lc.replyChance == null ? 1 : Number(lc.replyChance));
 
-    // 统一先在 readDelay 后写入已读状态
     state.pendingTimers.push(setTimeout(() => {
-      markUserMsgsRead(contact.id, willNoreply || willSkipReply);
+      markUserMsgsRead(contactId, willNoreply || willSkipReply);
     }, readDelay * 1000));
 
-    // 已读不回 或 不回复 → 结束
     if (willNoreply || willSkipReply) return;
 
     const maxR = Math.min(3, Math.max(1, s.maxReplies || 2));
@@ -1220,28 +1317,11 @@
       cum += d;
       const sendSticker = stickers.length && Math.random() < 0.22;
       state.pendingTimers.push(setTimeout(() => {
-        if (state.chatContactId !== contact.id) return;
-        showTyping();
+        // 仅当前正在看该会话时显示“正在输入”
+        if (state.chatContactId === contactId) showTyping();
       }, Math.max(0, (cum - d * 0.6) * 1000)));
       state.pendingTimers.push(setTimeout(() => {
-        // 回复前确保已读（非不回）
-        markUserMsgsRead(contact.id, false);
-        if (state.chatContactId !== contact.id) {
-          // 不在当前页也写入消息
-          let msg;
-          if (sendSticker) {
-            const st = stickers[Math.floor(Math.random() * stickers.length)];
-            msg = { id: genId('m'), from: 'contact', type: 'sticker', stickerId: st.id, stickerData: st.data, time: Date.now() };
-          } else if (pool.length) {
-            const text = composeSplicedCard(contact) || pool[Math.floor(Math.random() * pool.length)];
-            msg = { id: genId('m'), from: 'contact', type: 'text', text, time: Date.now() };
-          } else return;
-          if (!state.chats[contact.id]) state.chats[contact.id] = [];
-          state.chats[contact.id].push(msg);
-          notifyContactMessage(contact.id, msg);
-          saveData();
-          return;
-        }
+        markUserMsgsRead(contactId, false);
         let msg;
         if (sendSticker) {
           const st = stickers[Math.floor(Math.random() * stickers.length)];
@@ -1250,8 +1330,7 @@
           const text = composeSplicedCard(contact) || pool[Math.floor(Math.random() * pool.length)];
           msg = { id: genId('m'), from: 'contact', type: 'text', text, time: Date.now() };
         } else return;
-        pushMsg(msg);
-        appendMessage(msg);
+        deliverContactMsg(contact, msg);
       }, cum * 1000));
     }
   }
@@ -1267,8 +1346,7 @@
     appendMessage(poke);
     const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
     state.pendingTimers.push(setTimeout(() => {
-      if (state.chatContactId !== c.id) return;
-      // 对方回拍（不算用户那条的重复）
+      // 切走界面也要回拍/回复，写入聊天记录
       if (Math.random() < (lc.pokeChance != null ? Math.max(0.4, lc.pokeChance + 0.5) : 0.65)) {
         const acts = c.interactionCards?.length ? c.interactionCards : DEFAULT_INTERACTION;
         const back = {
@@ -1276,8 +1354,11 @@
           text: `${c.name}${acts[Math.floor(Math.random() * acts.length)]}你`,
           time: Date.now()
         };
-        pushMsg(back);
-        appendMessage(back);
+        if (!state.chats[c.id]) state.chats[c.id] = [];
+        state.chats[c.id].push(back);
+        saveData();
+        if (state.chatContactId === c.id) appendMessage(back);
+        else { notifyContactMessage(c.id, back); maybeBrowserNotify(c, back); }
       } else {
         scheduleReplies(c, 1);
       }
@@ -3404,16 +3485,25 @@
         '<button class="me-menu-item" id="btn-manage-stickers" type="button"><span class="mm-icon">😊</span><span class="mm-text">表情包管理</span><span class="mm-arrow">›</span></button>',
         '<button class="me-menu-item" id="btn-moments-cover" type="button"><span class="mm-icon">🖼️</span><span class="mm-text">朋友圈封面</span><span class="mm-arrow">›</span></button>',
         '<button class="me-menu-item" id="btn-export-data" type="button"><span class="mm-icon">📦</span><span class="mm-text">导出全部数据</span><span class="mm-arrow">›</span></button>',
-        '<button class="me-menu-item" id="btn-import-data" type="button"><span class="mm-icon">📥</span><span class="mm-text">导入备份数据</span><span class="mm-arrow">›</span></button>'
+        '<button class="me-menu-item" id="btn-import-data" type="button"><span class="mm-icon">📥</span><span class="mm-text">导入备份数据</span><span class="mm-arrow">›</span></button>',
+        '<button class="me-menu-item" id="btn-toggle-notify" type="button"><span class="mm-icon">🔔</span><span class="mm-text">通知：未开启</span><span class="mm-arrow">›</span></button>'
       ].join('');
       const theme = host.querySelector('.theme-section');
       if (theme) host.insertBefore(menu, theme);
       else host.appendChild(menu);
+    } else if (!document.getElementById('btn-toggle-notify')) {
+      const b = document.createElement('button');
+      b.className = 'me-menu-item';
+      b.id = 'btn-toggle-notify';
+      b.type = 'button';
+      b.innerHTML = '<span class="mm-icon">🔔</span><span class="mm-text">通知：未开启</span><span class="mm-arrow">›</span>';
+      menu.appendChild(b);
     }
     const stickers = document.getElementById('btn-manage-stickers');
     const cover = document.getElementById('btn-moments-cover');
     const exp = document.getElementById('btn-export-data');
     const imp = document.getElementById('btn-import-data');
+    const ntf = document.getElementById('btn-toggle-notify');
     if (stickers && !stickers._bound) {
       stickers._bound = true;
       stickers.addEventListener('click', function (e) { e.preventDefault(); openStickerManager(); });
@@ -3430,6 +3520,20 @@
       imp._bound = true;
       imp.addEventListener('click', function () { document.getElementById('file-backup')?.click(); });
     }
+    if (ntf && !ntf._bound) {
+      ntf._bound = true;
+      ntf.addEventListener('click', function () {
+        if (state.notifyEnabled) {
+          state.notifyEnabled = false;
+          saveData();
+          updateNotifyUI();
+          alert('已关闭系统通知');
+        } else {
+          requestNotifyPermission();
+        }
+      });
+    }
+    updateNotifyUI();
   }
 
   function updateMeAvatarUI() {
@@ -3471,6 +3575,7 @@
     state.userName = data.userName || '昕';
     state.lastProactiveAt = data.lastProactiveAt || {};
     state.momentsCover = data.momentsCover || null;
+    state.notifyEnabled = !!data.notifyEnabled;
     applyTheme(state.theme);
     startStatusRotation();
     scheduleProactiveMessages();
@@ -3978,6 +4083,9 @@
     wireAvatarPoolFiles();
     wireAskSurvey();
     ensureMeMenu();
+    scheduleLetterSystem();
+    updateTabDots();
+    updateNotifyUI();
   }
 
   // ========== 头像池随机更换（灵感：Mochi 字卡 · 小红书@言序）==========
@@ -4291,12 +4399,16 @@
     scheduleContactAnswerSurvey(msg);
   }
 
-  function scheduleContactAnswerSurvey(msg) {
-    var c = state.contacts.find(function (x) { return x.id === state.chatContactId; });
+  function scheduleContactAnswerSurvey(msg, contactOpt) {
+    var c = contactOpt || state.contacts.find(function (x) { return x.id === state.chatContactId; });
     if (!c || !msg) return;
+    msg._contactId = c.id;
+    var lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
+    var minD = Math.max(0.5, Number(lc.askMinDelay) || 2);
+    var maxD = Math.max(minD, Number(lc.askMaxDelay) || 8);
     state.pendingTimers.push(setTimeout(function () {
       autoAnswerSurveyAsContact(msg, c);
-    }, randomDelay(2, 6) * 1000));
+    }, randomDelay(minD, maxD) * 1000));
   }
 
   function autoAnswerSurveyAsContact(msg, contact) {
@@ -4318,13 +4430,16 @@
     msg.answered = true;
     msg.answers = answers;
     saveData();
-    if (state.chatContactId) {
+    // 切走页面也要落库；在当前会话则刷新 UI
+    if (state.chatContactId === contact.id) {
       renderMessages();
-      if (pool.length) {
-        var follow = { id: genId('m'), from: 'contact', type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: Date.now() };
-        pushMsg(follow);
-        appendMessage(follow);
-      }
+    } else {
+      notifyContactMessage(contact.id, { from: 'contact', type: 'text', text: '[已填写问卷/提问]' });
+      maybeBrowserNotify(contact, { type: 'text', text: '填写了你的问卷/提问' });
+    }
+    if (pool.length) {
+      var follow = { id: genId('m'), from: 'contact', type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: Date.now() };
+      deliverContactMsg(contact, follow);
     }
   }
 
