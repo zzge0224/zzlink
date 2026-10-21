@@ -1213,9 +1213,25 @@
     let t = null;
     const start = () => { t = setTimeout(() => {
       const msg = (state.chats[state.chatContactId]||[]).find(m => m.id === row.dataset.id);
-      if (msg) { state.longPressMsg = msg; const r = row.getBoundingClientRect();
+      if (msg) {
+        state.longPressMsg = msg;
+        const r = row.getBoundingClientRect();
+        // 动态填充菜单
+        const opts = [];
+        opts.push({label:'引用', act:'quote'});
+        opts.push({label:'复制', act:'copy'});
+        if (msg.from === 'contact' && msg.text) {
+          opts.push({label:'存入字卡库', act:'add-card'});
+        }
+        opts.push({label:'编辑', act:'edit'});
+        opts.push({label:'删除', act:'delete', danger:true});
+        msgActionMenu.innerHTML = opts.map(o =>
+          `<button data-action="${o.act}"${o.danger?' style="color:#e54d42"':''}>${o.label}</button>`
+        ).join('');
         msgActionMenu.style.left = Math.min(r.left+20, innerWidth-120)+'px';
-        msgActionMenu.style.top = (r.top-48)+'px'; msgActionMenu.classList.remove('hidden'); }
+        msgActionMenu.style.top = (r.top-48 - (opts.length*44))+'px';
+        msgActionMenu.classList.remove('hidden');
+      }
     }, 500); };
     const cancel = () => { if (t) clearTimeout(t); };
     row.addEventListener('touchstart', start, {passive:true});
@@ -3671,7 +3687,6 @@
       leaveChat();
     };
     btnBack.addEventListener('click', onBack);
-    btnBack.addEventListener('touchend', (e) => { e.preventDefault(); onBack(e); }, { passive: false });
 
     let lastTap=0;
     headerAvatar.addEventListener('click', () => {
@@ -3920,8 +3935,47 @@
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); }
     });
     $('#quote-bar-close').addEventListener('click', () => { state.quotingMsg=null; updateQuoteBar(); });
-    msgActionMenu.querySelector('[data-action="quote"]').addEventListener('click', () => {
-      if (state.longPressMsg) { state.quotingMsg=state.longPressMsg; updateQuoteBar(); hideMsgMenu(); msgInput.focus(); }
+    msgActionMenu.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn || !state.longPressMsg) return;
+      const msg = state.longPressMsg;
+      const act = btn.dataset.action;
+      const cid = state.chatContactId;
+      if (act === 'quote') {
+        state.quotingMsg = msg; updateQuoteBar();
+      } else if (act === 'copy') {
+        const txt = msg.text || '';
+        if (navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{});
+        else { const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+      } else if (act === 'add-card') {
+        const c = state.contacts.find(x => x.id === cid);
+        if (c && msg.text) {
+          if (!c.cardGroups) c.cardGroups = {'默认': c.cards ? c.cards.slice() : []};
+          const group = c.activeCardGroup || '默认';
+          if (!c.cardGroups[group]) c.cardGroups[group] = [];
+          if (!c.cardGroups[group].includes(msg.text)) {
+            c.cardGroups[group].push(msg.text);
+            c.cards = Object.values(c.cardGroups).flat();
+            saveData();
+          }
+          if (typeof showListenToast === 'function') showListenToast('已存入字卡库');
+        }
+      } else if (act === 'edit') {
+        const newText = prompt('编辑消息内容：', msg.text || '');
+        if (newText != null && newText.trim()) {
+          msg.text = newText.trim();
+          saveData();
+          renderMessages();
+        }
+      } else if (act === 'delete') {
+        if (confirm('删除这条消息？')) {
+          const arr = state.chats[cid] || [];
+          state.chats[cid] = arr.filter(x => x.id !== msg.id);
+          saveData();
+          renderMessages();
+        }
+      }
+      hideMsgMenu();
     });
     document.addEventListener('click', e => { if (!msgActionMenu.contains(e.target)) hideMsgMenu(); });
 
