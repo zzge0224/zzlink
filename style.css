@@ -1202,3 +1202,67 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
   z-index: 60;
   pointer-events: auto;
 }
+
+/* 一起听双头像 + 边听边聊 */
+.listen-top { display:flex; align-items:center; padding:8px 10px; gap:8px; flex-shrink:0; }
+.listen-with-block { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; }
+.listen-duo-avatars { display:flex; align-items:center; justify-content:center; gap:0; }
+.listen-av {
+  width:36px; height:36px; border-radius:50%; border:2px solid var(--canvas);
+  background:var(--accent); color:#fff; font-size:13px; font-weight:600;
+  display:flex; align-items:center; justify-content:center;
+  background-size:cover; background-position:center; overflow:hidden;
+}
+.listen-av.me { z-index:2; margin-right:-6px; background:#7b6bb0; }
+.listen-av.ta { z-index:1; background:var(--accent); }
+.listen-with { font-size:13px; color:var(--paper); opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:70vw; text-align:center; }
+.listen-chat-toggle {
+  width:36px; height:36px; border-radius:18px; border:1px solid var(--border);
+  background:var(--chrome); color:var(--paper); font-size:13px; cursor:pointer; flex-shrink:0;
+}
+.listen-chat-panel {
+  position:absolute; left:0; right:0; bottom:0; max-height:42%;
+  background:var(--chrome); border-top:1px solid var(--border);
+  display:flex; flex-direction:column; z-index:20;
+  box-shadow:0 -8px 24px rgba(0,0,0,.2);
+}
+.listen-chat-panel.hidden { display:none !important; }
+.listen-chat-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 12px; font-size:13px; color:var(--paper); border-bottom:1px solid var(--border);
+}
+.listen-chat-msgs {
+  flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px;
+  min-height:80px; max-height:28vh;
+}
+.listen-chat-bubble {
+  max-width:82%; padding:8px 12px; border-radius:12px; font-size:13px; line-height:1.45;
+  word-break:break-word; white-space:pre-wrap;
+}
+.listen-chat-bubble.user {
+  align-self:flex-end; background:var(--bubble-user); color:var(--bubble-user-text);
+  border-bottom-right-radius:4px;
+}
+.listen-chat-bubble.contact {
+  align-self:flex-start; background:var(--bubble-contact); color:var(--bubble-contact-text);
+  border-bottom-left-radius:4px;
+}
+.listen-chat-composer {
+  display:flex; gap:8px; padding:8px 10px; border-top:1px solid var(--border); align-items:center;
+}
+.listen-chat-composer input {
+  flex:1; border:1px solid var(--border); border-radius:18px; padding:8px 12px;
+  background:var(--canvas); color:var(--paper); font-size:14px; outline:none;
+}
+.msg-listen-invite {
+  background:var(--chrome) !important; border:1px solid var(--border);
+  min-width:200px; padding:12px 14px !important;
+}
+.msg-listen-invite .li-title { font-size:14px; font-weight:600; margin-bottom:4px; color:var(--paper); }
+.msg-listen-invite .li-song { font-size:12px; color:var(--muted); margin-bottom:10px; }
+.msg-listen-invite .li-actions { display:flex; gap:8px; }
+.msg-listen-invite .li-actions button {
+  flex:1; border:none; border-radius:16px; padding:7px 0; font-size:13px; cursor:pointer;
+}
+.msg-listen-invite .li-accept { background:var(--accent); color:#fff; }
+.msg-listen-invite .li-reject { background:var(--canvas); color:var(--muted); border:1px solid var(--border); }

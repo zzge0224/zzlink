@@ -220,8 +220,14 @@
   <div id="listen-page" class="listen-page hidden">
     <div class="listen-top">
       <button id="listen-back" class="listen-back">‹</button>
-      <div class="listen-with" id="listen-with-name">一起听</div>
-      <div class="listen-spacer"></div>
+      <div class="listen-with-block">
+        <div class="listen-duo-avatars" id="listen-duo-avatars">
+          <div class="listen-av me" id="listen-av-me"></div>
+          <div class="listen-av ta" id="listen-av-ta"></div>
+        </div>
+        <div class="listen-with" id="listen-with-name">一起听</div>
+      </div>
+      <button type="button" class="listen-chat-toggle" id="listen-chat-toggle" title="边听边聊">聊</button>
     </div>
     <div class="listen-cover-wrap">
       <div class="listen-cover-ring"><div id="listen-cover" class="listen-cover"></div></div>
@@ -245,6 +251,18 @@
     </div>
     <div id="listen-toast" class="listen-toast hidden"></div>
     <audio id="listen-audio" preload="metadata"></audio>
+    <!-- 边听边聊面板 -->
+    <div id="listen-chat-panel" class="listen-chat-panel hidden">
+      <div class="listen-chat-head">
+        <span>边听边聊</span>
+        <button type="button" class="btn-xs" id="listen-chat-close">收起</button>
+      </div>
+      <div id="listen-chat-msgs" class="listen-chat-msgs"></div>
+      <div class="listen-chat-composer">
+        <input type="text" id="listen-chat-input" placeholder="说点什么…" autocomplete="off"/>
+        <button type="button" class="btn-send" id="listen-chat-send">发送</button>
+      </div>
+    </div>
   </div>
 
   <!-- 一起听悬浮窗 -->

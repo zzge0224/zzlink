@@ -14,6 +14,7 @@
     pauseChance: 0.18,
     favoriteChance: 0.12,       // 一起听时收藏「整首歌」的概率
     lyricFavoriteChance: 0.2,   // 播放中独立：随机收藏一句歌词
+    listenInviteChance: 0.18,   // 主动邀请一起听的概率（在主动发消息时）
     pauseDurationMax: 6,
     momentsChance: 0.15,
     replyChance: 0.92,
@@ -490,6 +491,7 @@
   function getPreviewText(msg) {
     if (!msg) return '暂无消息，点击开始聊天';
     if (msg.type === 'system' || msg.type === 'poke') return msg.text;
+    if (msg.type === 'listen_invite') return '[一起听] ' + (msg.songTitle || msg.text || '');
     if (msg.type === 'transfer') return `[转账] ${msg.amount} 星币`;
     if (msg.type === 'redpacket') return `[红包] ${msg.note || '恭喜发财'}`;
     if (msg.type === 'sticker') return '[表情]';
@@ -858,6 +860,7 @@
       <div class="settings-section-title">互动概率</div>
       <div class="settings-cell"><span>一起听·暂停概率</span><input type="number" id="cs-pause" step="0.01" min="0" max="1" value="${lc.pauseChance}"/></div>
       <div class="settings-cell"><span>一起听·收藏歌曲概率</span><input type="number" id="cs-fav" step="0.01" min="0" max="1" value="${lc.favoriteChance}"/></div>
+      <div class="settings-cell"><span>邀请一起听概率</span><input type="number" id="cs-listen-invite" step="0.01" min="0" max="1" value="${lc.listenInviteChance != null ? lc.listenInviteChance : 0.18}"/></div>
       <div class="settings-cell"><span>一起听·收藏歌词概率</span><input type="number" id="cs-lyric-fav" step="0.01" min="0" max="1" value="${lc.lyricFavoriteChance != null ? lc.lyricFavoriteChance : 0.2}"/></div>
       <div class="settings-cell"><span>暂停最长秒数</span><input type="number" id="cs-pdur" min="1" max="30" value="${lc.pauseDurationMax}"/></div>
       <div class="settings-cell"><span>拼字卡概率</span><input type="number" id="cs-splice" step="0.01" min="0" max="1" value="${lc.spliceChance != null ? lc.spliceChance : 0.35}"/></div>
@@ -915,6 +918,7 @@
         pauseChance: clamp01(num('#cs-pause', 0.18)),
         favoriteChance: clamp01(num('#cs-fav', 0.12)),
         lyricFavoriteChance: clamp01(num('#cs-lyric-fav', 0.2)),
+        listenInviteChance: clamp01(num('#cs-listen-invite', 0.18)),
         pauseDurationMax: Math.max(1, Math.min(30, num('#cs-pdur', 6))),
         momentsChance: clamp01(num('#cs-moments', 0.15)),
         replyChance: clamp01(num('#cs-reply', 0.92)),
@@ -994,6 +998,25 @@
       }
       html += `</div>`;
       return html;
+    }
+    if (m.type === 'listen_invite') {
+      const st = m.status || 'pending';
+      let actions = '';
+      if (st === 'pending' && m.from === 'contact') {
+        actions = `<div class="li-actions">
+          <button type="button" class="li-accept" data-li-act="accept">接受</button>
+          <button type="button" class="li-reject" data-li-act="reject">拒绝</button>
+        </div>`;
+      } else if (st === 'accepted') {
+        actions = `<div class="li-song">已接受</div>`;
+      } else if (st === 'rejected') {
+        actions = `<div class="li-song">已拒绝</div>`;
+      }
+      return `<div class="msg-bubble msg-listen-invite" data-li-id="${m.id}">
+        <div class="li-title">邀请你一起听</div>
+        <div class="li-song">♪ ${escapeHtml(m.songTitle || '')}${m.songArtist ? ' · ' + escapeHtml(m.songArtist) : ''}</div>
+        ${actions}
+      </div>`;
     }
     if (m.type === 'transfer' || m.type === 'redpacket') {
       const st = m.moneyStatus || (m.opened ? 'accepted' : 'pending');
@@ -1321,7 +1344,6 @@
   function deliverContactMsg(contact, msg) {
     if (!contact || !msg) return;
     if (!state.chats[contact.id]) state.chats[contact.id] = [];
-    // 避免重复 push：若已由 pushMsg 写入则跳过
     const arr = state.chats[contact.id];
     if (!arr.find(x => x.id === msg.id)) arr.push(msg);
     saveData();
@@ -1331,6 +1353,9 @@
     } else {
       notifyContactMessage(contact.id, msg);
       maybeBrowserNotify(contact, msg);
+    }
+    if (state.listenContactId === contact.id) {
+      try { renderListenChatMsgs(); } catch (_) {}
     }
     renderChatList();
     updateTabDots();
@@ -2030,24 +2055,146 @@
 
   const PLAY_MODE_LABEL = { order: '顺序', random: '随机', loop: '列表循环', one: '单曲循环' };
 
+  function setListenDuoAvatars(contact) {
+    const me = $('#listen-av-me');
+    const ta = $('#listen-av-ta');
+    if (me) {
+      if (state.userAvatar) {
+        me.style.backgroundImage = `url(${state.userAvatar})`;
+        me.textContent = '';
+      } else {
+        me.style.backgroundImage = '';
+        me.textContent = (state.userName || '我').charAt(0);
+      }
+    }
+    if (ta && contact) {
+      if (contact.avatarImg) {
+        ta.style.backgroundImage = `url(${contact.avatarImg})`;
+        ta.textContent = '';
+      } else {
+        ta.style.backgroundImage = '';
+        ta.style.background = contact.avatarColor || 'var(--accent)';
+        ta.textContent = (contact.name || '?').charAt(0);
+      }
+    }
+  }
+
   function openListenWithContact(songId, contactId) {
     const song = state.songs.find(s => s.id === songId);
     const contact = state.contacts.find(c => c.id === contactId);
     if (!song || !contact) return;
     state.listenContactId = contactId;
-    // 队列：当前曲库全部（有 src 的优先）
     state.listenQueue = state.songs.map(s => s.id);
     state.listenIndex = Math.max(0, state.listenQueue.indexOf(songId));
     if (state.listenIndex < 0) {
       state.listenQueue.unshift(songId);
       state.listenIndex = 0;
     }
-    listenWithName.textContent = `和 ${contact.name} 一起听`;
+    if (listenWithName) listenWithName.textContent = `和 ${contact.name} 一起听`;
+    setListenDuoAvatars(contact);
     updatePlayModeBtn();
     loadListenTrack(songId, true);
     listenPage.classList.remove('hidden');
     hideFloatPlayer();
     startListenSimulation();
+    $('#listen-chat-panel')?.classList.add('hidden');
+    renderListenChatMsgs();
+  }
+
+  function renderListenChatMsgs() {
+    const box = $('#listen-chat-msgs');
+    if (!box || !state.listenContactId) return;
+    const msgs = (state.chats[state.listenContactId] || []).slice(-40);
+    box.innerHTML = msgs.map(m => {
+      if (m.from === 'system' || m.type === 'system' || m.type === 'poke') {
+        return `<div class="listen-chat-bubble contact" style="align-self:center;opacity:.7;font-size:11px;background:transparent">${escapeHtml(m.text || '')}</div>`;
+      }
+      const cls = m.from === 'user' ? 'user' : 'contact';
+      let text = m.text || '';
+      if (m.type === 'sticker') text = '[表情]';
+      else if (m.type === 'image') text = '[图片]';
+      else if (m.type === 'listen_invite') text = '[一起听邀请]';
+      else if (!text) text = getPreviewText(m) || '…';
+      return `<div class="listen-chat-bubble ${cls}">${escapeHtml(text)}</div>`;
+    }).join('') || '<div style="text-align:center;color:var(--muted);font-size:12px;padding:12px">还没有消息，打个招呼吧</div>';
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function sendListenChat() {
+    const input = $('#listen-chat-input');
+    const text = (input?.value || '').trim();
+    if (!text || !state.listenContactId) return;
+    const c = state.contacts.find(x => x.id === state.listenContactId);
+    if (!c) return;
+    const msg = { id: genId('m'), from: 'user', type: 'text', text, time: Date.now(), read: false };
+    if (!state.chats[c.id]) state.chats[c.id] = [];
+    state.chats[c.id].push(msg);
+    saveData();
+    if (input) input.value = '';
+    renderListenChatMsgs();
+    if (state.chatContactId === c.id) appendMessage(msg);
+    scheduleReplies(c);
+    const check = setInterval(() => {
+      if (state.listenContactId === c.id) renderListenChatMsgs();
+    }, 900);
+    setTimeout(() => clearInterval(check), 25000);
+  }
+
+  function toggleListenChatPanel(forceOpen) {
+    const panel = $('#listen-chat-panel');
+    if (!panel) return;
+    if (forceOpen === true) panel.classList.remove('hidden');
+    else if (forceOpen === false) panel.classList.add('hidden');
+    else panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) renderListenChatMsgs();
+  }
+
+  function tryContactListenInvite(contact) {
+    if (!contact || !(state.songs || []).length) return false;
+    const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
+    const chance = Number(lc.listenInviteChance != null ? lc.listenInviteChance : 0.18);
+    if (Math.random() > chance) return false;
+    if (state.listenContactId === contact.id && listenPage && !listenPage.classList.contains('hidden')) return false;
+    const song = state.songs[Math.floor(Math.random() * state.songs.length)];
+    if (!song) return false;
+    const msg = {
+      id: genId('m'), from: 'contact', type: 'listen_invite',
+      songId: song.id, songTitle: song.title || '未知歌曲', songArtist: song.artist || '',
+      text: `想和你一起听《${song.title || '这首歌'}》`,
+      status: 'pending', time: Date.now()
+    };
+    if (!state.chats[contact.id]) state.chats[contact.id] = [];
+    state.chats[contact.id].push(msg);
+    saveData();
+    if (state.chatContactId === contact.id) appendMessage(msg);
+    else {
+      notifyContactMessage(contact.id, msg);
+      maybeBrowserNotify(contact, msg);
+      renderChatList();
+    }
+    return true;
+  }
+
+  function acceptListenInvite(msg, contactId) {
+    if (!msg || msg.status === 'accepted') return;
+    msg.status = 'accepted';
+    const tip = { id: genId('m'), from: 'system', type: 'system', text: '你接受了一起听邀请', time: Date.now() };
+    if (!state.chats[contactId]) state.chats[contactId] = [];
+    state.chats[contactId].push(tip);
+    saveData();
+    if (state.chatContactId === contactId) renderMessages();
+    openListenWithContact(msg.songId, contactId);
+    toggleListenChatPanel(true);
+  }
+
+  function rejectListenInvite(msg, contactId) {
+    if (!msg || msg.status === 'rejected') return;
+    msg.status = 'rejected';
+    const tip = { id: genId('m'), from: 'system', type: 'system', text: '你拒绝了一起听邀请', time: Date.now() };
+    if (!state.chats[contactId]) state.chats[contactId] = [];
+    state.chats[contactId].push(tip);
+    saveData();
+    if (state.chatContactId === contactId) renderMessages();
   }
 
   async function loadListenTrack(songId, autoplay) {
@@ -3807,6 +3954,27 @@
     pageTitle.addEventListener('click', () => {
       if (state.chatContactId) handleAppBack();
     });
+    // 一起听邀请接受/拒绝
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-li-act]');
+      if (!btn) return;
+      const bubble = btn.closest('[data-li-id]');
+      if (!bubble) return;
+      const id = bubble.getAttribute('data-li-id');
+      const cid = state.chatContactId;
+      if (!cid) return;
+      const msg = (state.chats[cid] || []).find(x => x.id === id);
+      if (!msg) return;
+      if (btn.getAttribute('data-li-act') === 'accept') acceptListenInvite(msg, cid);
+      else rejectListenInvite(msg, cid);
+    });
+    $('#listen-chat-toggle')?.addEventListener('click', () => toggleListenChatPanel());
+    $('#listen-chat-close')?.addEventListener('click', () => toggleListenChatPanel(false));
+    $('#listen-chat-send')?.addEventListener('click', sendListenChat);
+    $('#listen-chat-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); sendListenChat(); }
+    });
+
 
     let lastTap=0;
     headerAvatar.addEventListener('click', () => {
@@ -5083,6 +5251,10 @@
         state.lastProactiveAt[c.id] = now;
         tryContactSendMoney(c);
         if (state.chatContactId === c.id) tryContactAsk(c);
+        // 有概率邀请一起听（有歌曲时）
+        if ((state.songs || []).length && tryContactListenInvite(c)) {
+          /* 本轮已发邀请，可再发文字也可跳过 */
+        }
         const pool = getContactCardPool(c);
         const stickers = state.stickers || [];
         let msg;
