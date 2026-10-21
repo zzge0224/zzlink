@@ -662,19 +662,22 @@
   function applyContactChatBg(id) {
     const c = state.contacts.find(x => x.id === id);
     if (!c) return;
-    // 始终用 cover + center，避免拉伸变形
-    messageList.style.backgroundSize = 'cover';
-    messageList.style.backgroundPosition = 'center center';
-    messageList.style.backgroundRepeat = 'no-repeat';
+    // cover = 裁切填满，不拉伸变形；禁止 100% 100% 拉伸
+    const el = messageList;
+    if (!el) return;
+    el.style.setProperty('background-size', 'cover', 'important');
+    el.style.setProperty('background-position', 'center center', 'important');
+    el.style.setProperty('background-repeat', 'no-repeat', 'important');
+    el.style.setProperty('background-attachment', 'scroll', 'important');
     if (c.chatBgImg) {
-      messageList.style.backgroundImage = `url(${c.chatBgImg})`;
-      messageList.style.backgroundColor = '';
+      el.style.setProperty('background-image', `url(${c.chatBgImg})`, 'important');
+      el.style.backgroundColor = '';
     } else if (c.chatBgColor) {
-      messageList.style.backgroundImage = '';
-      messageList.style.backgroundColor = c.chatBgColor;
+      el.style.setProperty('background-image', 'none', 'important');
+      el.style.backgroundColor = c.chatBgColor;
     } else {
-      messageList.style.backgroundImage = '';
-      messageList.style.backgroundColor = '';
+      el.style.setProperty('background-image', 'none', 'important');
+      el.style.backgroundColor = '';
     }
   }
   function enterChat(id) {
@@ -3025,24 +3028,34 @@
     window.addEventListener('touchcancel', onEnd);
   }
 
-  /** 压缩图片：保持原始比例缩小，展示端用 CSS background-size:cover */
+  /**
+   * 压缩图片：严格保持宽高比，不拉伸。
+   * 聊天背景建议 maxSize≥1080、q≥0.82，避免糊和比例观感差。
+   */
   function compressImage(file, maxSize = 720, q = 0.72) {
     return new Promise((resolve, reject) => {
       const r = new FileReader();
       r.onload = e => {
         const img = new Image();
         img.onload = () => {
-          let w = img.width, h = img.height;
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (!w || !h) { reject(new Error('invalid image')); return; }
           const maxEdge = Math.max(w, h);
           if (maxEdge > maxSize) {
             const scale = maxSize / maxEdge;
-            w = Math.round(w * scale);
-            h = Math.round(h * scale);
+            w = Math.max(1, Math.round(w * scale));
+            h = Math.max(1, Math.round(h * scale));
           }
           const cv = document.createElement('canvas');
           cv.width = w;
           cv.height = h;
-          cv.getContext('2d').drawImage(img, 0, 0, w, h);
+          const ctx = cv.getContext('2d');
+          // 禁止浏览器默认平滑导致的奇怪缩放观感时仍保持比例绘制
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
+          // PNG 若本身透明且较小可保留；背景统一 jpeg 更省空间
           resolve(cv.toDataURL('image/jpeg', q));
         };
         img.onerror = reject;
@@ -3051,6 +3064,81 @@
       r.onerror = reject;
       r.readAsDataURL(file);
     });
+  }
+
+  /** 专用于聊天/群背景：更高清晰度 + 保持比例 */
+  function compressChatBg(file) {
+    return compressImage(file, 1280, 0.85);
+  }
+
+  /** 读取文本文件：自动尝试 UTF-8 / GBK，避免中文乱码 */
+  function readTextFileSmart(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onerror = () => reject(new Error('read fail'));
+      r.onload = () => {
+        const buf = r.result;
+        if (!(buf instanceof ArrayBuffer)) {
+          resolve(String(buf || ''));
+          return;
+        }
+        const bytes = new Uint8Array(buf);
+        // 去掉 UTF-8 BOM
+        let start = 0;
+        if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) start = 3;
+
+        const tryDecode = (label) => {
+          try {
+            return new TextDecoder(label, { fatal: false }).decode(bytes.subarray(start));
+          } catch (_) {
+            return null;
+          }
+        };
+
+        const utf8 = tryDecode('utf-8') || '';
+        // 粗略检测：大量替换符 或 典型 GBK 被当成 UTF-8 的乱码特征
+        const badCount = (utf8.match(/\uFFFD/g) || []).length;
+        const looksMojibake = /Ã.|Â.|ä.|å.|æ.|ç.|è.|é.|ð.|ñ.|ò./.test(utf8) && /[\u0080-\u00ff]{2,}/.test(utf8);
+        const mostlyGarbled = utf8.length > 0 && badCount / Math.max(1, utf8.length) > 0.02;
+
+        if (!mostlyGarbled && !looksMojibake && utf8.trim()) {
+          resolve(utf8);
+          return;
+        }
+        const gbk = tryDecode('gbk') || tryDecode('gb18030') || tryDecode('gb2312');
+        if (gbk && gbk.trim()) {
+          resolve(gbk);
+          return;
+        }
+        resolve(utf8 || '');
+      };
+      r.readAsArrayBuffer(file);
+    });
+  }
+
+  /** 把文件内容解析成字卡行：支持纯文本一行一条、JSON 数组 */
+  function parseCardsFromText(raw, fileName) {
+    const name = (fileName || '').toLowerCase();
+    let text = String(raw || '').replace(/^\uFEFF/, '');
+    if (name.endsWith('.json') || (text.trim().startsWith('[') || text.trim().startsWith('{'))) {
+      try {
+        const data = JSON.parse(text);
+        if (Array.isArray(data)) {
+          return data.map(x => {
+            if (typeof x === 'string') return x.trim();
+            if (x && typeof x.text === 'string') return x.text.trim();
+            if (x && typeof x.content === 'string') return x.content.trim();
+            return '';
+          }).filter(Boolean);
+        }
+        if (data && Array.isArray(data.cards)) {
+          return data.cards.map(x => (typeof x === 'string' ? x : (x.text || ''))).map(s => String(s).trim()).filter(Boolean);
+        }
+      } catch (_) { /* fall through to line mode */ }
+    }
+    // 一行一条；也兼容用 ---- 或空行分段的短段落
+    const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    return lines;
   }
 
   function resetToDefault() {
@@ -3470,7 +3558,7 @@
         if (state.uploadTarget === 'group-bg') {
           const g = (state.groups || []).find(x => x.id === state.groupUploadId);
           if (g) {
-            g.chatBgImg = await compressImage(f, 900, 0.7);
+            g.chatBgImg = await compressChatBg(f);
             g.chatBgColor = null;
             saveData();
             applyGroupChatBg(g);
@@ -3480,7 +3568,7 @@
           return;
         }
         const c = state.contacts.find(x => x.id === state.currentContactId); if (!c) return;
-        c.chatBgImg = await compressImage(f, 900, 0.7);
+        c.chatBgImg = await compressChatBg(f);
         c.chatBgColor = null;
         if (!saveData()) alert('背景已应用，但存储空间不足，建议删除部分歌曲后再保存');
         closeModal();
@@ -3756,22 +3844,42 @@
       const f = e.target.files?.[0]; e.target.value = '';
       if (f) importBackupFile(f);
     });
-    $('#file-cards-txt')?.addEventListener('change', e => {
+    $('#file-cards-txt')?.addEventListener('change', async e => {
       const f = e.target.files?.[0]; e.target.value = '';
       if (!f) return;
       const c = state.contacts.find(x => x.id === state.currentContactId);
-      if (!c) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const lines = String(reader.result || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      if (!c) { alert('请先选择联系人'); return; }
+      const lower = (f.name || '').toLowerCase();
+      if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
+        alert('暂不支持 Word(.doc/.docx)。请另存为「UTF-8 或 ANSI 的 .txt」，一行一条字卡后再导入。');
+        return;
+      }
+      try {
+        const raw = await readTextFileSmart(f);
+        const lines = parseCardsFromText(raw, f.name);
+        if (!lines.length) {
+          alert('没有解析到字卡。请确认：TXT 一行一条，或 JSON 字符串数组。若仍乱码，用记事本另存为 UTF-8 再试。');
+          return;
+        }
         ensureContactShape(c);
         if (!c.cardGroups[state.activeCardGroup]) c.cardGroups[state.activeCardGroup] = [];
-        c.cardGroups[state.activeCardGroup].push(...lines);
+        // 去重追加
+        const set = new Set(c.cardGroups[state.activeCardGroup]);
+        let added = 0;
+        lines.forEach(line => {
+          if (!set.has(line)) {
+            set.add(line);
+            c.cardGroups[state.activeCardGroup].push(line);
+            added++;
+          }
+        });
         c.cards = Object.values(c.cardGroups).flat();
-        saveData(); renderCardsPanel();
-        alert(`已导入 ${lines.length} 条字卡`);
-      };
-      reader.readAsText(f);
+        saveData();
+        renderCardsPanel();
+        alert(`已导入 ${added} 条字卡（共解析 ${lines.length} 行，重复已跳过）`);
+      } catch (err) {
+        alert('导入失败：' + (err && err.message ? err.message : '请换 UTF-8 的 txt'));
+      }
     });
     $('#btn-manage-stickers')?.addEventListener('click', openStickerManager);
     $('#me-avatar')?.addEventListener('click', () => {

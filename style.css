@@ -1112,3 +1112,16 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
   border-radius:50%; background:#e54d42; display:none;
 }
 .tab-dot.on { display:block; }
+
+/* 聊天背景：只裁切、不拉伸 */
+#message-list {
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: scroll !important;
+}
+#group-messages {
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+}
