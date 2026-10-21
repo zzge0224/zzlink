@@ -737,10 +737,24 @@
     enterGroup(gid);
   }
   function showChatListView() {
-    chatListView.classList.remove('hidden'); chatDetailView.classList.add('hidden');
-    btnBack.classList.add('hidden'); headerAvatar.classList.add('hidden');
+    if (chatListView) {
+      chatListView.classList.remove('hidden');
+      chatListView.style.display = '';
+    }
+    if (chatDetailView) {
+      chatDetailView.classList.add('hidden');
+      chatDetailView.style.display = 'none';
+    }
+    if (btnBack) {
+      btnBack.classList.add('hidden');
+      btnBack.setAttribute('aria-hidden', 'true');
+    }
+    headerAvatar.classList.add('hidden');
     $('#btn-chat-more')?.classList.add('hidden');
-    pageTitle.textContent = '聊天'; state.quotingMsg = null; updateQuoteBar();
+    pageTitle.textContent = '聊天';
+    state.quotingMsg = null;
+    updateQuoteBar();
+    document.getElementById('app')?.classList.remove('chat-detail-open');
   }
   function applyContactChatBg(id) {
     const c = state.contacts.find(x => x.id === id);
@@ -770,8 +784,21 @@
     const c = state.contacts.find(x => x.id === id); if (!c) return;
     state.chatContactId = id;
     clearUnread('contact', id);
-    chatListView.classList.add('hidden'); chatDetailView.classList.remove('hidden');
-    btnBack.classList.remove('hidden');
+    if (chatListView) {
+      chatListView.classList.add('hidden');
+      chatListView.style.display = 'none';
+    }
+    if (chatDetailView) {
+      chatDetailView.classList.remove('hidden');
+      chatDetailView.style.display = 'flex';
+    }
+    if (btnBack) {
+      btnBack.classList.remove('hidden');
+      btnBack.removeAttribute('aria-hidden');
+      btnBack.style.display = 'flex';
+      btnBack.style.pointerEvents = 'auto';
+      btnBack.style.zIndex = '200';
+    }
     const st = c.currentStatus ? ` · ${c.currentStatus}` : '';
     pageTitle.innerHTML = `${escapeHtml(c.name)}<span class="header-status">${escapeHtml(st)}</span>`;
     headerAvatar.classList.remove('hidden');
@@ -786,14 +813,23 @@
   }
   function leaveChat() {
     // 不取消待发送的回复定时器，否则切走界面后联系人消息会丢失
-    hideTyping();
+    try { hideTyping(); } catch (_) {}
     state.chatContactId = null;
     state.quotingMsg = null;
+    state.activeGroupId = null;
     $('#btn-chat-more')?.classList.add('hidden');
     const pin = $('#chat-pin-memorial');
     if (pin) { pin.classList.add('hidden'); pin.textContent = ''; }
+    const settings = $('#chat-settings-page');
+    if (settings) settings.classList.add('hidden');
     document.getElementById('app')?.classList.remove('chat-detail-open');
-    showChatListView(); renderChatList();
+    showChatListView();
+    renderChatList();
+    // 确保仍在聊天 Tab
+    const pageChat = $('#page-chat');
+    if (pageChat && !pageChat.classList.contains('active')) {
+      switchPage('chat');
+    }
   }
 
   function openChatSettings() {
@@ -1498,7 +1534,14 @@
     const groups = Object.keys(c.cardGroups);
     if (!groups.includes(state.activeCardGroup)) state.activeCardGroup = groups[0] || '默认';
     const gName = state.activeCardGroup;
-    const list = c.cardGroups[gName] || [];
+    let list = c.cardGroups[gName] || [];
+    const cardQ = (state.cardSearchQuery || '').trim().toLowerCase();
+    if (cardQ) {
+      list = list.map((t, i) => ({ t, i })).filter(x => String(x.t).toLowerCase().includes(cardQ));
+    } else {
+      list = list.map((t, i) => ({ t, i }));
+    }
+    // list items are {t, i} for stable index when filtering
     const selectMode = !!state.cardSelectMode;
     const selected = state.cardSelected || new Set();
     const mk = (text, idx, type) => {
@@ -1516,6 +1559,9 @@
         <button class="btn-xs" id="btn-open-chat">去聊天</button>
       </div>
       <div class="settings-summary">状态 <strong>${escapeHtml(c.currentStatus || '')}</strong> · 本组 ${list.length} 条</div>
+      <div class="card-search-bar">
+        <input type="search" id="card-search-input" class="search-input" placeholder="搜索本联系人字卡…" value="${escapeHtml(state.cardSearchQuery || '')}" autocomplete="off"/>
+      </div>
       <div class="section-title">字卡分组</div>
       <div class="group-tabs" id="group-tabs">
         ${groups.map(g => `<button class="group-tab ${g === gName ? 'active' : ''}" data-g="${escapeHtml(g)}">${escapeHtml(g)}</button>`).join('')}
@@ -1535,7 +1581,7 @@
         <button class="btn-xs" id="btn-sel-move">移到分组</button>
         <span style="font-size:12px;color:var(--muted)">已选 ${[...selected].filter(k => k.startsWith('normal:')).length}</span>
       </div>` : ''}
-      <div class="card-list">${list.map((t, i) => mk(t, i, 'normal')).join('') || '<div class="empty-state small"><p>暂无字卡</p></div>'}</div>
+      <div class="card-list">${list.map(({ t, i }) => mk(t, i, 'normal')).join('') || '<div class="empty-state small"><p>' + (cardQ ? '无匹配字卡' : '暂无字卡') + '</p></div>'}</div>
       <div class="section-title">互动字卡 <button class="btn-add" id="btn-add-inter" style="margin-left:8px">+</button></div>
       <div class="card-list">${(c.interactionCards || []).map((t, i) => mk(t, i, 'interaction')).join('') || '<div class="empty-state small"><p>暂无</p></div>'}</div>
       <div class="section-title">查岗提问题库 <button class="btn-add" id="btn-add-askq" style="margin-left:8px">+</button></div>
@@ -1551,7 +1597,7 @@
             <button class="card-btn delete" data-ask-del="${i}">✕</button>
           </div>
         </div>`;
-      }).join('') || '<div class="empty-state small"><p>暂无自定义题，将使用系统默认查岗题</p></div>'}</div>
+      }).join('') || '<div class="empty-state small"><p>暂无查岗题。点 + 添加后，对方才会按概率向你提问</p></div>'}</div>
       <div class="section-title">TA 收藏的歌</div>
       <div>${favSongs.map(sg => `<div class="fav-song-item" data-sid="${sg.id}"><div class="song-cover" style="${sg.cover ? `background-image:url(${sg.cover})` : ''}">${sg.cover ? '' : '🎵'}</div>
         <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist || '')}</div></div></div>`).join('') || '<div class="empty-state small"><p>暂无收藏</p></div>'}</div>
@@ -1570,6 +1616,12 @@
       c.cardGroups[name.trim()] = [];
       state.activeCardGroup = name.trim();
       saveData(); renderCardsPanel();
+    });
+    $('#card-search-input')?.addEventListener('input', (e) => {
+      state.cardSearchQuery = e.target.value || '';
+      // 防抖渲染
+      clearTimeout(renderCardsPanel._st);
+      renderCardsPanel._st = setTimeout(() => renderCardsPanel(), 180);
     });
     $('#btn-add-card')?.addEventListener('click', () => openCardModal('add', 'normal'));
     $('#btn-add-inter')?.addEventListener('click', () => openCardModal('add', 'interaction'));
@@ -3692,12 +3744,26 @@
     updateMeAvatarUI();
 
     $$('.tab-item').forEach(t => t.addEventListener('click', () => switchPage(t.dataset.page)));
-    const onBack = (e) => {
-      if (e) { e.preventDefault(); e.stopPropagation(); }
+    function handleAppBack(e) {
+      if (e) {
+        try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
+      }
       // 设置页优先关闭
       const settings = $('#chat-settings-page');
       if (settings && !settings.classList.contains('hidden')) {
         settings.classList.add('hidden');
+        return;
+      }
+      // 听歌全屏
+      const listen = $('#listen-page');
+      if (listen && !listen.classList.contains('hidden')) {
+        try { closeListenPage(); } catch (_) {}
+        return;
+      }
+      // 朋友圈全屏
+      const moments = $('#moments-page');
+      if (moments && !moments.classList.contains('hidden')) {
+        moments.classList.add('hidden');
         return;
       }
       // 群聊返回
@@ -3711,43 +3777,36 @@
           $('#group-title').textContent = '群聊';
           $('#group-settings')?.classList.add('hidden');
           $('#group-new')?.classList.remove('hidden');
-          btnBack.classList.add('hidden');
+          if (btnBack) btnBack.classList.add('hidden');
           pageTitle.textContent = '联系人';
           document.getElementById('app')?.classList.remove('chat-detail-open');
-          renderGroupList();
+          try { renderGroupList(); } catch (_) {}
           renderChatList();
           return;
         }
-        // 残留 activeGroupId 清理
         state.activeGroupId = null;
       }
-      // 聊天详情返回列表
-      if (state.chatContactId || !$('#chat-detail-view')?.classList.contains('hidden')) {
-        leaveChat();
-        return;
-      }
+      // 聊天详情 → 列表
       leaveChat();
-    };
-    // 多重绑定，确保手机端可点返回
-    btnBack.onclick = onBack;
-    btnBack.addEventListener('click', onBack, true);
-    btnBack.addEventListener('touchstart', (e) => { e.stopPropagation(); }, { passive: true, capture: true });
-    btnBack.addEventListener('touchend', (e) => {
+    }
+    // 暴露到全局，便于 inline / 调试
+    window.__zijianBack = handleAppBack;
+
+    if (btnBack) {
+      btnBack.onclick = handleAppBack;
+      ['click', 'pointerup'].forEach(ev => {
+        btnBack.addEventListener(ev, handleAppBack, true);
+      });
+    }
+    // 聊天设置页自己的返回
+    $('#chat-settings-back')?.addEventListener('click', (e) => {
       e.preventDefault();
-      e.stopPropagation();
-      onBack(e);
-    }, { passive: false, capture: true });
-    document.querySelector('.app-header')?.addEventListener('click', (e) => {
-      if (e.target.closest('#btn-back')) onBack(e);
-    }, true);
-    // 长按标题也可返回（兜底）
-    let titleBackTimer = null;
-    pageTitle.addEventListener('touchstart', () => {
-      titleBackTimer = setTimeout(() => {
-        if (state.chatContactId) onBack();
-      }, 600);
-    }, { passive: true });
-    pageTitle.addEventListener('touchend', () => clearTimeout(titleBackTimer));
+      $('#chat-settings-page')?.classList.add('hidden');
+    });
+    // 标题单击返回（聊天详情时）
+    pageTitle.addEventListener('click', () => {
+      if (state.chatContactId) handleAppBack();
+    });
 
     let lastTap=0;
     headerAvatar.addEventListener('click', () => {
@@ -4341,35 +4400,7 @@
     syncRows();
   }
 
-  const DEFAULT_ASK_QUESTIONS = [
-    {
-      type: 'single', text: '你在干嘛呀？',
-      options: [
-        { t: '在想你', reply: '就知道你会这样说' },
-        { t: '在忙', reply: '忙完记得找我' },
-        { t: '摸鱼', reply: '被抓到了吧' },
-        { t: '发呆', reply: '发呆的时候在想我吗' }
-      ]
-    },
-    {
-      type: 'single', text: '吃饭了没？',
-      options: [
-        { t: '吃过了', reply: '乖，好好吃饭' },
-        { t: '还没', reply: '快去吃，我等你' },
-        { t: '正在吃', reply: '慢慢吃，别噎着' }
-      ]
-    },
-    {
-      type: 'single', text: '今天有没有想我？',
-      options: [
-        { t: '想了', reply: '我也想你' },
-        { t: '一直在想', reply: '嘴真甜' },
-        { t: '才没有', reply: '哼，嘴硬' }
-      ]
-    },
-    { type: 'text', text: '快说说，今天过得怎么样？', reply: '嗯，我听着呢' },
-    { type: 'text', text: '现在最想做的一件事是什么？', reply: '说出来我就当听到了' }
-  ];
+  // 系统默认查岗题已移除：仅使用联系人自定义 askQuestions
 
   function tryContactAsk(contact) {
     if (!contact || state.chatContactId !== contact.id) return;
@@ -4378,8 +4409,9 @@
     if (Math.random() > chance) return;
     if (messageList.querySelector('.ask-card')) return;
 
-    const qs = (contact.askQuestions && contact.askQuestions.length)
-      ? contact.askQuestions : DEFAULT_ASK_QUESTIONS;
+    // 仅使用用户自定义查岗题；无自定义则不出题（已移除系统默认题）
+    const qs = (contact.askQuestions && contact.askQuestions.length) ? contact.askQuestions : [];
+    if (!qs.length) return;
     const q = qs[Math.floor(Math.random() * qs.length)];
     if (!q) return;
 
