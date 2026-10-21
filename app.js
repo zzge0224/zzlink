@@ -855,26 +855,26 @@
       <div class="settings-cell"><span>最小延迟(秒)</span><input type="number" id="cs-min" step="0.5" value="${s.minDelay}"/></div>
       <div class="settings-cell"><span>最大延迟(秒)</span><input type="number" id="cs-max" step="0.5" value="${s.maxDelay}"/></div>
       <div class="settings-cell"><span>每次最多回复条数</span><input type="number" id="cs-count" min="1" max="3" value="${s.maxReplies}"/></div>
-      <div class="settings-cell"><span>回复概率</span><input type="number" id="cs-reply" step="0.01" min="0" max="1" value="${lc.replyChance}"/></div>
-      <div class="settings-cell"><span>已读不回概率</span><input type="number" id="cs-noreply" step="0.01" min="0" max="1" value="${lc.readNoReplyChance}"/></div>
-      <div class="settings-section-title">互动概率</div>
-      <div class="settings-cell"><span>一起听·暂停概率</span><input type="number" id="cs-pause" step="0.01" min="0" max="1" value="${lc.pauseChance}"/></div>
-      <div class="settings-cell"><span>一起听·收藏歌曲概率</span><input type="number" id="cs-fav" step="0.01" min="0" max="1" value="${lc.favoriteChance}"/></div>
-      <div class="settings-cell"><span>邀请一起听概率</span><input type="number" id="cs-listen-invite" step="0.01" min="0" max="1" value="${lc.listenInviteChance != null ? lc.listenInviteChance : 0.18}"/></div>
-      <div class="settings-cell"><span>一起听·收藏歌词概率</span><input type="number" id="cs-lyric-fav" step="0.01" min="0" max="1" value="${lc.lyricFavoriteChance != null ? lc.lyricFavoriteChance : 0.2}"/></div>
+      <div class="settings-cell"><span>回复概率 %</span><input type="number" id="cs-reply" step="1" min="0" max="100" value="${Math.round((lc.replyChance||0)*100)}"/></div>
+      <div class="settings-cell"><span>已读不回概率 %</span><input type="number" id="cs-noreply" step="1" min="0" max="100" value="${Math.round((lc.readNoReplyChance||0)*100)}"/></div>
+      <div class="settings-section-title">互动概率（单位：%）</div>
+      <div class="settings-cell"><span>一起听·暂停 %</span><input type="number" id="cs-pause" step="1" min="0" max="100" value="${Math.round((lc.pauseChance||0)*100)}"/></div>
+      <div class="settings-cell"><span>一起听·收藏歌曲 %</span><input type="number" id="cs-fav" step="1" min="0" max="100" value="${Math.round((lc.favoriteChance||0)*100)}"/></div>
+      <div class="settings-cell"><span>邀请一起听 %</span><input type="number" id="cs-listen-invite" step="1" min="0" max="100" value="${Math.round(((lc.listenInviteChance != null ? lc.listenInviteChance : 0.18)||0)*100)}"/></div>
+      <div class="settings-cell"><span>一起听·收藏歌词 %</span><input type="number" id="cs-lyric-fav" step="1" min="0" max="100" value="${Math.round(((lc.lyricFavoriteChance != null ? lc.lyricFavoriteChance : 0.2)||0)*100)}"/></div>
       <div class="settings-cell"><span>暂停最长秒数</span><input type="number" id="cs-pdur" min="1" max="30" value="${lc.pauseDurationMax}"/></div>
-      <div class="settings-cell"><span>拼字卡概率</span><input type="number" id="cs-splice" step="0.01" min="0" max="1" value="${lc.spliceChance != null ? lc.spliceChance : 0.35}"/></div>
+      <div class="settings-cell"><span>拼字卡 %</span><input type="number" id="cs-splice" step="1" min="0" max="100" value="${Math.round(((lc.spliceChance != null ? lc.spliceChance : 0.35)||0)*100)}"/></div>
       <div class="settings-cell"><span>拼字最少片数</span><input type="number" id="cs-splice-min" min="2" max="6" value="${lc.spliceMin != null ? lc.spliceMin : 2}"/></div>
       <div class="settings-cell"><span>拼字最多片数</span><input type="number" id="cs-splice-max" min="2" max="8" value="${lc.spliceMax != null ? lc.spliceMax : 4}"/></div>
-      <div class="settings-cell"><span>朋友圈发动态概率</span><input type="number" id="cs-moments" step="0.01" min="0" max="1" value="${lc.momentsChance}"/></div>
-      <div class="settings-cell"><span>主动拍一拍概率</span><input type="number" id="cs-poke" step="0.01" min="0" max="1" value="${lc.pokeChance}"/></div>
+      <div class="settings-cell"><span>朋友圈发动态 %</span><input type="number" id="cs-moments" step="1" min="0" max="100" value="${Math.round((lc.momentsChance||0)*100)}"/></div>
+      <div class="settings-cell"><span>主动拍一拍 %</span><input type="number" id="cs-poke" step="1" min="0" max="100" value="${Math.round((lc.pokeChance||0)*100)}"/></div>
       <div class="settings-cell"><span>主动发消息间隔(分钟)</span><input type="number" id="cs-proactive" min="0" max="10080" value="${lc.proactiveIntervalMin == null ? 30 : lc.proactiveIntervalMin}"/></div>
       <div class="settings-section-title" style="padding-top:0">间隔为 0 则关闭主动发消息</div>
       <div class="settings-section-title">头像池 · 提问</div>
       <div class="settings-cell" id="cs-avatar-pool"><span>对方头像池</span><span class="val">›</span></div>
       <div class="settings-cell" id="cs-user-avatar-pool"><span>我的头像池</span><span class="val">›</span></div>
-      <div class="settings-cell"><span>头像随机更换概率</span><input type="number" id="cs-av-swap" step="0.01" min="0" max="1" value="${lc.avatarSwapChance != null ? lc.avatarSwapChance : 0.08}"/></div>
-      <div class="settings-cell"><span>查岗提问概率</span><input type="number" id="cs-ask-chance" step="0.01" min="0" max="1" value="${lc.askChance != null ? lc.askChance : 0.1}"/></div>
+      <div class="settings-cell"><span>头像随机更换 %</span><input type="number" id="cs-av-swap" step="1" min="0" max="100" value="${Math.round(((lc.avatarSwapChance != null ? lc.avatarSwapChance : 0.08)||0)*100)}"/></div>
+      <div class="settings-cell"><span>查岗提问 %</span><input type="number" id="cs-ask-chance" step="1" min="0" max="100" value="${Math.round(((lc.askChance != null ? lc.askChance : 0.1)||0)*100)}"/></div>
       <div class="settings-cell"><span>回答问卷/提问最短(秒)</span><input type="number" id="cs-ask-min" step="0.5" min="0.5" max="120" value="${lc.askMinDelay != null ? lc.askMinDelay : 2}"/></div>
       <div class="settings-cell"><span>回答问卷/提问最长(秒)</span><input type="number" id="cs-ask-max" step="0.5" min="0.5" max="300" value="${lc.askMaxDelay != null ? lc.askMaxDelay : 8}"/></div>
       <div style="padding:16px"><button class="btn-primary" id="cs-save" style="width:100%">保存</button></div>`;
@@ -911,29 +911,34 @@
       let max = Math.max(min, Math.min(60, num('#cs-max', 4)));
       let count = Math.max(1, Math.min(3, parseInt($('#cs-count')?.value, 10) || 2));
       c.settings = { minDelay: min, maxDelay: max, maxReplies: count };
-      const clamp01 = v => Math.max(0, Math.min(1, v));
+      // 界面为百分比 0~100，内部存 0~1
+      const pct01 = (id, defPct) => {
+        const v = parseFloat($(id)?.value);
+        const pct = isNaN(v) ? defPct : v;
+        return Math.max(0, Math.min(1, pct / 100));
+      };
       let spliceMin = Math.max(2, Math.min(6, parseInt($('#cs-splice-min')?.value, 10) || 2));
       let spliceMax = Math.max(spliceMin, Math.min(8, parseInt($('#cs-splice-max')?.value, 10) || 4));
       c.listenConfig = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {}, {
-        pauseChance: clamp01(num('#cs-pause', 0.18)),
-        favoriteChance: clamp01(num('#cs-fav', 0.12)),
-        lyricFavoriteChance: clamp01(num('#cs-lyric-fav', 0.2)),
-        listenInviteChance: clamp01(num('#cs-listen-invite', 0.18)),
+        pauseChance: pct01('#cs-pause', 18),
+        favoriteChance: pct01('#cs-fav', 12),
+        lyricFavoriteChance: pct01('#cs-lyric-fav', 20),
+        listenInviteChance: pct01('#cs-listen-invite', 18),
         pauseDurationMax: Math.max(1, Math.min(30, num('#cs-pdur', 6))),
-        momentsChance: clamp01(num('#cs-moments', 0.15)),
-        replyChance: clamp01(num('#cs-reply', 0.92)),
-        readNoReplyChance: clamp01(num('#cs-noreply', 0.08)),
-        pokeChance: clamp01(num('#cs-poke', 0.1)),
+        momentsChance: pct01('#cs-moments', 15),
+        replyChance: pct01('#cs-reply', 92),
+        readNoReplyChance: pct01('#cs-noreply', 8),
+        pokeChance: pct01('#cs-poke', 10),
         proactiveIntervalMin: Math.max(0, Math.min(10080, num('#cs-proactive', 30))),
-        avatarSwapChance: clamp01(num('#cs-av-swap', 0.08)),
-        askChance: clamp01(num('#cs-ask-chance', 0.1)),
+        avatarSwapChance: pct01('#cs-av-swap', 8),
+        askChance: pct01('#cs-ask-chance', 10),
         askMinDelay: Math.max(0.5, Math.min(120, num('#cs-ask-min', 2))),
         askMaxDelay: (function () {
           var amin = Math.max(0.5, Math.min(120, num('#cs-ask-min', 2)));
           var amax = Math.max(0.5, Math.min(300, num('#cs-ask-max', 8)));
           return Math.max(amin, amax);
         })(),
-        spliceChance: clamp01(num('#cs-splice', 0.35)),
+        spliceChance: pct01('#cs-splice', 35),
         spliceMin,
         spliceMax,
         momentsSticker: (c.listenConfig && c.listenConfig.momentsSticker) !== false,
@@ -1224,7 +1229,10 @@
     }
     const cls = m.from === 'user' ? 'user' : 'contact';
     const av = msgAvatarHtml(m.from);
-    const body = `<div class="msg-col">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div>${readStatusHtml(m)}</div>`;
+    const spliceTag = (m.spliced && m.from === 'contact')
+      ? `<div class="msg-splice-tag" title="${escapeHtml((m.pieces || []).join(' · '))}">自主拼字</div>`
+      : '';
+    const body = `<div class="msg-col">${renderMsgBubble(m)}${spliceTag}<div class="msg-time">${formatTime(m.time)}</div>${readStatusHtml(m)}</div>`;
     return `<div class="msg-row ${cls}" data-id="${m.id}">${cls === 'contact' ? av + body : body + av}</div>`;
   }
 
@@ -1305,14 +1313,15 @@
     return contact.cards || [];
   }
 
-  /** 拼字卡：从字卡库抽多片短句拼成一条回复（灵感来自词典/拼字玩法） */
+  /** 拼字卡：返回 { text, spliced, pieces }；未触发拼字时 spliced=false */
   function composeSplicedCard(contact) {
     const pool = getContactCardPool(contact).filter(Boolean);
     if (!pool.length) return null;
     const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
     const chance = Number(lc.spliceChance != null ? lc.spliceChance : 0.35);
     if (Math.random() > chance) {
-      return pool[Math.floor(Math.random() * pool.length)];
+      const t = pool[Math.floor(Math.random() * pool.length)];
+      return { text: t, spliced: false, pieces: [t] };
     }
     const minN = Math.max(2, Math.min(6, parseInt(lc.spliceMin, 10) || 2));
     const maxN = Math.max(minN, Math.min(8, parseInt(lc.spliceMax, 10) || 4));
@@ -1335,10 +1344,13 @@
         }
       }
     }
-    if (picked.length < 2) return pool[Math.floor(Math.random() * pool.length)];
-    // 用空格或直接拼接（中文无空格更自然）
-    const hasAscii = picked.some(p => /[a-zA-Z]/.test(p));
-    return hasAscii ? picked.join(' ') : picked.join('');
+    if (picked.length < 2) {
+      const t = pool[Math.floor(Math.random() * pool.length)];
+      return { text: t, spliced: false, pieces: [t] };
+    }
+    // 片与片之间用空格或逗号隔开（随机，更像随手拼）
+    const sep = Math.random() < 0.55 ? ' ' : '，';
+    return { text: picked.join(sep), spliced: true, pieces: picked };
   }
 
   function deliverContactMsg(contact, msg) {
@@ -1405,8 +1417,13 @@
           const st = stickers[Math.floor(Math.random() * stickers.length)];
           msg = { id: genId('m'), from: 'contact', type: 'sticker', stickerId: st.id, stickerData: st.data, time: Date.now() };
         } else if (pool.length) {
-          const text = composeSplicedCard(contact) || pool[Math.floor(Math.random() * pool.length)];
-          msg = { id: genId('m'), from: 'contact', type: 'text', text, time: Date.now() };
+          const composed = composeSplicedCard(contact);
+          const text = (composed && composed.text) || pool[Math.floor(Math.random() * pool.length)];
+          msg = {
+            id: genId('m'), from: 'contact', type: 'text', text, time: Date.now(),
+            spliced: !!(composed && composed.spliced),
+            pieces: (composed && composed.pieces) || undefined
+          };
         } else return;
         deliverContactMsg(contact, msg);
       }, cum * 1000));
@@ -1623,13 +1640,23 @@
           </div>
         </div>`;
       }).join('') || '<div class="empty-state small"><p>暂无查岗题。点 + 添加后，对方才会按概率向你提问</p></div>'}</div>
-      <div class="section-title">TA 收藏的歌</div>
-      <div>${favSongs.map(sg => `<div class="fav-song-item" data-sid="${sg.id}"><div class="song-cover" style="${sg.cover ? `background-image:url(${sg.cover})` : ''}">${sg.cover ? '' : '🎵'}</div>
-        <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist || '')}</div></div></div>`).join('') || '<div class="empty-state small"><p>暂无收藏</p></div>'}</div>
-      <div class="section-title">TA 收藏的歌词</div>
-      <div class="card-list">${(c.favoriteLyrics || []).slice().reverse().slice(0, 30).map(t =>
-        `<div class="card-item"><div class="card-text">${escapeHtml(t)}</div></div>`
-      ).join('') || '<div class="empty-state small"><p>一起听时可能会收藏歌词</p></div>'}</div>`;
+      <div class="section-title">TA 收藏的歌 <span style="font-size:11px;color:var(--muted);font-weight:400">${favSongs.length} 首</span></div>
+      <div>${favSongs.map(sg => `<div class="fav-song-item" data-sid="${sg.id}">
+        <div class="song-cover" style="${sg.cover ? `background-image:url(${sg.cover})` : ''}">${sg.cover ? '' : '🎵'}</div>
+        <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist || '')}</div></div>
+        <div class="card-actions" style="margin-left:auto">
+          <button class="card-btn" data-fav-play="${sg.id}" title="播放">▶</button>
+          <button class="card-btn delete" data-fav-del="${sg.id}" title="删除">✕</button>
+        </div>
+      </div>`).join('') || '<div class="empty-state small"><p>暂无收藏</p></div>'}</div>
+      <div class="section-title">TA 收藏的歌词 <span style="font-size:11px;color:var(--muted);font-weight:400">${(c.favoriteLyrics||[]).length} 句</span></div>
+      <div class="card-list">${(c.favoriteLyrics || []).slice().reverse().map((line, ri) => {
+        const realIdx = (c.favoriteLyrics.length - 1 - ri);
+        return `<div class="card-item">
+          <div class="card-text">${escapeHtml(line)}</div>
+          <div class="card-actions"><button class="card-btn delete" data-lyric-del="${realIdx}">✕</button></div>
+        </div>`;
+      }).join('') || '<div class="empty-state small"><p>一起听时可能会收藏歌词</p></div>'}</div>`;
 
     $('#group-tabs')?.querySelectorAll('.group-tab[data-g]').forEach(btn => {
       btn.addEventListener('click', () => { state.activeCardGroup = btn.dataset.g; state.cardSelected = new Set(); renderCardsPanel(); });
@@ -1651,6 +1678,35 @@
     $('#btn-add-card')?.addEventListener('click', () => openCardModal('add', 'normal'));
     $('#btn-add-inter')?.addEventListener('click', () => openCardModal('add', 'interaction'));
     $('#btn-add-askq')?.addEventListener('click', () => openAskQuestionEditor(null));
+    cardsPanel.querySelectorAll('[data-fav-del]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const sid = btn.getAttribute('data-fav-del');
+        if (!confirm('从 TA 的收藏中移除这首歌？')) return;
+        c.favorites = (c.favorites || []).filter(id => id !== sid);
+        saveData();
+        renderCardsPanel();
+      });
+    });
+    cardsPanel.querySelectorAll('[data-fav-play]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openListenWithContact(btn.getAttribute('data-fav-play'), c.id);
+      });
+    });
+    cardsPanel.querySelectorAll('[data-lyric-del]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const i = +btn.getAttribute('data-lyric-del');
+        if (!confirm('删除这句收藏歌词？')) return;
+        if (Array.isArray(c.favoriteLyrics) && i >= 0 && i < c.favoriteLyrics.length) {
+          c.favoriteLyrics.splice(i, 1);
+          saveData();
+          renderCardsPanel();
+        }
+      });
+    });
+
     cardsPanel.querySelectorAll('[data-ask-edit]').forEach(btn => {
       btn.addEventListener('click', () => openAskQuestionEditor(+btn.dataset.askEdit));
     });
@@ -2387,6 +2443,20 @@
     return true;
   }
 
+  function pushSystemTip(contactId, text) {
+    if (!contactId || !text) return;
+    const msg = { id: genId('m'), from: 'system', type: 'system', text, time: Date.now() };
+    if (!state.chats[contactId]) state.chats[contactId] = [];
+    state.chats[contactId].push(msg);
+    saveData();
+    if (state.chatContactId === contactId) {
+      try { appendMessage(msg); } catch (_) {}
+    }
+    if (state.listenContactId === contactId) {
+      try { renderListenChatMsgs(); } catch (_) {}
+    }
+  }
+
   function startListenSimulation() {
     stopListenSimulation();
     const contact = state.contacts.find(c => c.id === state.listenContactId);
@@ -2421,14 +2491,19 @@
         if (state.listenSongId && !contact.favorites.includes(state.listenSongId)) {
           contact.favorites.push(state.listenSongId);
           saveData();
+          const song = state.songs.find(s => s.id === state.listenSongId);
+          const title = song ? song.title : '一首歌';
+          showListenToast(`${contact.name} 收藏了这首歌`);
+          pushSystemTip(contact.id, `${contact.name} 收藏了歌曲「${title}」`);
+        } else {
+          showListenToast(`${contact.name} 又听了一遍这首歌`);
         }
-        showListenToast(`${contact.name} 收藏了这首歌`);
       } else if (r < pPause + pSong + pLyric) {
-        // 播放过程中独立收藏一句歌词（不依赖是否收藏歌曲）
         const line = pickCurrentOrRandomLyric();
         if (line && collectLyricLine(contact, line)) {
           saveData();
           showListenToast(`${contact.name} 收藏了歌词「${truncate(line, 18)}」`);
+          pushSystemTip(contact.id, `${contact.name} 收藏了歌词「${truncate(line, 24)}」`);
         } else if (line) {
           showListenToast(`${contact.name} 又念了句「${truncate(line, 14)}」`);
         }
@@ -2968,10 +3043,24 @@
   function updateChatPinMemorial(contactId) {
     const el = $('#chat-pin-memorial');
     if (!el) return;
-    const m = (state.memorials || []).find(x => x.contactId === contactId && x.pinInChat);
-    if (!m) { el.classList.add('hidden'); el.textContent = ''; return; }
-    el.textContent = `${m.title || '纪念'} · ${memorialLabel(m)}`;
+    const list = state.memorials || [];
+    // 兼容 pinInChat 为 true / 1 / 'true'
+    const m = list.find(x => x && x.contactId === contactId && (x.pinInChat === true || x.pinInChat === 1 || x.pinInChat === 'true'));
+    if (!m) {
+      el.classList.add('hidden');
+      el.innerHTML = '';
+      el.style.display = 'none';
+      return;
+    }
+    const label = memorialLabel(m);
+    el.innerHTML = `<span class="pin-ico">📌</span><span class="pin-text">${escapeHtml(m.title || '纪念')} · ${escapeHtml(label)}</span>`;
     el.classList.remove('hidden');
+    el.style.display = 'flex';
+    // 确保在详情视图里可见
+    if (chatDetailView && !chatDetailView.classList.contains('hidden')) {
+      el.style.visibility = 'visible';
+      el.style.opacity = '1';
+    }
   }
 
   function openMomentsPage() {
