@@ -119,11 +119,23 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 .hidden { display:none !important; }
 
 .app-header { height:52px; display:flex; align-items:center; justify-content:center; background:var(--chrome); border-bottom:1px solid var(--border); flex-shrink:0; position:relative; padding:0 48px; transition:background-color .35s,border-color .35s; z-index:40; }
-.header-center { display:flex; align-items:center; gap:8px; max-width:70%; }
+.header-center {
+  display:flex; align-items:center; gap:8px; max-width:60%;
+  pointer-events:none; /* 避免挡住左右按钮 */
+  position:relative; z-index:1;
+}
+.header-center > * { pointer-events:auto; }
 .app-header h1 { font-size:17px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--paper); }
 .header-avatar { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; color:#fff; cursor:pointer; background-size:cover; background-position:center; user-select:none; }
 .header-avatar.hidden { display:none; }
-.btn-back { position:absolute; left:8px; top:50%; transform:translateY(-50%); width:44px; height:44px; border:none; background:transparent; color:var(--paper); font-size:30px; cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center; z-index:50; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.btn-back {
+  position:absolute; left:4px; top:50%; transform:translateY(-50%);
+  width:48px; height:48px; border:none; background:transparent; color:var(--paper);
+  font-size:32px; cursor:pointer; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  z-index:100; pointer-events:auto !important;
+  -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+}
 .btn-back.hidden { display:none; }
 .header-right { position:absolute; right:12px; top:50%; transform:translateY(-50%); }
 

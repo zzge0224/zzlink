@@ -139,6 +139,8 @@
     if (!Array.isArray(c.statuses) || !c.statuses.length) c.statuses = DEFAULT_STATUSES.slice();
     if (!c.currentStatus) c.currentStatus = c.statuses[0];
     if (typeof c.balance !== 'number' || isNaN(c.balance)) c.balance = 8888;
+    // 查岗提问题库（联系人主动问用户）
+    if (!Array.isArray(c.askQuestions)) c.askQuestions = [];
     return c;
   }
 
@@ -1536,6 +1538,20 @@
       <div class="card-list">${list.map((t, i) => mk(t, i, 'normal')).join('') || '<div class="empty-state small"><p>暂无字卡</p></div>'}</div>
       <div class="section-title">互动字卡 <button class="btn-add" id="btn-add-inter" style="margin-left:8px">+</button></div>
       <div class="card-list">${(c.interactionCards || []).map((t, i) => mk(t, i, 'interaction')).join('') || '<div class="empty-state small"><p>暂无</p></div>'}</div>
+      <div class="section-title">查岗提问题库 <button class="btn-add" id="btn-add-askq" style="margin-left:8px">+</button></div>
+      <div class="settings-summary" style="margin-top:0">对方按「查岗提问概率」随机出题；可自建单选/简答及回复</div>
+      <div class="card-list" id="askq-list">${(c.askQuestions || []).map((q, i) => {
+        const tip = q.type === 'single'
+          ? `单选 · ${(q.options || []).map(o => o.t).join(' / ')}`
+          : `简答 · 回复：${q.reply || '…'}`;
+        return `<div class="card-item interaction" data-askqi="${i}">
+          <div class="card-text"><strong>${escapeHtml(q.text || '')}</strong><div style="font-size:11px;color:var(--muted);margin-top:4px">${escapeHtml(tip)}</div></div>
+          <div class="card-actions">
+            <button class="card-btn edit" data-ask-edit="${i}">✎</button>
+            <button class="card-btn delete" data-ask-del="${i}">✕</button>
+          </div>
+        </div>`;
+      }).join('') || '<div class="empty-state small"><p>暂无自定义题，将使用系统默认查岗题</p></div>'}</div>
       <div class="section-title">TA 收藏的歌</div>
       <div>${favSongs.map(sg => `<div class="fav-song-item" data-sid="${sg.id}"><div class="song-cover" style="${sg.cover ? `background-image:url(${sg.cover})` : ''}">${sg.cover ? '' : '🎵'}</div>
         <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist || '')}</div></div></div>`).join('') || '<div class="empty-state small"><p>暂无收藏</p></div>'}</div>
@@ -1557,6 +1573,19 @@
     });
     $('#btn-add-card')?.addEventListener('click', () => openCardModal('add', 'normal'));
     $('#btn-add-inter')?.addEventListener('click', () => openCardModal('add', 'interaction'));
+    $('#btn-add-askq')?.addEventListener('click', () => openAskQuestionEditor(null));
+    cardsPanel.querySelectorAll('[data-ask-edit]').forEach(btn => {
+      btn.addEventListener('click', () => openAskQuestionEditor(+btn.dataset.askEdit));
+    });
+    cardsPanel.querySelectorAll('[data-ask-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = +btn.dataset.askDel;
+        if (!confirm('删除这道查岗题？')) return;
+        c.askQuestions.splice(i, 1);
+        saveData();
+        renderCardsPanel();
+      });
+    });
     $('#btn-batch-cards')?.addEventListener('click', openBatchCardModal);
     $('#btn-file-cards')?.addEventListener('click', () => document.getElementById('file-cards-txt')?.click());
     $('#btn-dedup-cards')?.addEventListener('click', () => {
@@ -2405,6 +2434,35 @@
       }
       saveData();
       closeModal();
+      return;
+    }
+    if (state.modalMode === 'ask-question-edit') {
+      const c = state.contacts.find(x => x.id === state.currentContactId);
+      if (!c) { closeModal(); return; }
+      ensureContactShape(c);
+      const text = ($('#askq-text')?.value || '').trim();
+      if (!text) { alert('请填写题目'); return; }
+      const type = $('#askq-type')?.value || 'text';
+      let q;
+      if (type === 'single') {
+        const lines = ($('#askq-opts')?.value || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const options = lines.map(line => {
+          const parts = line.split('|');
+          return { t: (parts[0] || '').trim(), reply: (parts[1] || '嗯').trim() || '嗯' };
+        }).filter(o => o.t);
+        if (options.length < 2) { alert('单选题至少 2 个选项（格式：选项|回复）'); return; }
+        q = { type: 'single', text, options };
+      } else {
+        q = { type: 'text', text, reply: ($('#askq-reply')?.value || '').trim() || '嗯，我记下了' };
+      }
+      if (!Array.isArray(c.askQuestions)) c.askQuestions = [];
+      const idx = state._askQEditIndex;
+      if (typeof idx === 'number' && idx >= 0 && idx < c.askQuestions.length) c.askQuestions[idx] = q;
+      else c.askQuestions.push(q);
+      saveData();
+      closeModal();
+      renderCardsPanel();
+      alert('查岗题已保存');
       return;
     }
     if (state.modalMode === 'quick-ask') {
@@ -3670,8 +3728,26 @@
       }
       leaveChat();
     };
-    btnBack.addEventListener('click', onBack);
-    btnBack.addEventListener('touchend', (e) => { e.preventDefault(); onBack(e); }, { passive: false });
+    // 多重绑定，确保手机端可点返回
+    btnBack.onclick = onBack;
+    btnBack.addEventListener('click', onBack, true);
+    btnBack.addEventListener('touchstart', (e) => { e.stopPropagation(); }, { passive: true, capture: true });
+    btnBack.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onBack(e);
+    }, { passive: false, capture: true });
+    document.querySelector('.app-header')?.addEventListener('click', (e) => {
+      if (e.target.closest('#btn-back')) onBack(e);
+    }, true);
+    // 长按标题也可返回（兜底）
+    let titleBackTimer = null;
+    pageTitle.addEventListener('touchstart', () => {
+      titleBackTimer = setTimeout(() => {
+        if (state.chatContactId) onBack();
+      }, 600);
+    }, { passive: true });
+    pageTitle.addEventListener('touchend', () => clearTimeout(titleBackTimer));
 
     let lastTap=0;
     headerAvatar.addEventListener('click', () => {
@@ -4225,6 +4301,46 @@
   }
 
   // ========== 查岗提问（灵感：Mochi 查岗卡）==========
+  function openAskQuestionEditor(index) {
+    const c = state.contacts.find(x => x.id === state.currentContactId);
+    if (!c) { alert('请先选择联系人'); return; }
+    ensureContactShape(c);
+    if (!Array.isArray(c.askQuestions)) c.askQuestions = [];
+    const editing = (index != null && index >= 0) ? c.askQuestions[index] : null;
+    state.modalMode = 'ask-question-edit';
+    state._askQEditIndex = (index != null && index >= 0) ? index : -1;
+    modalTitle.textContent = editing ? '编辑查岗题' : '添加查岗题';
+    const type = editing ? (editing.type || 'text') : 'single';
+    const optsText = editing && editing.type === 'single' && Array.isArray(editing.options)
+      ? editing.options.map(o => `${o.t || ''}|${Array.isArray(o.reply) ? o.reply[0] : (o.reply || '')}`).join('\n')
+      : '在想你|就知道你会这样说\n在忙|忙完记得找我';
+    modalBody.innerHTML = `
+      <div class="form-row"><label>题目</label><input type="text" id="askq-text" value="${escapeHtml(editing?.text || '')}" placeholder="例如：你在干嘛呀？"/></div>
+      <div class="form-row"><label>类型</label>
+        <select id="askq-type">
+          <option value="single" ${type === 'single' ? 'selected' : ''}>单选题</option>
+          <option value="text" ${type === 'text' ? 'selected' : ''}>简答题</option>
+        </select>
+      </div>
+      <div class="form-row" id="askq-opts-row"><label>选项（每行：选项文字|对方回复）</label>
+        <textarea id="askq-opts" rows="5" placeholder="选项A|回复A">${escapeHtml(optsText)}</textarea>
+      </div>
+      <div class="form-row" id="askq-reply-row"><label>简答后对方回复</label>
+        <input type="text" id="askq-reply" value="${escapeHtml(editing?.reply || '嗯，我记下了')}" placeholder="嗯，我记下了"/>
+      </div>
+      <p style="font-size:11px;color:var(--muted)">单选至少 2 个选项。有自定义题库时优先用自定义，不再用系统默认题。</p>`;
+    modalOverlay.classList.remove('hidden');
+    const syncRows = () => {
+      const t = $('#askq-type')?.value;
+      const opts = $('#askq-opts-row');
+      const rep = $('#askq-reply-row');
+      if (opts) opts.style.display = t === 'single' ? '' : 'none';
+      if (rep) rep.style.display = t === 'text' ? '' : 'none';
+    };
+    $('#askq-type')?.addEventListener('change', syncRows);
+    syncRows();
+  }
+
   const DEFAULT_ASK_QUESTIONS = [
     {
       type: 'single', text: '你在干嘛呀？',
