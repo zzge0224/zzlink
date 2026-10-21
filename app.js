@@ -571,19 +571,31 @@
       if (!state.notifyEnabled) return;
       if (typeof Notification === 'undefined') return;
       if (Notification.permission !== 'granted') return;
-      // 仅页面不可见时弹系统通知（前台不打扰）
-      if (document.visibilityState === 'visible' && state.chatContactId === contact.id) return;
+      // 正在看该会话且页面前台 → 不弹
+      const viewingThis = state.chatContactId === (contact && contact.id);
+      if (document.visibilityState === 'visible' && viewingThis) return;
       const title = (contact && contact.name) ? contact.name : '字笺';
       let body = '[新消息]';
       if (msg) {
         if (msg.type === 'sticker') body = '[表情]';
         else if (msg.type === 'image') body = '[图片]';
-        else if (msg.text) body = String(msg.text).slice(0, 60);
+        else if (msg.type === 'poke' || msg.type === 'system') body = msg.text || body;
+        else if (msg.text) body = String(msg.text).slice(0, 80);
         else body = getPreviewText(msg) || body;
       }
-      const n = new Notification(title, { body: body, tag: 'zijian-' + (contact && contact.id), renotify: true });
+      // 每条独立 tag 后缀时间，避免系统合并丢通知
+      const tag = 'zijian-' + (contact && contact.id) + '-' + (msg && msg.id ? msg.id : Date.now());
+      if (document.visibilityState !== 'visible') {
+        document.title = '（新消息）' + title;
+      }
+      const n = new Notification(title, {
+        body,
+        tag,
+        renotify: true,
+        silent: false
+      });
       n.onclick = function () {
-        window.focus();
+        try { window.focus(); } catch (_) {}
         n.close();
         if (contact && contact.id) {
           switchPage('chat');
@@ -731,16 +743,19 @@
   function applyContactChatBg(id) {
     const c = state.contacts.find(x => x.id === id);
     if (!c) return;
-    // cover = 裁切填满，不拉伸变形；禁止 100% 100% 拉伸
     const el = messageList;
     if (!el) return;
+    // 原比例：cover 只裁切不拉伸；禁止 100% 100%
     el.style.setProperty('background-size', 'cover', 'important');
     el.style.setProperty('background-position', 'center center', 'important');
     el.style.setProperty('background-repeat', 'no-repeat', 'important');
     el.style.setProperty('background-attachment', 'scroll', 'important');
+    // 清除可能造成变形的属性
+    el.style.removeProperty('background-width');
+    el.style.removeProperty('background-height');
     if (c.chatBgImg) {
-      el.style.setProperty('background-image', `url(${c.chatBgImg})`, 'important');
-      el.style.backgroundColor = '';
+      el.style.setProperty('background-image', `url("${c.chatBgImg}")`, 'important');
+      el.style.backgroundColor = 'transparent';
     } else if (c.chatBgColor) {
       el.style.setProperty('background-image', 'none', 'important');
       el.style.backgroundColor = c.chatBgColor;
@@ -1439,8 +1454,6 @@
       const item = document.createElement('div');
       item.className = 'contact-item' + (c.id === state.currentContactId ? ' active' : '');
       item.innerHTML = `${renderAvatarEl(c)}<div class="contact-name">${escapeHtml(c.name)}</div>
-        <div class="contact-status">${escapeHtml(c.currentStatus || '')}</div>
-        <div class="contact-balance">${typeof c.balance==='number'?c.balance:8888} ★</div>
         <button class="contact-del" data-id="${c.id}" title="删除">✕</button>`;
       item.addEventListener('click', e => {
         if (e.target.closest('.contact-del')) return;
@@ -3147,9 +3160,47 @@
     });
   }
 
-  /** 专用于聊天/群背景：更高清晰度 + 保持比例 */
+  /**
+   * 聊天背景：尽量保留原图比例与清晰度。
+   * 仅当边长过大或文件过大时等比缩小，绝不拉伸变形。
+   */
   function compressChatBg(file) {
-    return compressImage(file, 1280, 0.85);
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onerror = reject;
+      r.onload = () => {
+        const dataUrl = r.result;
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (!w || !h) { resolve(dataUrl); return; }
+          // 仅限制最长边，保持宽高比
+          const maxEdge = 1600;
+          const needScale = Math.max(w, h) > maxEdge || (file.size && file.size > 1.8 * 1024 * 1024);
+          if (!needScale && typeof dataUrl === 'string' && dataUrl.length < 2.5e6) {
+            resolve(dataUrl); // 原图直存
+            return;
+          }
+          const scale = maxEdge / Math.max(w, h);
+          w = Math.max(1, Math.round(w * Math.min(1, scale)));
+          h = Math.max(1, Math.round(h * Math.min(1, scale)));
+          const cv = document.createElement('canvas');
+          cv.width = w;
+          cv.height = h;
+          const ctx = cv.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
+          // 保留 PNG 透明；否则 jpeg
+          const isPng = (file.type || '').includes('png') || (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/png'));
+          resolve(cv.toDataURL(isPng ? 'image/png' : 'image/jpeg', isPng ? undefined : 0.9));
+        };
+        img.src = dataUrl;
+      };
+      r.readAsDataURL(file);
+    });
   }
 
   /** 读取文本文件：自动尝试 UTF-8 / GBK，避免中文乱码 */
@@ -3583,11 +3634,18 @@
     updateMeAvatarUI();
 
     $$('.tab-item').forEach(t => t.addEventListener('click', () => switchPage(t.dataset.page)));
-    btnBack.addEventListener('click', () => {
+    const onBack = (e) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      // 设置页优先关闭
+      const settings = $('#chat-settings-page');
+      if (settings && !settings.classList.contains('hidden')) {
+        settings.classList.add('hidden');
+        return;
+      }
       // 群聊返回
       if (state.activeGroupId) {
         const view = $('#group-chat-view');
-        if (view && !view.classList.contains('hidden')) {
+        if (view && !view.classList.contains('hidden') && view.style.display !== 'none') {
           state.activeGroupId = null;
           view.classList.add('hidden');
           view.style.display = 'none';
@@ -3597,13 +3655,23 @@
           $('#group-new')?.classList.remove('hidden');
           btnBack.classList.add('hidden');
           pageTitle.textContent = '联系人';
+          document.getElementById('app')?.classList.remove('chat-detail-open');
           renderGroupList();
           renderChatList();
           return;
         }
+        // 残留 activeGroupId 清理
+        state.activeGroupId = null;
+      }
+      // 聊天详情返回列表
+      if (state.chatContactId || !$('#chat-detail-view')?.classList.contains('hidden')) {
+        leaveChat();
+        return;
       }
       leaveChat();
-    });
+    };
+    btnBack.addEventListener('click', onBack);
+    btnBack.addEventListener('touchend', (e) => { e.preventDefault(); onBack(e); }, { passive: false });
 
     let lastTap=0;
     headerAvatar.addEventListener('click', () => {
@@ -4086,6 +4154,11 @@
     scheduleLetterSystem();
     updateTabDots();
     updateNotifyUI();
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') {
+        document.title = '字笺 · ZiJian';
+      }
+    });
   }
 
   // ========== 头像池随机更换（灵感：Mochi 字卡 · 小红书@言序）==========
