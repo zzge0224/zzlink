@@ -421,6 +421,25 @@
     const hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
     return d.toDateString() === now.toDateString() ? `${hh}:${mm}` : `${d.getMonth()+1}/${d.getDate()} ${hh}:${mm}`;
   }
+  function formatTimeDivider(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    const sameDay = d.toDateString() === now.toDateString();
+    const yest = new Date(now); yest.setDate(now.getDate() - 1);
+    if (sameDay) return '今天 ' + hm;
+    if (d.toDateString() === yest.toDateString()) return '昨天 ' + hm;
+    if (d.getFullYear() === now.getFullYear()) return (d.getMonth()+1) + '月' + d.getDate() + '日 ' + hm;
+    return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + ' ' + hm;
+  }
+  function shouldShowTimeDivider(prev, cur) {
+    if (!cur || !cur.time) return false;
+    if (!prev || !prev.time) return true;
+    return Math.abs(cur.time - prev.time) >= 5 * 60 * 1000; // 5 分钟
+  }
+
   function formatSec(s) {
     if (!isFinite(s) || s < 0) return '0:00';
     const m = Math.floor(s / 60), sec = Math.floor(s % 60);
@@ -1320,7 +1339,7 @@
 
   function buildMsgRowHtml(m) {
     if (m.type === 'system' || m.type === 'poke') {
-      return `<div class="msg-row system" data-id="${m.id}">${renderMsgBubble(m)}<div class="msg-time">${formatTime(m.time)}</div></div>`;
+      return `<div class="msg-row system" data-id="${m.id}">${renderMsgBubble(m)}</div>`;
     }
     const cls = m.from === 'user' ? 'user' : 'contact';
     const av = msgAvatarHtml(m.from);
@@ -1349,12 +1368,28 @@
 
   function renderMessages() {
     const msgs = state.chats[state.chatContactId] || [];
-    messageList.innerHTML = msgs.map(buildMsgRowHtml).join('');
+    let html = '';
+    msgs.forEach((m, i) => {
+      const prev = i > 0 ? msgs[i - 1] : null;
+      if (shouldShowTimeDivider(prev, m)) {
+        html += `<div class="msg-time-divider"><span>${escapeHtml(formatTimeDivider(m.time))}</span></div>`;
+      }
+      html += buildMsgRowHtml(m);
+    });
+    messageList.innerHTML = html;
     messageList.querySelectorAll('.msg-row').forEach(bindMsgRowEvents);
     requestAnimationFrame(() => { messageList.scrollTop = messageList.scrollHeight; });
   }
   function appendMessage(msg) {
     const typing = messageList.querySelector('.typing-row'); if (typing) typing.remove();
+    const list = state.chats[state.chatContactId] || [];
+    const prev = list.length >= 2 ? list[list.length - 2] : null;
+    if (shouldShowTimeDivider(prev, msg)) {
+      const div = document.createElement('div');
+      div.className = 'msg-time-divider';
+      div.innerHTML = `<span>${escapeHtml(formatTimeDivider(msg.time))}</span>`;
+      messageList.appendChild(div);
+    }
     const wrap = document.createElement('div');
     wrap.innerHTML = buildMsgRowHtml(msg);
     const row = wrap.firstElementChild;
