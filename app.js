@@ -570,13 +570,93 @@
     });
   }
 
+  function showInAppPopup(opts) {
+    // 站内顶部弹窗：不在当前会话时提醒
+    opts = opts || {};
+    let layer = $('#in-app-popup');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'in-app-popup';
+      layer.className = 'in-app-popup hidden';
+      layer.innerHTML = `<div class="in-app-popup-inner">
+        <div class="in-app-popup-av" id="iap-av"></div>
+        <div class="in-app-popup-text">
+          <div class="in-app-popup-title" id="iap-title"></div>
+          <div class="in-app-popup-body" id="iap-body"></div>
+        </div>
+        <button type="button" class="in-app-popup-close" id="iap-close">✕</button>
+      </div>`;
+      document.body.appendChild(layer);
+      layer.addEventListener('click', (e) => {
+        if (e.target.closest('#iap-close')) {
+          layer.classList.add('hidden');
+          return;
+        }
+        if (e.target.closest('.in-app-popup-inner')) {
+          const cid = layer.dataset.contactId;
+          const kind = layer.dataset.kind;
+          layer.classList.add('hidden');
+          if (kind === 'mailbox') {
+            switchPage('interact');
+            openMailboxPage();
+          } else if (cid) {
+            switchPage('chat');
+            enterChat(cid);
+          }
+        }
+      });
+    }
+    const title = opts.title || '新消息';
+    const body = opts.body || '';
+    $('#iap-title').textContent = title;
+    $('#iap-body').textContent = body;
+    const av = $('#iap-av');
+    if (av) {
+      const c = opts.contactId ? state.contacts.find(x => x.id === opts.contactId) : null;
+      if (c && c.avatarImg) {
+        av.style.backgroundImage = `url(${c.avatarImg})`;
+        av.textContent = '';
+      } else if (c) {
+        av.style.backgroundImage = '';
+        av.style.background = c.avatarColor || 'var(--accent)';
+        av.textContent = (c.name || '?').charAt(0);
+      } else {
+        av.style.backgroundImage = '';
+        av.style.background = 'var(--accent)';
+        av.textContent = '信';
+      }
+    }
+    layer.dataset.contactId = opts.contactId || '';
+    layer.dataset.kind = opts.kind || 'chat';
+    layer.classList.remove('hidden');
+    clearTimeout(showInAppPopup._t);
+    showInAppPopup._t = setTimeout(() => layer.classList.add('hidden'), 4500);
+  }
+
   function maybeBrowserNotify(contact, msg) {
     try {
+      const viewingThis = state.chatContactId === (contact && contact.id);
+      // 站内弹窗：只要不在该会话就提示（即使页面在前台）
+      if (!viewingThis && contact) {
+        let body = '[新消息]';
+        if (msg) {
+          if (msg.type === 'sticker') body = '[表情]';
+          else if (msg.type === 'image') body = '[图片]';
+          else if (msg.type === 'listen_invite') body = '[一起听邀请]';
+          else if (msg.type === 'poke' || msg.type === 'system') body = msg.text || body;
+          else if (msg.text) body = String(msg.text).slice(0, 60);
+          else body = getPreviewText(msg) || body;
+        }
+        showInAppPopup({
+          title: contact.name || '联系人',
+          body,
+          contactId: contact.id,
+          kind: 'chat'
+        });
+      }
       if (!state.notifyEnabled) return;
       if (typeof Notification === 'undefined') return;
       if (Notification.permission !== 'granted') return;
-      // 正在看该会话且页面前台 → 不弹
-      const viewingThis = state.chatContactId === (contact && contact.id);
       if (document.visibilityState === 'visible' && viewingThis) return;
       const title = (contact && contact.name) ? contact.name : '字笺';
       let body = '[新消息]';
@@ -587,7 +667,6 @@
         else if (msg.text) body = String(msg.text).slice(0, 80);
         else body = getPreviewText(msg) || body;
       }
-      // 每条独立 tag 后缀时间，避免系统合并丢通知
       const tag = 'zijian-' + (contact && contact.id) + '-' + (msg && msg.id ? msg.id : Date.now());
       if (document.visibilityState !== 'visible') {
         document.title = '（新消息）' + title;
@@ -1640,23 +1719,31 @@
           </div>
         </div>`;
       }).join('') || '<div class="empty-state small"><p>暂无查岗题。点 + 添加后，对方才会按概率向你提问</p></div>'}</div>
-      <div class="section-title">TA 收藏的歌 <span style="font-size:11px;color:var(--muted);font-weight:400">${favSongs.length} 首</span></div>
-      <div>${favSongs.map(sg => `<div class="fav-song-item" data-sid="${sg.id}">
-        <div class="song-cover" style="${sg.cover ? `background-image:url(${sg.cover})` : ''}">${sg.cover ? '' : '🎵'}</div>
-        <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist || '')}</div></div>
-        <div class="card-actions" style="margin-left:auto">
-          <button class="card-btn" data-fav-play="${sg.id}" title="播放">▶</button>
-          <button class="card-btn delete" data-fav-del="${sg.id}" title="删除">✕</button>
+      <div class="cards-fav-block">
+        <div class="section-title cards-fav-toggle" id="btn-toggle-fav-songs" style="cursor:pointer;user-select:none">
+          TA 收藏的歌 · ${favSongs.length} 首 <span class="fav-caret">${state._favSongsOpen ? '▾' : '▸'}</span>
         </div>
-      </div>`).join('') || '<div class="empty-state small"><p>暂无收藏</p></div>'}</div>
-      <div class="section-title">TA 收藏的歌词 <span style="font-size:11px;color:var(--muted);font-weight:400">${(c.favoriteLyrics||[]).length} 句</span></div>
-      <div class="card-list">${(c.favoriteLyrics || []).slice().reverse().map((line, ri) => {
-        const realIdx = (c.favoriteLyrics.length - 1 - ri);
-        return `<div class="card-item">
-          <div class="card-text">${escapeHtml(line)}</div>
-          <div class="card-actions"><button class="card-btn delete" data-lyric-del="${realIdx}">✕</button></div>
-        </div>`;
-      }).join('') || '<div class="empty-state small"><p>一起听时可能会收藏歌词</p></div>'}</div>`;
+        <div id="fav-songs-wrap" class="${state._favSongsOpen ? '' : 'hidden'}">
+          ${favSongs.length ? favSongs.map(sg => `<div class="fav-song-item" data-sid="${sg.id}">
+            <div class="song-cover" style="${sg.cover ? `background-image:url(${sg.cover})` : ''}">${sg.cover ? '' : '🎵'}</div>
+            <div class="song-info"><div class="song-title">${escapeHtml(sg.title)}</div><div class="song-artist">${escapeHtml(sg.artist || '')}</div></div>
+            <button type="button" class="btn-xs" data-fav-play="${sg.id}">听</button>
+            <button type="button" class="btn-xs" data-fav-del="${sg.id}">删</button>
+          </div>`).join('') : '<div class="empty-state small"><p>暂无收藏歌曲</p></div>'}
+        </div>
+        <div class="section-title cards-fav-toggle" id="btn-toggle-fav-lyrics" style="cursor:pointer;user-select:none">
+          TA 收藏的歌词 · ${(c.favoriteLyrics||[]).length} 句 <span class="fav-caret">${state._favLyricsOpen ? '▾' : '▸'}</span>
+        </div>
+        <div id="fav-lyrics-wrap" class="card-list ${state._favLyricsOpen ? '' : 'hidden'}">
+          ${(c.favoriteLyrics || []).length ? (c.favoriteLyrics || []).slice().reverse().map((line, ri) => {
+            const realIdx = (c.favoriteLyrics.length - 1 - ri);
+            return `<div class="card-item fav-lyric-item">
+              <div class="card-text">${escapeHtml(line)}</div>
+              <div class="card-actions"><button class="card-btn delete" data-lyric-del="${realIdx}">✕</button></div>
+            </div>`;
+          }).join('') : '<div class="empty-state small"><p>一起听时可能会收藏歌词</p></div>'}
+        </div>
+      </div>`;
 
     $('#group-tabs')?.querySelectorAll('.group-tab[data-g]').forEach(btn => {
       btn.addEventListener('click', () => { state.activeCardGroup = btn.dataset.g; state.cardSelected = new Set(); renderCardsPanel(); });
@@ -1678,6 +1765,15 @@
     $('#btn-add-card')?.addEventListener('click', () => openCardModal('add', 'normal'));
     $('#btn-add-inter')?.addEventListener('click', () => openCardModal('add', 'interaction'));
     $('#btn-add-askq')?.addEventListener('click', () => openAskQuestionEditor(null));
+    $('#btn-toggle-fav-songs')?.addEventListener('click', () => {
+      state._favSongsOpen = !state._favSongsOpen;
+      renderCardsPanel();
+    });
+    $('#btn-toggle-fav-lyrics')?.addEventListener('click', () => {
+      state._favLyricsOpen = !state._favLyricsOpen;
+      renderCardsPanel();
+    });
+
     cardsPanel.querySelectorAll('[data-fav-del]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -3768,14 +3864,29 @@
     if (!state.lastLetterAt) state.lastLetterAt = {};
     state.lastLetterAt[c.id] = now;
     state.mailboxUnread = (state.mailboxUnread || 0) + 1;
+    syncMailboxUnread();
     saveData();
     updateTabDots();
+    showInAppPopup({
+      title: c.name || '来信',
+      body: (text || '').slice(0, 40) || '给你写了一封信',
+      contactId: c.id,
+      kind: 'mailbox'
+    });
+  }
+
+  function syncMailboxUnread() {
+    const n = (state.letters || []).filter(L => L && L.read === false).length;
+    state.mailboxUnread = n;
+    return n;
   }
 
   function renderMailbox() {
     const list = $('#mailbox-list');
     const empty = $('#mailbox-empty');
     if (!list) return;
+    syncMailboxUnread();
+    updateTabDots();
     const letters = state.letters || [];
     if (!letters.length) {
       list.innerHTML = '';
@@ -3785,13 +3896,20 @@
     empty?.classList.add('hidden');
     list.innerHTML = letters.map(L => {
       const unread = L.read === false;
+      const contactName = L.name || (state.contacts.find(c => c.id === L.contactId) || {}).name || '对方';
+      const repliesHtml = (L.replies || []).map(r => {
+        const isContact = r.from === 'contact';
+        const who = isContact ? contactName : '我';
+        const cls = isContact ? 'letter-reply contact' : 'letter-reply me';
+        return `<div class="${cls}"><div class="letter-reply-who">${escapeHtml(who)}</div><div class="letter-reply-text">${escapeHtml(r.text || '')}</div><div class="letter-time">${formatTime(r.time)}</div></div>`;
+      }).join('');
       return `<div class="letter-card ${unread ? 'unread' : ''}" data-lid="${L.id}">
-        <div class="letter-from">${escapeHtml(L.name || '来信')}${L.favorite ? ' <span class="letter-fav">★</span>' : ''}</div>
+        <div class="letter-from">${escapeHtml(contactName)}${L.favorite ? ' <span class="letter-fav">★</span>' : ''}${unread ? ' <span class="letter-unread-dot">未读</span>' : ''}</div>
         <div class="letter-time">${formatTime(L.time)}</div>
         <div class="letter-body">${escapeHtml(L.text)}</div>
-        ${(L.replies || []).map(r => `<div class="letter-body" style="opacity:.85;margin-top:8px;border-left:2px solid var(--accent);padding-left:8px">我：${escapeHtml(r.text)}<div class="letter-time">${formatTime(r.time)}</div></div>`).join('')}
+        ${repliesHtml}
         <div class="letter-actions">
-          <button type="button" class="btn-xs" data-lact="read">标为已读</button>
+          <button type="button" class="btn-xs" data-lact="read">${unread ? '标为已读' : '已读'}</button>
           <button type="button" class="btn-xs" data-lact="fav">${L.favorite ? '取消收藏' : '收藏'}</button>
           <button type="button" class="btn-xs" data-lact="reply">回信</button>
           <button type="button" class="btn-xs" data-lact="del">删除</button>
@@ -3802,39 +3920,70 @@
       const id = card.dataset.lid;
       const L = (state.letters || []).find(x => x.id === id);
       if (!L) return;
+      // 点开卡片即已读
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('[data-lact]')) return;
+        if (L.read === false) {
+          L.read = true;
+          syncMailboxUnread();
+          saveData();
+          updateTabDots();
+          card.classList.remove('unread');
+          const dot = card.querySelector('.letter-unread-dot');
+          if (dot) dot.remove();
+        }
+      });
       card.querySelectorAll('[data-lact]').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
           const act = btn.dataset.lact;
           if (act === 'read') {
-            if (L.read === false) {
-              L.read = true;
-              state.mailboxUnread = Math.max(0, (state.mailboxUnread || 1) - 1);
-            }
+            L.read = true;
+            syncMailboxUnread();
           } else if (act === 'fav') {
             L.favorite = !L.favorite;
           } else if (act === 'del') {
             if (!confirm('删除这封信？')) return;
-            if (L.read === false) state.mailboxUnread = Math.max(0, (state.mailboxUnread || 1) - 1);
             state.letters = state.letters.filter(x => x.id !== id);
+            syncMailboxUnread();
           } else if (act === 'reply') {
             const text = prompt('回信内容：');
             if (!text || !text.trim()) return;
             if (!L.replies) L.replies = [];
-            L.replies.push({ text: text.trim(), time: Date.now() });
+            L.replies.push({ text: text.trim(), time: Date.now(), from: 'user' });
             L.read = true;
-            // 联系人可能再回信
+            syncMailboxUnread();
+            saveData();
+            renderMailbox();
+            // 对方回信：延迟更长，且标注 from:contact + 对方名字
             const cfg = Object.assign({}, DEFAULT_MAILBOX, state.mailboxConfig || {});
             if (Math.random() < (cfg.replyChance || 0.55)) {
               const c = state.contacts.find(x => x.id === L.contactId);
               const pool = c ? getContactCardPool(c) : [];
               if (pool.length) {
+                const delay = 8000 + Math.random() * 22000; // 8~30 秒，避免“立马回”
                 setTimeout(() => {
-                  L.replies.push({ text: pool[Math.floor(Math.random() * pool.length)], time: Date.now(), from: 'contact' });
+                  if (!state.letters.find(x => x.id === L.id)) return;
+                  L.replies.push({
+                    text: pool[Math.floor(Math.random() * pool.length)],
+                    time: Date.now(),
+                    from: 'contact'
+                  });
+                  L.read = false; // 对方新回信 → 未读
+                  syncMailboxUnread();
                   saveData();
+                  updateTabDots();
                   if ($('#mailbox-subpage') && !$('#mailbox-subpage').classList.contains('hidden')) renderMailbox();
-                }, 1500 + Math.random() * 2500);
+                  showInAppPopup({
+                    title: (c && c.name) || L.name || '来信',
+                    body: '回了你的信',
+                    kind: 'mailbox',
+                    contactId: L.contactId
+                  });
+                }, delay);
               }
             }
+            return;
           }
           saveData();
           updateTabDots();
