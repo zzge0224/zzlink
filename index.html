@@ -100,6 +100,11 @@
               <span class="discover-label">纪念</span>
               <span class="discover-arrow">›</span>
             </button>
+            <button class="discover-item" id="btn-goto-pet">
+              <span class="discover-icon">🐾</span>
+              <span class="discover-text">共同养宠</span>
+              <span class="discover-arrow">›</span>
+            </button>
             <button class="discover-item" id="btn-goto-mailbox">
               <span class="discover-icon">✉️</span>
               <span class="discover-label">信箱</span>
@@ -119,6 +124,14 @@
               <button class="btn-primary" id="btn-add-memorial">＋ 添加纪念</button>
             </div>
             <div id="memorial-list" class="memorial-list"></div>
+          </div>
+          <div id="pet-subpage" class="music-subpage hidden">
+            <div class="music-page-toolbar">
+              <button class="btn-xs" id="btn-pet-back">‹ 返回</button>
+              <span style="flex:1;text-align:center;font-size:14px;color:var(--paper)">共同养宠</span>
+              <button class="btn-xs" id="btn-pet-rename" style="visibility:hidden">改名</button>
+            </div>
+            <div id="pet-root" class="pet-page"></div>
           </div>
           <div id="mailbox-subpage" class="music-subpage hidden">
             <div class="music-page-toolbar">

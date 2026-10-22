@@ -155,7 +155,7 @@
         chats: {}, stickers: [], moments: [], memorials: [], questionnaires: [], groups: [],
         userBalance: 888, theme: 'classic', playMode: 'order',
         unread: {}, groupUnread: {}, pinned: [], letters: [],
-        mailboxConfig: { ...DEFAULT_MAILBOX }, mailboxUnread: 0, momentNotifs: 0,
+        mailboxConfig: { ...DEFAULT_MAILBOX }, mailboxUnread: 0, momentNotifs: 0, pets: {}, petActiveId: null,
         lastLetterAt: {}, lastProactiveAt: {}, momentsCover: null,
         userAvatar: null, userAvatarPool: [], userName: '我',
         notifyEnabled: false
@@ -185,6 +185,7 @@
       letters: Array.isArray(p.letters) ? p.letters : [],
       mailboxConfig: Object.assign({}, DEFAULT_MAILBOX, p.mailboxConfig || {}),
       mailboxUnread: p.mailboxUnread || 0,
+      pets: (p.pets && typeof p.pets === "object") ? p.pets : {},
       momentNotifs: p.momentNotifs || 0,
       lastLetterAt: p.lastLetterAt || {},
       notifyEnabled: !!p.notifyEnabled
@@ -261,6 +262,7 @@
       letters: (state.letters || []).slice(-80),
       mailboxConfig: state.mailboxConfig || { ...DEFAULT_MAILBOX },
       mailboxUnread: state.mailboxUnread || 0,
+      pets: state.pets || {},
       momentNotifs: state.momentNotifs || 0,
       lastLetterAt: state.lastLetterAt || {},
       notifyEnabled: !!state.notifyEnabled,
@@ -497,6 +499,8 @@
     // 互动页子视图重置
     $('#music-subpage')?.classList.add('hidden');
     $('#memorial-subpage')?.classList.add('hidden');
+    $('#mailbox-subpage')?.classList.add('hidden');
+    $('#pet-subpage')?.classList.add('hidden');
     document.querySelector('.discover-list')?.classList.remove('hidden');
     if (name === 'chat') {
       if (state.chatContactId) enterChat(state.chatContactId);
@@ -3965,9 +3969,11 @@
         return `<div class="${cls}"><div class="letter-reply-who">${escapeHtml(who)}</div><div class="letter-reply-text">${escapeHtml(r.text || '')}</div><div class="letter-time">${formatTime(r.time)}</div></div>`;
       }).join('');
       return `<div class="letter-card ${unread ? 'unread' : ''}" data-lid="${L.id}">
-        <div class="letter-from">${escapeHtml(contactName)}${L.favorite ? ' <span class="letter-fav">★</span>' : ''}${unread ? ' <span class="letter-unread-dot">未读</span>' : ''}</div>
+        <div class="letter-seal">${unread ? '未拆' : '已阅'}</div>
+        <div class="letter-from">${escapeHtml(contactName)}${L.favorite ? ' <span class="letter-fav">★</span>' : ''}</div>
         <div class="letter-time">${formatTime(L.time)}</div>
         <div class="letter-body">${escapeHtml(L.text)}</div>
+        <div class="letter-sign">—— ${escapeHtml(contactName)}</div>
         ${repliesHtml}
         <div class="letter-actions">
           <button type="button" class="btn-xs" data-lact="read">${unread ? '标为已读' : '已读'}</button>
@@ -4076,7 +4082,269 @@
     modalOverlay.classList.remove('hidden');
   }
 
-  function openMailboxPage() {
+
+  // ========== 共同养宠 ==========
+  const PET_SPECIES = [
+    { id: 'cat', emoji: '🐱', label: '小猫' },
+    { id: 'dog', emoji: '🐶', label: '小狗' },
+    { id: 'rabbit', emoji: '🐰', label: '兔子' },
+    { id: 'hamster', emoji: '🐹', label: '仓鼠' },
+    { id: 'fox', emoji: '🦊', label: '小狐' },
+    { id: 'bird', emoji: '🐦', label: '小鸟' }
+  ];
+
+  function ensurePets() {
+    if (!state.pets || typeof state.pets !== 'object') state.pets = {};
+  }
+
+  function defaultPet(contactId, contactName) {
+    const sp = PET_SPECIES[Math.floor(Math.random() * PET_SPECIES.length)];
+    return {
+      contactId,
+      species: sp.id,
+      emoji: sp.emoji,
+      name: (contactName || 'TA').slice(0, 4) + '的' + sp.label,
+      hunger: 70,
+      mood: 70,
+      exp: 0,
+      level: 1,
+      lastFeedAt: 0,
+      lastPlayAt: 0,
+      lastPatAt: 0,
+      lastContactCareAt: 0,
+      log: []
+    };
+  }
+
+  function getOrCreatePet(contactId) {
+    ensurePets();
+    const c = state.contacts.find(x => x.id === contactId);
+    if (!state.pets[contactId]) {
+      state.pets[contactId] = defaultPet(contactId, c && c.name);
+      saveData();
+    }
+    const p = state.pets[contactId];
+    // 时间流逝：每 2 小时饿一点、心情掉一点
+    const now = Date.now();
+    if (!p._decayAt) p._decayAt = now;
+    const hours = (now - p._decayAt) / 3600000;
+    if (hours >= 0.5) {
+      const steps = Math.min(8, Math.floor(hours / 0.5));
+      p.hunger = Math.max(0, (p.hunger || 0) - steps * 4);
+      p.mood = Math.max(0, (p.mood || 0) - steps * 3);
+      p._decayAt = now;
+    }
+    return p;
+  }
+
+  function petPushLog(p, text) {
+    if (!p.log) p.log = [];
+    p.log.unshift({ text, time: Date.now() });
+    if (p.log.length > 20) p.log.length = 20;
+  }
+
+  function petAddExp(p, n) {
+    p.exp = (p.exp || 0) + n;
+    let guard = 0;
+    while (p.exp >= p.level * 20 && guard++ < 10) {
+      p.exp -= p.level * 20;
+      p.level += 1;
+      petPushLog(p, `升级到 Lv.${p.level}！`);
+    }
+  }
+
+  function openPetPage() {
+    document.querySelector('.discover-list')?.classList.add('hidden');
+    $('#music-subpage')?.classList.add('hidden');
+    $('#memorial-subpage')?.classList.add('hidden');
+    $('#mailbox-subpage')?.classList.add('hidden');
+    $('#pet-subpage')?.classList.remove('hidden');
+    renderPetPage();
+  }
+
+  function closePetPage() {
+    $('#pet-subpage')?.classList.add('hidden');
+    document.querySelector('.discover-list')?.classList.remove('hidden');
+    state.petActiveId = null;
+  }
+
+  function renderPetPage() {
+    const root = $('#pet-root');
+    const renameBtn = $('#btn-pet-rename');
+    if (!root) return;
+    ensurePets();
+    const cid = state.petActiveId;
+    if (!cid) {
+      if (renameBtn) renameBtn.style.visibility = 'hidden';
+      const contacts = state.contacts || [];
+      if (!contacts.length) {
+        root.innerHTML = '<div class="empty-state small"><p>请先添加联系人</p></div>';
+        return;
+      }
+      root.innerHTML = `<p style="font-size:13px;color:var(--muted);margin:0 0 10px">选择一位联系人，一起照顾你们的小宠。对方也会随机喂养、逗弄。</p>
+        <div class="pet-pick-list">${contacts.map(c => {
+          const has = state.pets[c.id];
+          const emoji = has ? (has.emoji || '🐾') : '🐾';
+          const sub = has ? `${has.name || '小宠'} · Lv.${has.level || 1}` : '尚未领养';
+          return `<button type="button" class="pet-pick-item" data-pid="${c.id}">
+            <span style="font-size:28px">${emoji}</span>
+            <span style="flex:1;min-width:0">
+              <div style="font-weight:600">${escapeHtml(c.name)}</div>
+              <div style="font-size:12px;color:var(--muted)">${escapeHtml(sub)}</div>
+            </span>
+            <span style="color:var(--muted)">›</span>
+          </button>`;
+        }).join('')}</div>`;
+      root.querySelectorAll('[data-pid]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.petActiveId = btn.dataset.pid;
+          getOrCreatePet(state.petActiveId);
+          renderPetPage();
+        });
+      });
+      return;
+    }
+
+    const c = state.contacts.find(x => x.id === cid);
+    const p = getOrCreatePet(cid);
+    if (renameBtn) renameBtn.style.visibility = 'visible';
+    const hunger = Math.max(0, Math.min(100, Math.round(p.hunger || 0)));
+    const mood = Math.max(0, Math.min(100, Math.round(p.mood || 0)));
+    const status = hunger < 25 ? '有点饿…' : mood < 25 ? '有点闷…' : hunger > 80 && mood > 80 ? '状态很好' : '还不错';
+    root.innerHTML = `
+      <button type="button" class="btn-xs" id="pet-back-list" style="margin-bottom:10px">‹ 换联系人</button>
+      <div class="pet-stage">
+        <div class="pet-emoji">${p.emoji || '🐾'}</div>
+        <div class="pet-name">${escapeHtml(p.name || '小宠')}<span class="pet-level-badge">Lv.${p.level || 1}</span></div>
+        <div class="pet-with">与 ${escapeHtml(c ? c.name : 'TA')} 共同照顾 · ${status}</div>
+        <div class="pet-stats">
+          <div class="pet-stat">
+            <div class="pet-stat-label">饱食</div>
+            <div class="pet-stat-bar"><div class="pet-stat-fill" style="width:${hunger}%"></div></div>
+            <div class="pet-stat-val">${hunger}</div>
+          </div>
+          <div class="pet-stat">
+            <div class="pet-stat-label">心情</div>
+            <div class="pet-stat-bar"><div class="pet-stat-fill" style="width:${mood}%;background:var(--gold,#d4a84b)"></div></div>
+            <div class="pet-stat-val">${mood}</div>
+          </div>
+        </div>
+        <div class="pet-stat" style="margin-top:8px">
+          <div class="pet-stat-label">经验 ${p.exp || 0} / ${(p.level || 1) * 20}</div>
+          <div class="pet-stat-bar"><div class="pet-stat-fill" style="width:${Math.min(100, ((p.exp||0)/((p.level||1)*20))*100)}%"></div></div>
+        </div>
+        <div class="pet-actions">
+          <button type="button" data-pet="feed">🍖 喂食</button>
+          <button type="button" data-pet="play">🎾 逗弄</button>
+          <button type="button" data-pet="pat">🫶 摸摸</button>
+        </div>
+      </div>
+      <div class="pet-log">${(p.log || []).slice(0, 8).map(x =>
+        `<div class="pet-log-item">${escapeHtml(x.text)} · ${formatTime(x.time)}</div>`
+      ).join('') || '<div class="pet-log-item">还没有动态，去互动一下吧</div>'}</div>`;
+
+    $('#pet-back-list')?.addEventListener('click', () => {
+      state.petActiveId = null;
+      renderPetPage();
+    });
+    root.querySelectorAll('[data-pet]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        petUserAction(cid, btn.dataset.pet);
+      });
+    });
+  }
+
+  function petUserAction(contactId, act) {
+    const p = getOrCreatePet(contactId);
+    const c = state.contacts.find(x => x.id === contactId);
+    const now = Date.now();
+    const cd = { feed: 20 * 60 * 1000, play: 15 * 60 * 1000, pat: 10 * 60 * 1000 };
+    const lastKey = act === 'feed' ? 'lastFeedAt' : act === 'play' ? 'lastPlayAt' : 'lastPatAt';
+    if (now - (p[lastKey] || 0) < cd[act]) {
+      alert('冷却中，稍后再来吧');
+      return;
+    }
+    p[lastKey] = now;
+    if (act === 'feed') {
+      p.hunger = Math.min(100, (p.hunger || 0) + 18 + Math.random() * 10);
+      p.mood = Math.min(100, (p.mood || 0) + 4);
+      petAddExp(p, 6);
+      petPushLog(p, `你喂了 ${p.name}`);
+    } else if (act === 'play') {
+      p.mood = Math.min(100, (p.mood || 0) + 16 + Math.random() * 8);
+      p.hunger = Math.max(0, (p.hunger || 0) - 5);
+      petAddExp(p, 5);
+      petPushLog(p, `你逗弄了 ${p.name}`);
+    } else {
+      p.mood = Math.min(100, (p.mood || 0) + 10 + Math.random() * 6);
+      petAddExp(p, 3);
+      petPushLog(p, `你摸了摸 ${p.name}`);
+    }
+    // 对方有概率跟着互动
+    if (Math.random() < 0.45) {
+      setTimeout(() => petContactCare(contactId, true), 2000 + Math.random() * 4000);
+    }
+    saveData();
+    renderPetPage();
+  }
+
+  function petContactCare(contactId, force) {
+    const c = state.contacts.find(x => x.id === contactId);
+    if (!c) return;
+    ensurePets();
+    if (!state.pets[contactId]) return;
+    const p = state.pets[contactId];
+    const now = Date.now();
+    if (!force && now - (p.lastContactCareAt || 0) < 30 * 60 * 1000) return;
+    if (!force && Math.random() > 0.35) return;
+    p.lastContactCareAt = now;
+    const acts = ['feed', 'play', 'pat'];
+    const act = acts[Math.floor(Math.random() * acts.length)];
+    if (act === 'feed') {
+      p.hunger = Math.min(100, (p.hunger || 0) + 12 + Math.random() * 10);
+      petAddExp(p, 4);
+      petPushLog(p, `${c.name} 喂了 ${p.name}`);
+    } else if (act === 'play') {
+      p.mood = Math.min(100, (p.mood || 0) + 12 + Math.random() * 8);
+      petAddExp(p, 4);
+      petPushLog(p, `${c.name} 逗弄了 ${p.name}`);
+    } else {
+      p.mood = Math.min(100, (p.mood || 0) + 8);
+      petAddExp(p, 2);
+      petPushLog(p, `${c.name} 摸了摸 ${p.name}`);
+    }
+    saveData();
+    // 聊天系统提示（低打扰）
+    if (Math.random() < 0.5) {
+      if (!state.chats[contactId]) state.chats[contactId] = [];
+      state.chats[contactId].push({
+        id: genId('m'), from: 'system', type: 'system',
+        text: `${c.name} 去看了看你们的${p.name || '小宠'}`,
+        time: Date.now()
+      });
+      saveData();
+      if (state.chatContactId === contactId) {
+        try { renderMessages(); } catch (_) {}
+      } else {
+        try { renderChatList(); } catch (_) {}
+      }
+    }
+    if (state.petActiveId === contactId) {
+      try { renderPetPage(); } catch (_) {}
+    }
+  }
+
+  function schedulePetCare() {
+    if (state._petCareTimer) clearInterval(state._petCareTimer);
+    state._petCareTimer = setInterval(() => {
+      (state.contacts || []).forEach(c => {
+        if (state.pets && state.pets[c.id]) petContactCare(c.id, false);
+      });
+    }, 5 * 60 * 1000);
+  }
+
+
+    function openMailboxPage() {
     document.querySelector('.discover-list')?.classList.add('hidden');
     $('#music-subpage')?.classList.add('hidden');
     $('#memorial-subpage')?.classList.add('hidden');
@@ -4214,6 +4482,7 @@
     state.letters = Array.isArray(data.letters) ? data.letters : [];
     state.mailboxConfig = Object.assign({}, DEFAULT_MAILBOX, data.mailboxConfig || {});
     state.mailboxUnread = data.mailboxUnread || 0;
+    state.pets = (data.pets && typeof data.pets === "object") ? data.pets : {};
     state.momentNotifs = data.momentNotifs || 0;
     state.lastLetterAt = data.lastLetterAt || {};
     state.userBalance = data.userBalance; state.theme = data.theme;
@@ -4227,6 +4496,7 @@
     applyTheme(state.theme);
     startStatusRotation();
     scheduleProactiveMessages();
+    schedulePetCare();
     enableFloatDrag();
     updateMeAvatarUI();
     updateMeNameUI();
@@ -4623,6 +4893,16 @@
       pageTitle.textContent = '互动';
     });
     $('#btn-goto-mailbox')?.addEventListener('click', openMailboxPage);
+    $('#btn-goto-pet')?.addEventListener('click', openPetPage);
+    $('#btn-pet-back')?.addEventListener('click', closePetPage);
+    $('#btn-pet-rename')?.addEventListener('click', () => {
+      if (!state.petActiveId) return;
+      const p = getOrCreatePet(state.petActiveId);
+      const n = prompt('给小宠起个名字', p.name || '小宠');
+      if (n === null) return;
+      p.name = (n.trim() || p.name || '小宠').slice(0, 12);
+      saveData(); renderPetPage();
+    });
     $('#btn-mailbox-back')?.addEventListener('click', () => {
       $('#mailbox-subpage')?.classList.add('hidden');
       document.querySelector('.discover-list')?.classList.remove('hidden');
