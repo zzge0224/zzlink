@@ -84,7 +84,7 @@
     contacts: [], songs: [], chats: {}, stickers: [], moments: [], memorials: [],
     questionnaires: [],
     groups: [],
-    userBalance: 888, theme: 'classic', userAvatar: null, userName: '昕',
+    userBalance: 888, theme: 'classic', userAvatar: null, userName: '我',
     currentContactId: null, chatContactId: null,
     editingCardIndex: null, editingCardType: 'normal', editingGroup: '默认', modalMode: null,
     pendingTimers: [], quotingMsg: null, longPressMsg: null,
@@ -157,7 +157,7 @@
         unread: {}, groupUnread: {}, pinned: [], letters: [],
         mailboxConfig: { ...DEFAULT_MAILBOX }, mailboxUnread: 0, momentNotifs: 0,
         lastLetterAt: {}, lastProactiveAt: {}, momentsCover: null,
-        userAvatar: null, userAvatarPool: [], userName: '昕',
+        userAvatar: null, userAvatarPool: [], userName: '我',
         notifyEnabled: false
       };
     }
@@ -176,7 +176,7 @@
       playMode: p.playMode || 'order',
       userAvatar: p.userAvatar || null,
       userAvatarPool: Array.isArray(p.userAvatarPool) ? p.userAvatarPool : [],
-      userName: p.userName || '昕',
+      userName: p.userName || '我',
       lastProactiveAt: p.lastProactiveAt || {},
       momentsCover: p.momentsCover || null,
       unread: p.unread || {},
@@ -252,7 +252,7 @@
       playMode: state.playMode || 'order',
       userAvatar: state.userAvatar || null,
       userAvatarPool: state.userAvatarPool || [],
-      userName: state.userName || '昕',
+      userName: state.userName || '我',
       lastProactiveAt: state.lastProactiveAt || {},
       momentsCover: state.momentsCover || null,
       unread: state.unread || {},
@@ -507,6 +507,7 @@
       pageTitle.textContent = '我';
       ensureMeMenu();
       updateMeAvatarUI();
+      updateMeNameUI();
       updateStats();
       updateThemeUI();
       updateNotifyUI();
@@ -3237,7 +3238,7 @@
     const cover = $('#moments-cover');
     const nameEl = $('#moments-cover-name');
     const av = $('#moments-cover-avatar');
-    if (nameEl) nameEl.textContent = state.userName || '昕';
+    if (nameEl) nameEl.textContent = state.userName || '我';
     if (av) {
       if (state.userAvatar) {
         av.style.backgroundImage = `url(${state.userAvatar})`;
@@ -3245,7 +3246,7 @@
       } else {
         av.style.backgroundImage = '';
         av.style.background = 'var(--accent)';
-        av.textContent = (state.userName || '昕').charAt(0);
+        av.textContent = (state.userName || '我').charAt(0);
       }
     }
     if (cover) {
@@ -3357,11 +3358,11 @@
     list.innerHTML = sorted.map(m => {
       const isMe = m.contactId === 'me';
       const c = isMe ? null : state.contacts.find(x => x.id === m.contactId);
-      const name = isMe ? (state.userName || '昕') : (c ? c.name : '未知');
+      const name = isMe ? (state.userName || '我') : (c ? c.name : '未知');
       const avHtml = isMe
         ? (state.userAvatar
           ? `<div class="avatar" style="background-image:url(${state.userAvatar})"></div>`
-          : `<div class="avatar" style="background:var(--accent)">${(state.userName || '昕').charAt(0)}</div>`)
+          : `<div class="avatar" style="background:var(--accent)">${(state.userName || '我').charAt(0)}</div>`)
         : (c ? renderAvatarEl(c) : '<div class="avatar" style="background:#666">?</div>');
       const liked = (m.likes || []).includes('me');
       const ago = (() => {
@@ -4150,7 +4151,7 @@
   function updateMeAvatarUI() {
     const el = $('#me-avatar');
     const nameEl = $('#me-name');
-    if (nameEl) nameEl.textContent = state.userName || '昕';
+    if (nameEl) nameEl.textContent = state.userName || '我';
     if (!el) return;
     if (state.userAvatar) {
       el.style.backgroundImage = `url(${state.userAvatar})`;
@@ -4160,9 +4161,45 @@
     } else {
       el.style.backgroundImage = '';
       el.style.background = '#3D9A62';
-      el.textContent = (state.userName || '昕').charAt(0);
+      el.textContent = (state.userName || '我').charAt(0);
     }
   }
+
+  function updateMeNameUI() {
+    const name = (state.userName || '我').trim() || '我';
+    const nameEl = document.getElementById('me-name');
+    if (nameEl) nameEl.textContent = name;
+    const av = document.getElementById('me-avatar');
+    if (av && !state.userAvatar) {
+      av.textContent = name.charAt(0);
+    }
+    const coverName = document.getElementById('moments-cover-name');
+    if (coverName) coverName.textContent = name;
+    const coverAv = document.getElementById('moments-cover-avatar');
+    if (coverAv && !state.userAvatar) coverAv.textContent = name.charAt(0);
+  }
+
+  function editUserName() {
+    const cur = (state.userName || '我').trim() || '我';
+    const next = prompt('修改昵称（显示在朋友圈、消息等处）', cur);
+    if (next === null) return;
+    const name = next.trim() || '我';
+    if (name.length > 20) {
+      alert('昵称请不要超过 20 个字');
+      return;
+    }
+    state.userName = name;
+    saveData();
+    updateMeNameUI();
+    updateMeAvatarUI();
+    try {
+      if (typeof renderMoments === 'function' && document.getElementById('moments-page') &&
+          !document.getElementById('moments-page').classList.contains('hidden')) {
+        renderMoments();
+      }
+    } catch (_) {}
+  }
+
 
   async function init() {
     const data = await loadDataAsync();
@@ -4183,7 +4220,7 @@
     state.playMode = data.playMode || 'order';
     state.userAvatar = data.userAvatar || null;
     state.userAvatarPool = Array.isArray(data.userAvatarPool) ? data.userAvatarPool : [];
-    state.userName = data.userName || '昕';
+    state.userName = data.userName || '我';
     state.lastProactiveAt = data.lastProactiveAt || {};
     state.momentsCover = data.momentsCover || null;
     state.notifyEnabled = !!data.notifyEnabled;
@@ -4192,8 +4229,11 @@
     scheduleProactiveMessages();
     enableFloatDrag();
     updateMeAvatarUI();
+    updateMeNameUI();
 
     $$('.tab-item').forEach(t => t.addEventListener('click', () => switchPage(t.dataset.page)));
+    document.getElementById('btn-edit-name')?.addEventListener('click', editUserName);
+    document.getElementById('me-name')?.addEventListener('click', editUserName);
     function handleAppBack(e) {
       if (e) {
         try { e.preventDefault(); e.stopPropagation(); } catch (_) {}

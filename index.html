@@ -147,9 +147,9 @@
         <div class="me-content">
           <div class="me-profile-card">
             <div class="me-profile-row">
-              <div class="avatar-large" id="me-avatar" style="background:#3D9A62" title="点击更换头像">昕</div>
+              <div class="avatar-large" id="me-avatar" style="background:#3D9A62" title="点击更换头像">我</div>
               <div class="me-profile-info">
-                <h2 id="me-name">昕</h2>
+                <h2 id="me-name" title="点击修改昵称" style="cursor:pointer">我</h2>
                 <p class="me-id">字笺 · 纸上心意</p>
                 <p class="me-hint">点击头像更换</p>
               </div>
@@ -164,6 +164,9 @@
           </div>
 
           <div class="me-menu" id="me-menu">
+            <button class="me-menu-item" id="btn-edit-name" type="button">
+              <span class="mm-icon">✏️</span><span class="mm-text">修改昵称</span><span class="mm-arrow">›</span>
+            </button>
             <button class="me-menu-item" id="btn-manage-stickers" type="button">
               <span class="mm-icon">😊</span><span class="mm-text">表情包管理</span><span class="mm-arrow">›</span>
             </button>
@@ -401,8 +404,8 @@
       <div class="moments-cover" id="moments-cover">
         <button type="button" id="moments-cover-btn" class="moments-cover-btn">更换封面</button>
         <div class="moments-cover-user">
-          <span class="moments-cover-name" id="moments-cover-name">昕</span>
-          <div class="moments-cover-avatar" id="moments-cover-avatar">昕</div>
+          <span class="moments-cover-name" id="moments-cover-name">我</span>
+          <div class="moments-cover-avatar" id="moments-cover-avatar">我</div>
         </div>
       </div>
       <div id="moments-list" class="moments-list"></div>
