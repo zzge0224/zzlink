@@ -114,7 +114,9 @@
   const DEFAULT_MAILBOX = {
     minIntervalH: 6, maxIntervalH: 36,
     minWords: 20, maxWords: 120,
-    replyChance: 0.55,
+    replyChance: 0.55,       // 0~1，界面按 % 显示
+    replyMinMin: 1,          // 对方回信最少延迟（分钟）— 对齐 mochi
+    replyMaxMin: 30,         // 对方回信最多延迟（分钟）
     enabled: true
   };
 
@@ -425,6 +427,20 @@
     return m + ':' + String(sec).padStart(2, '0');
   }
   function randomDelay(a, b) { return a + Math.random() * (b - a); }
+  /** 0~1 概率命中（与 mochi「0~100% 再 /100」等价） */
+  function rollChance(p01) {
+    const p = Number(p01);
+    if (!isFinite(p) || p <= 0) return false;
+    if (p >= 1) return true;
+    return Math.random() < p;
+  }
+  /** 0~100 百分比命中（mochi 风格 Math.random()*100 < pct） */
+  function rollPercent(pct) {
+    const p = Number(pct);
+    if (!isFinite(p) || p <= 0) return false;
+    if (p >= 100) return true;
+    return Math.random() * 100 < p;
+  }
 
   // ===== LRC =====
   function parseLrc(text) {
@@ -946,6 +962,7 @@
       <div class="settings-cell"><span>拼字最少片数</span><input type="number" id="cs-splice-min" min="2" max="6" value="${lc.spliceMin != null ? lc.spliceMin : 2}"/></div>
       <div class="settings-cell"><span>拼字最多片数</span><input type="number" id="cs-splice-max" min="2" max="8" value="${lc.spliceMax != null ? lc.spliceMax : 4}"/></div>
       <div class="settings-cell"><span>朋友圈发动态 %</span><input type="number" id="cs-moments" step="1" min="0" max="100" value="${Math.round((lc.momentsChance||0)*100)}"/></div>
+      <div class="settings-cell"><span>评论朋友圈回复 %</span><input type="number" id="cs-moment-comment" step="1" min="0" max="100" value="${Math.round(((lc.momentCommentChance != null ? lc.momentCommentChance : 0.65)||0)*100)}"/></div>
       <div class="settings-cell"><span>主动拍一拍 %</span><input type="number" id="cs-poke" step="1" min="0" max="100" value="${Math.round((lc.pokeChance||0)*100)}"/></div>
       <div class="settings-cell"><span>主动发消息间隔(分钟)</span><input type="number" id="cs-proactive" min="0" max="10080" value="${lc.proactiveIntervalMin == null ? 30 : lc.proactiveIntervalMin}"/></div>
       <div class="settings-section-title" style="padding-top:0">间隔为 0 则关闭主动发消息</div>
@@ -1021,8 +1038,7 @@
         spliceMin,
         spliceMax,
         momentsSticker: (c.listenConfig && c.listenConfig.momentsSticker) !== false,
-        momentCommentChance: (c.listenConfig && c.listenConfig.momentCommentChance != null)
-          ? c.listenConfig.momentCommentChance : 0.65
+        momentCommentChance: pct01('#cs-moment-comment', 65)
       });
       scheduleProactiveMessages();
       saveData();
@@ -1398,7 +1414,7 @@
     if (!pool.length) return null;
     const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
     const chance = Number(lc.spliceChance != null ? lc.spliceChance : 0.35);
-    if (Math.random() > chance) {
+    if (!rollChance(chance)) {
       const t = pool[Math.floor(Math.random() * pool.length)];
       return { text: t, spliced: false, pieces: [t] };
     }
@@ -1466,9 +1482,9 @@
       Math.min(2.2, Math.max(0.8, minD * 0.85))
     );
 
-    const willNoreply = !forceCount && Math.random() < (Number(lc.readNoReplyChance) || 0);
+    const willNoreply = !forceCount && rollChance(lc.readNoReplyChance);
     const willSkipReply = !forceCount && !willNoreply &&
-      Math.random() > (lc.replyChance == null ? 1 : Number(lc.replyChance));
+      !rollChance(lc.replyChance == null ? 1 : lc.replyChance);
 
     state.pendingTimers.push(setTimeout(() => {
       markUserMsgsRead(contactId, willNoreply || willSkipReply);
@@ -1521,7 +1537,7 @@
     const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
     state.pendingTimers.push(setTimeout(() => {
       // 切走界面也要回拍/回复，写入聊天记录
-      if (Math.random() < (lc.pokeChance != null ? Math.max(0.4, lc.pokeChance + 0.5) : 0.65)) {
+      if (rollChance(lc.pokeChance != null ? lc.pokeChance : 0.1)) {
         const acts = c.interactionCards?.length ? c.interactionCards : DEFAULT_INTERACTION;
         const back = {
           id: genId('m'), from: 'system', type: 'poke',
@@ -1961,8 +1977,8 @@
       <div class="form-row"><label>最小延迟(秒)</label><input type="number" id="set-min" step="0.5" value="${s.minDelay}"/></div>
       <div class="form-row"><label>最大延迟(秒)</label><input type="number" id="set-max" step="0.5" value="${s.maxDelay}"/></div>
       <div class="form-row"><label>每次最多回复条数</label><input type="number" id="set-count" min="1" max="3" value="${s.maxReplies}"/></div>
-      <div class="form-row"><label>一起听·暂停概率(0~1)</label><input type="number" id="set-pause" step="0.01" min="0" max="1" value="${lc.pauseChance}"/></div>
-      <div class="form-row"><label>一起听·收藏概率(0~1)</label><input type="number" id="set-fav" step="0.01" min="0" max="1" value="${lc.favoriteChance}"/></div>
+      <div class="form-row"><label>一起听·暂停概率 %</label><input type="number" id="set-pause" step="1" min="0" max="100" value="${Math.round((lc.pauseChance||0)*100)}"/></div>
+      <div class="form-row"><label>一起听·收藏概率 %</label><input type="number" id="set-fav" step="1" min="0" max="100" value="${Math.round((lc.favoriteChance||0)*100)}"/></div>
       <div class="form-row"><label>暂停最长秒数</label><input type="number" id="set-pdur" min="1" max="30" value="${lc.pauseDurationMax}"/></div>`;
     modalOverlay.classList.remove('hidden');
   }
@@ -2305,7 +2321,7 @@
     if (!contact || !(state.songs || []).length) return false;
     const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
     const chance = Number(lc.listenInviteChance != null ? lc.listenInviteChance : 0.18);
-    if (Math.random() > chance) return false;
+    if (!rollChance(chance)) return false;
     if (state.listenContactId === contact.id && listenPage && !listenPage.classList.contains('hidden')) return false;
     const song = state.songs[Math.floor(Math.random() * state.songs.length)];
     if (!song) return false;
@@ -2561,12 +2577,15 @@
     const cfg = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
     state.listenInterval = setInterval(() => {
       if (listenAudio.paused) return;
+      // 三段互斥；若总和>1 则按比例归一化，保证设置可同时生效
+      let pPause = Math.max(0, Number(cfg.pauseChance) || 0);
+      let pSong = Math.max(0, Number(cfg.favoriteChance) || 0);
+      let pLyric = Math.max(0, Number(cfg.lyricFavoriteChance != null ? cfg.lyricFavoriteChance : 0.2) || 0);
+      const sum = pPause + pSong + pLyric;
+      if (sum > 1) {
+        pPause /= sum; pSong /= sum; pLyric /= sum;
+      }
       const r = Math.random();
-      const pPause = Number(cfg.pauseChance) || 0;
-      const pSong = Number(cfg.favoriteChance) || 0;
-      const pLyric = Number(cfg.lyricFavoriteChance != null ? cfg.lyricFavoriteChance : 0.2) || 0;
-
-      // 三段互斥：暂停 | 收藏歌 | 收藏歌词（剩余为无事）
       if (r < pPause) {
         listenAudio.pause();
         listenPlay.textContent = '▶';
@@ -2684,8 +2703,8 @@
       c.settings = { minDelay:min, maxDelay:max, maxReplies:count };
       const pc=parseFloat($('#set-pause')?.value), fc=parseFloat($('#set-fav')?.value), pd=parseFloat($('#set-pdur')?.value);
       c.listenConfig = {
-        pauseChance: isNaN(pc)?0.18:Math.max(0,Math.min(1,pc)),
-        favoriteChance: isNaN(fc)?0.12:Math.max(0,Math.min(1,fc)),
+        pauseChance: isNaN(pc)?0.18:Math.max(0,Math.min(1,pc/100)),
+        favoriteChance: isNaN(fc)?0.12:Math.max(0,Math.min(1,fc/100)),
         pauseDurationMax: isNaN(pd)?6:Math.max(1,Math.min(30,pd))
       };
       saveData(); renderCardsPanel(); closeModal(); return;
@@ -2799,7 +2818,7 @@
         if (c) {
           ensureContactShape(c);
           const v = parseFloat($('#pool-chance')?.value);
-          if (!isNaN(v)) c.listenConfig.avatarSwapChance = Math.max(0, Math.min(1, v));
+          if (!isNaN(v)) c.listenConfig.avatarSwapChance = Math.max(0, Math.min(1, v / 100));
         }
       }
       saveData();
@@ -2874,8 +2893,14 @@
         maxIntervalH: parseFloat($('#mb-max-h')?.value) || 36,
         minWords: parseInt($('#mb-min-w')?.value, 10) || 20,
         maxWords: parseInt($('#mb-max-w')?.value, 10) || 120,
-        replyChance: Math.max(0, Math.min(1, parseFloat($('#mb-reply')?.value) || 0.55))
+        // UI 为百分比
+        replyChance: Math.max(0, Math.min(1, (parseFloat($('#mb-reply')?.value) || 55) / 100)),
+        replyMinMin: Math.max(0.2, parseFloat($('#mb-reply-min')?.value) || 1),
+        replyMaxMin: Math.max(0.2, parseFloat($('#mb-reply-max')?.value) || 30)
       };
+      if (state.mailboxConfig.replyMaxMin < state.mailboxConfig.replyMinMin) {
+        state.mailboxConfig.replyMaxMin = state.mailboxConfig.replyMinMin;
+      }
       if (state.mailboxConfig.maxIntervalH < state.mailboxConfig.minIntervalH) {
         state.mailboxConfig.maxIntervalH = state.mailboxConfig.minIntervalH;
       }
@@ -2893,11 +2918,11 @@
         const st = modalBody.querySelector(`input[data-cid="${c.id}"][data-k="momentsSticker"]`);
         if (ch) {
           const v = parseFloat(ch.value);
-          if (!isNaN(v)) c.listenConfig.momentsChance = Math.max(0, Math.min(1, v));
+          if (!isNaN(v)) c.listenConfig.momentsChance = Math.max(0, Math.min(1, v / 100));
         }
         if (cc) {
           const v = parseFloat(cc.value);
-          if (!isNaN(v)) c.listenConfig.momentCommentChance = Math.max(0, Math.min(1, v));
+          if (!isNaN(v)) c.listenConfig.momentCommentChance = Math.max(0, Math.min(1, v / 100));
         }
         if (st) c.listenConfig.momentsSticker = !!st.checked;
       });
@@ -2937,7 +2962,7 @@
         maxDelay: max,
         maxReplies: Math.max(1, Math.min(5, parseInt($('#gs-count')?.value, 10) || 2))
       };
-      g.listenConfig.replyChance = Math.max(0, Math.min(1, num('#gs-reply', 0.85)));
+      g.listenConfig.replyChance = Math.max(0, Math.min(1, num('#gs-reply', 85) / 100));
       saveData();
       $('#group-title').textContent = g.name;
       applyGroupChatBg(g);
@@ -3217,7 +3242,7 @@
       ensureContactShape(c);
       const ch = (c.listenConfig && c.listenConfig.momentsChance != null)
         ? Number(c.listenConfig.momentsChance) : 0.15;
-      return ch > 0 && Math.random() < Math.max(ch, 0.05);
+      return ch > 0 && rollChance(ch);
     });
     const poolC = candidates.length ? candidates : (state.contacts || []);
     const c = poolC[Math.floor(Math.random() * poolC.length)];
@@ -3264,7 +3289,7 @@
     ensureContactShape(c);
     const chance = c.listenConfig?.momentCommentChance != null
       ? Number(c.listenConfig.momentCommentChance) : 0.65;
-    if (Math.random() > chance) return;
+    if (!rollChance(chance)) return;
     const allowSticker = c.listenConfig?.momentsSticker !== false;
     setTimeout(() => {
       if (!m.comments) m.comments = [];
@@ -3379,11 +3404,11 @@
         const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
         return `<div class="survey-editor-q">
           <strong>${escapeHtml(c.name)}</strong>
-          <div class="form-row"><label>发动态概率 (0~1)</label>
-            <input type="number" data-cid="${c.id}" data-k="momentsChance" min="0" max="1" step="0.01" value="${lc.momentsChance != null ? lc.momentsChance : 0.15}"/>
+          <div class="form-row"><label>发动态概率 %</label>
+            <input type="number" data-cid="${c.id}" data-k="momentsChance" min="0" max="100" step="1" value="${Math.round(((lc.momentsChance != null ? lc.momentsChance : 0.15)||0)*100)}"/>
           </div>
-          <div class="form-row"><label>回复你评论的概率 (0~1)</label>
-            <input type="number" data-cid="${c.id}" data-k="momentCommentChance" min="0" max="1" step="0.01" value="${lc.momentCommentChance != null ? lc.momentCommentChance : 0.65}"/>
+          <div class="form-row"><label>回复你评论的概率 %</label>
+            <input type="number" data-cid="${c.id}" data-k="momentCommentChance" min="0" max="100" step="1" value="${Math.round(((lc.momentCommentChance != null ? lc.momentCommentChance : 0.65)||0)*100)}"/>
           </div>
           <label style="font-size:13px;display:flex;align-items:center;gap:8px;margin-top:6px">
             <input type="checkbox" data-cid="${c.id}" data-k="momentsSticker" ${lc.momentsSticker !== false ? 'checked' : ''}/>
@@ -3957,11 +3982,14 @@
             renderMailbox();
             // 对方回信：延迟更长，且标注 from:contact + 对方名字
             const cfg = Object.assign({}, DEFAULT_MAILBOX, state.mailboxConfig || {});
-            if (Math.random() < (cfg.replyChance || 0.55)) {
+            // 对齐 mochi：replyProb% + 回信延迟分钟区间
+            if (rollChance(cfg.replyChance != null ? cfg.replyChance : 0.55)) {
               const c = state.contacts.find(x => x.id === L.contactId);
               const pool = c ? getContactCardPool(c) : [];
               if (pool.length) {
-                const delay = 8000 + Math.random() * 22000; // 8~30 秒，避免“立马回”
+                const minM = Math.max(0.2, Number(cfg.replyMinMin) || 1);
+                const maxM = Math.max(minM, Number(cfg.replyMaxMin) || 30);
+                const delay = (minM + Math.random() * (maxM - minM)) * 60 * 1000;
                 setTimeout(() => {
                   if (!state.letters.find(x => x.id === L.id)) return;
                   L.replies.push({
@@ -3969,7 +3997,7 @@
                     time: Date.now(),
                     from: 'contact'
                   });
-                  L.read = false; // 对方新回信 → 未读
+                  L.read = false;
                   syncMailboxUnread();
                   saveData();
                   updateTabDots();
@@ -4005,8 +4033,10 @@
       <div class="form-row"><label>来信间隔最多（小时）</label><input type="number" id="mb-max-h" step="0.5" min="0.1" value="${cfg.maxIntervalH}"/></div>
       <div class="form-row"><label>信件最少字数</label><input type="number" id="mb-min-w" min="5" value="${cfg.minWords}"/></div>
       <div class="form-row"><label>信件最多字数</label><input type="number" id="mb-max-w" min="10" value="${cfg.maxWords}"/></div>
-      <div class="form-row"><label>对方回信概率 (0~1)</label><input type="number" id="mb-reply" step="0.01" min="0" max="1" value="${cfg.replyChance}"/></div>
-      <p style="font-size:11px;color:var(--muted)">信件内容来自联系人字卡库拼接。间隔按小时计算。</p>`;
+      <div class="form-row"><label>对方回信概率 %</label><input type="number" id="mb-reply" step="1" min="0" max="100" value="${Math.round((cfg.replyChance||0)*100)}"/></div>
+      <div class="form-row"><label>对方回信最少延迟（分钟）</label><input type="number" id="mb-reply-min" step="0.5" min="0.2" value="${cfg.replyMinMin != null ? cfg.replyMinMin : 1}"/></div>
+      <div class="form-row"><label>对方回信最多延迟（分钟）</label><input type="number" id="mb-reply-max" step="0.5" min="0.2" value="${cfg.replyMaxMin != null ? cfg.replyMaxMin : 30}"/></div>
+      <p style="font-size:11px;color:var(--muted)">对齐 mochi：回信概率为百分比；对方回信在设定分钟区间后送达。信件内容来自字卡库拼接。</p>`;
     modalOverlay.classList.remove('hidden');
   }
 
@@ -4718,7 +4748,7 @@
     ensureContactShape(contact);
     const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
     const chance = lc.avatarSwapChance != null ? Number(lc.avatarSwapChance) : 0.08;
-    if (Math.random() > chance) return;
+    if (!rollChance(chance)) return;
 
     const pool = getContactAvatarPool(contact);
     const mePool = getUserAvatarPool();
@@ -4812,7 +4842,7 @@
     if (!contact || state.chatContactId !== contact.id) return;
     const lc = Object.assign({}, DEFAULT_LISTEN, contact.listenConfig || {});
     const chance = lc.askChance != null ? Number(lc.askChance) : 0.1;
-    if (Math.random() > chance) return;
+    if (!rollChance(chance)) return;
     if (messageList.querySelector('.ask-card')) return;
 
     // 仅使用用户自定义查岗题；无自定义则不出题（已移除系统默认题）
@@ -5231,7 +5261,7 @@
       <div class="form-row"><label>回复最小延迟(秒)</label><input type="number" id="gs-min" step="0.5" value="${s.minDelay}"/></div>
       <div class="form-row"><label>回复最大延迟(秒)</label><input type="number" id="gs-max" step="0.5" value="${s.maxDelay}"/></div>
       <div class="form-row"><label>每次最多回复人数</label><input type="number" id="gs-count" min="1" max="5" value="${s.maxReplies}"/></div>
-      <div class="form-row"><label>成员回复概率</label><input type="number" id="gs-reply" step="0.01" min="0" max="1" value="${lc.replyChance}"/></div>
+      <div class="form-row"><label>成员回复概率 %</label><input type="number" id="gs-reply" step="1" min="0" max="100" value="${Math.round((lc.replyChance||0.85)*100)}"/></div>
       <p style="font-size:11px;color:var(--muted)">成员将从各自字卡库中随机回复</p>`;
     modalOverlay.classList.remove('hidden');
     $('#gs-pick-av')?.addEventListener('click', () => {
@@ -5352,7 +5382,7 @@
     let replied = 0;
     shuffled.forEach(c => {
       if (replied >= maxN) return;
-      if (Math.random() > replyChance) return;
+      if (!rollChance(replyChance)) return;
       replied++;
       const delay = randomDelay(s.minDelay || 1.5, s.maxDelay || 4);
       setTimeout(() => {
@@ -5407,8 +5437,8 @@
         ${pool.map((src, i) => `<div class="avatar-pool-item" style="background-image:url(${src})"><button type="button" data-del="${i}">✕</button></div>`).join('')}
         <button type="button" class="avatar-pool-add" id="pool-add">＋</button>
       </div>
-      ${!isUser ? `<div class="form-row" style="margin-top:12px"><label>随机更换概率 (0~1)</label>
-        <input type="number" id="pool-chance" min="0" max="1" step="0.01" value="${(c.listenConfig && c.listenConfig.avatarSwapChance != null) ? c.listenConfig.avatarSwapChance : 0.08}"/></div>` : ''}`;
+      ${!isUser ? `<div class="form-row" style="margin-top:12px"><label>随机更换概率 %</label>
+        <input type="number" id="pool-chance" min="0" max="100" step="1" value="${Math.round(((c.listenConfig && c.listenConfig.avatarSwapChance != null) ? c.listenConfig.avatarSwapChance : 0.08)*100)}"/></div>` : ''}`;
     modalOverlay.classList.remove('hidden');
     $('#pool-add')?.addEventListener('click', () => {
       state.uploadTarget = isUser ? 'user-pool' : 'contact-pool';
@@ -5422,7 +5452,7 @@
           const v = parseFloat($('#pool-chance')?.value);
           if (!isNaN(v)) {
             ensureContactShape(c);
-            c.listenConfig.avatarSwapChance = Math.max(0, Math.min(1, v));
+            c.listenConfig.avatarSwapChance = Math.max(0, Math.min(1, v / 100));
           }
         }
         saveData();
@@ -5460,17 +5490,8 @@
     });
   }
 
-  document.addEventListener('click', e => {
-    if (e.target?.id === 'cs-save' || e.target?.closest?.('#cs-save')) {
-      const c = state.contacts.find(x => x.id === state.chatContactId);
-      if (!c) return;
-      ensureContactShape(c);
-      const ask = parseFloat($('#cs-ask-chance')?.value);
-      if (!isNaN(ask)) c.listenConfig.askChance = Math.max(0, Math.min(1, ask));
-      const avc = parseFloat($('#pool-chance')?.value);
-      if (!isNaN(avc)) c.listenConfig.avatarSwapChance = Math.max(0, Math.min(1, avc));
-    }
-  }, true);
+  // 注意：联系人设置保存统一走 openChatSettings 内 #cs-save（百分比→0~1）
+  // 此处不再二次写入，避免把「10%」误存成 1.0（100%）
 
   // 扩展 proactive：头像更换 + 查岗
   const _sp = scheduleProactiveMessages;
