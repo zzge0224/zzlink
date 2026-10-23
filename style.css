@@ -505,7 +505,7 @@ html, body { height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI
 }
 .discover-item:active { background:var(--accent-soft); }
 .discover-icon { font-size:22px; width:28px; text-align:center; }
-.discover-label { flex:1; }
+.discover-label, .discover-text { flex:1; }
 .discover-arrow { color:var(--muted); font-size:18px; }
 .music-subpage { padding:12px 16px; }
 .music-subpage.hidden { display:none; }

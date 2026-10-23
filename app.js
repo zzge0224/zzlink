@@ -673,20 +673,23 @@
     showInAppPopup._t = setTimeout(() => layer.classList.add('hidden'), 4500);
   }
 
+  function msgNotifyBody(msg) {
+    if (!msg) return '[新消息]';
+    if (msg.type === 'sticker') return '[表情]';
+    if (msg.type === 'image') return '[图片]';
+    if (msg.type === 'listen_invite') return '[一起听邀请]';
+    if (msg.type === 'poke' || msg.type === 'system') return msg.text || '[系统消息]';
+    if (msg.text) return String(msg.text).slice(0, 80);
+    try { return getPreviewText(msg) || '[新消息]'; } catch (_) { return '[新消息]'; }
+  }
+
   function maybeBrowserNotify(contact, msg) {
     try {
-      const viewingThis = state.chatContactId === (contact && contact.id);
-      // 站内弹窗：只要不在该会话就提示（即使页面在前台）
+      const viewingThis = state.chatContactId === (contact && contact.id)
+        && document.visibilityState === 'visible';
+      const body = msgNotifyBody(msg);
+      // 站内弹窗：不在该会话、或页面在后台时
       if (!viewingThis && contact) {
-        let body = '[新消息]';
-        if (msg) {
-          if (msg.type === 'sticker') body = '[表情]';
-          else if (msg.type === 'image') body = '[图片]';
-          else if (msg.type === 'listen_invite') body = '[一起听邀请]';
-          else if (msg.type === 'poke' || msg.type === 'system') body = msg.text || body;
-          else if (msg.text) body = String(msg.text).slice(0, 60);
-          else body = getPreviewText(msg) || body;
-        }
         showInAppPopup({
           title: contact.name || '联系人',
           body,
@@ -694,38 +697,55 @@
           kind: 'chat'
         });
       }
+      // 系统通知
       if (!state.notifyEnabled) return;
       if (typeof Notification === 'undefined') return;
       if (Notification.permission !== 'granted') return;
-      if (document.visibilityState === 'visible' && viewingThis) return;
+      // 正在看这个聊天且前台 → 不弹系统通知
+      if (viewingThis) return;
       const title = (contact && contact.name) ? contact.name : '字笺';
-      let body = '[新消息]';
-      if (msg) {
-        if (msg.type === 'sticker') body = '[表情]';
-        else if (msg.type === 'image') body = '[图片]';
-        else if (msg.type === 'poke' || msg.type === 'system') body = msg.text || body;
-        else if (msg.text) body = String(msg.text).slice(0, 80);
-        else body = getPreviewText(msg) || body;
-      }
-      const tag = 'zijian-' + (contact && contact.id) + '-' + (msg && msg.id ? msg.id : Date.now());
+      const tag = 'zijian-' + ((contact && contact.id) || 'x') + '-' + ((msg && msg.id) || Date.now());
       if (document.visibilityState !== 'visible') {
-        document.title = '（新消息）' + title;
+        try { document.title = '（新消息）' + title; } catch (_) {}
       }
-      const n = new Notification(title, {
-        body,
-        tag,
-        renotify: true,
-        silent: false
-      });
-      n.onclick = function () {
-        try { window.focus(); } catch (_) {}
-        n.close();
-        if (contact && contact.id) {
-          switchPage('chat');
-          enterChat(contact.id);
-        }
+      const opts = { body, tag, renotify: true, silent: false };
+      // 优先走 Service Worker（后台更稳）；失败再回退页面 Notification
+      const showViaPage = function () {
+        try {
+          const n = new Notification(title, opts);
+          n.onclick = function () {
+            try { window.focus(); } catch (_) {}
+            try { n.close(); } catch (_) {}
+            if (contact && contact.id) {
+              switchPage('chat');
+              enterChat(contact.id);
+            }
+          };
+        } catch (e) { console.warn('Notification', e); }
       };
+      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(function (reg) {
+          if (reg && reg.showNotification) {
+            return reg.showNotification(title, Object.assign({
+              data: { contactId: contact && contact.id }
+            }, opts)).catch(showViaPage);
+          }
+          showViaPage();
+        }).catch(showViaPage);
+      } else {
+        showViaPage();
+      }
     } catch (e) { console.warn('notify', e); }
+  }
+
+  function registerNotifySW() {
+    if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+    return navigator.serviceWorker.register('./sw.js').then(function (reg) {
+      return reg;
+    }).catch(function (e) {
+      console.warn('sw register', e);
+      return null;
+    });
   }
 
   function requestNotifyPermission() {
@@ -733,12 +753,25 @@
       alert('当前浏览器不支持系统通知');
       return Promise.resolve(false);
     }
-    return Notification.requestPermission().then(function (p) {
+    return registerNotifySW().then(function () {
+      return Notification.requestPermission();
+    }).then(function (p) {
       state.notifyEnabled = (p === 'granted');
       saveData();
       updateNotifyUI();
-      if (p === 'granted') alert('已开启：离开页面时有新消息会尝试弹出通知');
-      else alert('未获得通知权限，可在浏览器设置中允许本站通知');
+      if (p === 'granted') {
+        // 立即发一条测试通知，方便确认权限真的生效
+        try {
+          const n = new Notification('字笺', {
+            body: '通知已开启。离开本页时，联系人新消息会尝试提醒你。',
+            tag: 'zijian-test'
+          });
+          setTimeout(function () { try { n.close(); } catch (_) {} }, 4000);
+        } catch (_) {}
+        alert('已开启通知。\n说明：手机系统在锁屏/杀后台后可能仍无法送达（浏览器限制）。请尽量保持页面在后台标签中，不要上滑清掉。');
+      } else {
+        alert('未获得通知权限，请在浏览器「网站设置」中允许通知。');
+      }
       return state.notifyEnabled;
     });
   }
@@ -3081,37 +3114,67 @@
     }, 45000 + Math.random() * 30000);
   }
 
-  function scheduleProactiveMessages() {
-    if (state.proactiveTimer) clearInterval(state.proactiveTimer);
+  function runProactiveTick(forceCatchUp) {
     if (!state.lastProactiveAt) state.lastProactiveAt = {};
-    // 每分钟检查一次
-    state.proactiveTimer = setInterval(() => {
-      const now = Date.now();
-      state.contacts.forEach(c => {
+    const now = Date.now();
+    (state.contacts || []).forEach(c => {
+      try {
+        ensureContactShape(c);
         const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
         const intervalMin = Number(lc.proactiveIntervalMin);
         if (!intervalMin || intervalMin <= 0) return;
+        const needMs = intervalMin * 60 * 1000;
         const last = state.lastProactiveAt[c.id] || 0;
-        if (now - last < intervalMin * 60 * 1000) return;
+        if (now - last < needMs) return;
         state.lastProactiveAt[c.id] = now;
-        // 概率发红包/转账
-        tryContactSendMoney(c);
+        try {
+          tryRandomAvatarSwap(c);
+        } catch (_) {}
+        try {
+          tryContactSendMoney(c);
+        } catch (_) {}
+        if (state.chatContactId === c.id) {
+          try { tryContactAsk(c); } catch (_) {}
+        }
+        try {
+          if ((state.songs || []).length) tryContactListenInvite(c);
+        } catch (_) {}
         const pool = getContactCardPool(c);
         const stickers = state.stickers || [];
-        let msg;
+        let msg = null;
         if (stickers.length && Math.random() < 0.25) {
           const st = stickers[Math.floor(Math.random() * stickers.length)];
           msg = { id: genId('m'), from: 'contact', type: 'sticker', stickerId: st.id, stickerData: st.data, time: now };
         } else if (pool.length) {
           msg = { id: genId('m'), from: 'contact', type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: now };
-        } else return;
+        }
+        if (!msg) {
+          saveData();
+          return;
+        }
         if (!state.chats[c.id]) state.chats[c.id] = [];
         state.chats[c.id].push(msg);
+        if (state.chatContactId === c.id) {
+          try { appendMessage(msg); } catch (_) {}
+        } else {
+          try { notifyContactMessage(c.id, msg); } catch (_) {}
+          try { renderChatList(); } catch (_) {}
+        }
+        try { maybeBrowserNotify(c, msg); } catch (_) {}
         saveData();
-        if (state.chatContactId === c.id) appendMessage(msg);
-        else renderChatList();
-      });
-    }, 60000);
+      } catch (err) {
+        console.warn('proactive', err);
+      }
+    });
+  }
+
+  function scheduleProactiveMessages() {
+    if (state.proactiveTimer) clearInterval(state.proactiveTimer);
+    if (!state.lastProactiveAt) state.lastProactiveAt = {};
+    // 15 秒检查一次（前台更准时）；后台由系统节流，回前台会补发
+    state.proactiveTimer = setInterval(() => runProactiveTick(false), 15000);
+    // 启动后稍晚跑一轮，避免与 init 抢写
+    setTimeout(() => runProactiveTick(true), 2000);
   }
 
   function daysBetween(dateStr) {
@@ -5080,10 +5143,28 @@
     scheduleLetterSystem();
     updateTabDots();
     updateNotifyUI();
+    if (state.notifyEnabled) { try { registerNotifySW(); } catch (_) {} }
+    // SW 点击打开会话
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', function (ev) {
+        const d = ev.data || {};
+        if (d.type === 'zijian-open-chat' && d.contactId) {
+          switchPage('chat');
+          enterChat(d.contactId);
+        }
+      });
+    }
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible') {
         document.title = '字笺 · ZiJian';
+        // 从后台回前台：立刻补跑主动消息（系统挂起定时器时的补偿）
+        try { runProactiveTick(true); } catch (_) {}
+        try { scheduleLetterSystem && scheduleLetterSystem(); } catch (_) {}
       }
+    });
+    // 部分浏览器用 pagehide/pageshow
+    window.addEventListener('pageshow', function () {
+      try { runProactiveTick(true); } catch (_) {}
     });
   }
 
@@ -5848,44 +5929,8 @@
   // 注意：联系人设置保存统一走 openChatSettings 内 #cs-save（百分比→0~1）
   // 此处不再二次写入，避免把「10%」误存成 1.0（100%）
 
-  // 扩展 proactive：头像更换 + 查岗
-  const _sp = scheduleProactiveMessages;
-  scheduleProactiveMessages = function () {
-    if (state.proactiveTimer) clearInterval(state.proactiveTimer);
-    if (!state.lastProactiveAt) state.lastProactiveAt = {};
-    state.proactiveTimer = setInterval(() => {
-      const now = Date.now();
-      state.contacts.forEach(c => {
-        tryRandomAvatarSwap(c);
-        const lc = Object.assign({}, DEFAULT_LISTEN, c.listenConfig || {});
-        const intervalMin = Number(lc.proactiveIntervalMin);
-        if (!intervalMin || intervalMin <= 0) return;
-        const last = state.lastProactiveAt[c.id] || 0;
-        if (now - last < intervalMin * 60 * 1000) return;
-        state.lastProactiveAt[c.id] = now;
-        tryContactSendMoney(c);
-        if (state.chatContactId === c.id) tryContactAsk(c);
-        // 有概率邀请一起听（有歌曲时）
-        if ((state.songs || []).length && tryContactListenInvite(c)) {
-          /* 本轮已发邀请，可再发文字也可跳过 */
-        }
-        const pool = getContactCardPool(c);
-        const stickers = state.stickers || [];
-        let msg;
-        if (stickers.length && Math.random() < 0.25) {
-          const st = stickers[Math.floor(Math.random() * stickers.length)];
-          msg = { id: genId('m'), from: 'contact', type: 'sticker', stickerId: st.id, stickerData: st.data, time: now };
-        } else if (pool.length) {
-          msg = { id: genId('m'), from: 'contact', type: 'text', text: pool[Math.floor(Math.random() * pool.length)], time: now };
-        } else return;
-        if (!state.chats[c.id]) state.chats[c.id] = [];
-        state.chats[c.id].push(msg);
-        saveData();
-        if (state.chatContactId === c.id) appendMessage(msg);
-        else renderChatList();
-      });
-    }, 60000);
-  };
+  // proactive 已合并到 scheduleProactiveMessages / runProactiveTick
+
 
   // persist userAvatarPool
   const _serialize = (typeof serializeState === 'function') ? null : null;
